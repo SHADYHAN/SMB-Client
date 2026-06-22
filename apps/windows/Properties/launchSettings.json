@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "Rynat Windows Client (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "Rynat Windows Client (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}

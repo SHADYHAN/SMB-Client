@@ -1,0 +1,211 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <SolidColorBrush x:Key="RynatCanvasBrush" Color="#FFFFFFFF" />
+    <SolidColorBrush x:Key="RynatSidebarBrush" Color="#FFFFFFFF" />
+    <SolidColorBrush x:Key="RynatChromeBrush" Color="#FFFFFFFF" />
+    <SolidColorBrush x:Key="RynatSurfaceBrush" Color="#FFFFFFFF" />
+    <SolidColorBrush x:Key="RynatPanelBrush" Color="#FFFFFFFF" />
+    <SolidColorBrush x:Key="RynatLineBrush" Color="#FFECEFF5" />
+    <SolidColorBrush x:Key="RynatLineSoftBrush" Color="#00FFFFFF" />
+    <SolidColorBrush x:Key="RynatInkBrush" Color="#FF111827" />
+    <SolidColorBrush x:Key="RynatMutedBrush" Color="#FF64748B" />
+    <SolidColorBrush x:Key="RynatFaintBrush" Color="#FF94A3B8" />
+    <SolidColorBrush x:Key="RynatAccentBrush" Color="#FF2563C7" />
+    <SolidColorBrush x:Key="RynatSelectionBrush" Color="#FFD4E6FF" />
+    <SolidColorBrush x:Key="RynatSelectionStrongBrush" Color="#FFBCD8FF" />
+    <SolidColorBrush x:Key="RynatHoverBrush" Color="#FFEFF6FF" />
+    <SolidColorBrush x:Key="RynatFolderBrush" Color="#FF249469" />
+    <SolidColorBrush x:Key="RynatWarningBrush" Color="#FFD8B214" />
+    <SolidColorBrush x:Key="RynatGlassBrush" Color="#DDE4E4E4" />
+    <SolidColorBrush x:Key="RynatGlassStrongBrush" Color="#FFFFFFFF" />
+    <SolidColorBrush x:Key="RynatLoginFieldBrush" Color="#E6FFFFFF" />
+    <SolidColorBrush x:Key="RynatLoginFieldFocusedBrush" Color="#FFFFFFFF" />
+    <SolidColorBrush x:Key="RynatLoginFieldBorderBrush" Color="#DFFFFFFF" />
+    <SolidColorBrush x:Key="RynatLoginFieldFocusedBorderBrush" Color="#F2FFFFFF" />
+
+    <Thickness x:Key="RynatWindowPadding">0</Thickness>
+    <Thickness x:Key="RynatPanelPadding">14</Thickness>
+
+    <Style x:Key="RynatToolbarButtonStyle" TargetType="Button">
+        <Setter Property="MinWidth" Value="32" />
+        <Setter Property="MinHeight" Value="32" />
+        <Setter Property="Padding" Value="8,4" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="Transparent" />
+        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="Foreground" Value="{ThemeResource RynatMutedBrush}" />
+    </Style>
+
+    <Style x:Key="RynatSearchTextBoxStyle" TargetType="TextBox">
+        <Setter Property="Width" Value="236" />
+        <Setter Property="Height" Value="32" />
+        <Setter Property="Padding" Value="12,4" />
+        <Setter Property="Background" Value="{ThemeResource RynatChromeBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource RynatLineBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="9" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="Foreground" Value="{ThemeResource RynatInkBrush}" />
+    </Style>
+
+    <Style x:Key="RynatSidebarTabButtonStyle" TargetType="Button">
+        <Setter Property="MinHeight" Value="26" />
+        <Setter Property="Padding" Value="8,2" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="CornerRadius" Value="6" />
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="Foreground" Value="{ThemeResource RynatMutedBrush}" />
+    </Style>
+
+    <Style x:Key="RynatSecondaryButtonStyle" TargetType="Button">
+        <Setter Property="MinHeight" Value="34" />
+        <Setter Property="Padding" Value="13,6" />
+        <Setter Property="Background" Value="{ThemeResource RynatHoverBrush}" />
+        <Setter Property="BorderBrush" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="CornerRadius" Value="9" />
+        <Setter Property="Foreground" Value="{ThemeResource RynatInkBrush}" />
+    </Style>
+
+    <Style x:Key="RynatUserMenuButtonStyle" TargetType="Button">
+        <Setter Property="MinHeight" Value="34" />
+        <Setter Property="Padding" Value="10,6" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="CornerRadius" Value="9" />
+        <Setter Property="Foreground" Value="{ThemeResource RynatInkBrush}" />
+    </Style>
+
+    <Style x:Key="RynatPreviewActionButtonStyle" TargetType="Button" BasedOn="{StaticResource RynatSecondaryButtonStyle}">
+        <Setter Property="MinHeight" Value="34" />
+        <Setter Property="Padding" Value="12,5" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="Background" Value="{ThemeResource RynatGlassStrongBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource RynatLineBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="9" />
+    </Style>
+
+    <Style x:Key="RynatPathButtonStyle" TargetType="Button">
+        <Setter Property="MinHeight" Value="22" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="CornerRadius" Value="5" />
+        <Setter Property="Foreground" Value="{ThemeResource RynatFaintBrush}" />
+    </Style>
+
+    <Style x:Key="RynatStatusButtonStyle" TargetType="Button">
+        <Setter Property="MinHeight" Value="22" />
+        <Setter Property="Padding" Value="10,2" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="CornerRadius" Value="7" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="Foreground" Value="{ThemeResource RynatMutedBrush}" />
+    </Style>
+
+    <Style x:Key="RynatPrimaryButtonStyle" TargetType="Button">
+        <Setter Property="MinHeight" Value="44" />
+        <Setter Property="Padding" Value="16,9" />
+        <Setter Property="Background" Value="{ThemeResource RynatAccentBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource RynatAccentBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="13" />
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Foreground" Value="White" />
+    </Style>
+
+    <Style x:Key="RynatLoginTextBoxStyle" TargetType="TextBox">
+        <Setter Property="MinWidth" Value="0" />
+        <Setter Property="MinHeight" Value="0" />
+        <Setter Property="Height" Value="30" />
+        <Setter Property="Margin" Value="0,5,0,0" />
+        <Setter Property="Padding" Value="0,3,0,0" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="Foreground" Value="{ThemeResource RynatInkBrush}" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+    </Style>
+
+    <Style x:Key="RynatLoginPasswordBoxStyle" TargetType="PasswordBox">
+        <Setter Property="MinWidth" Value="0" />
+        <Setter Property="MinHeight" Value="0" />
+        <Setter Property="Height" Value="30" />
+        <Setter Property="Margin" Value="0,5,0,0" />
+        <Setter Property="Padding" Value="0,3,0,0" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="Foreground" Value="{ThemeResource RynatInkBrush}" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+    </Style>
+
+    <Style x:Key="RynatSectionTitleStyle" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Foreground" Value="{ThemeResource RynatInkBrush}" />
+    </Style>
+
+    <Style x:Key="RynatMutedTextStyle" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="Foreground" Value="{ThemeResource RynatMutedBrush}" />
+        <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+    </Style>
+
+    <Style x:Key="RynatLoginFieldIconStyle" TargetType="FontIcon">
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="Foreground" Value="{ThemeResource RynatFaintBrush}" />
+        <Setter Property="HorizontalAlignment" Value="Left" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="Margin" Value="15,0,0,0" />
+        <Setter Property="IsHitTestVisible" Value="False" />
+    </Style>
+
+    <Style x:Key="RynatListViewItemStyle" TargetType="ListViewItem">
+        <Setter Property="MinHeight" Value="30" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="Transparent" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="UseSystemFocusVisuals" Value="False" />
+        <Setter Property="FocusVisualPrimaryThickness" Value="0" />
+        <Setter Property="FocusVisualSecondaryThickness" Value="0" />
+    </Style>
+
+    <Style x:Key="RynatDirectoryListViewItemStyle" TargetType="ListViewItem" BasedOn="{StaticResource RynatListViewItemStyle}">
+        <Setter Property="MinHeight" Value="36" />
+        <Setter Property="Margin" Value="8,0" />
+        <Setter Property="CornerRadius" Value="8" />
+    </Style>
+
+    <Style x:Key="RynatSidebarListViewItemStyle" TargetType="ListViewItem" BasedOn="{StaticResource RynatListViewItemStyle}">
+        <Setter Property="MinHeight" Value="34" />
+        <Setter Property="Margin" Value="10,0" />
+    </Style>
+
+    <Style x:Key="RynatServerProfileListViewItemStyle" TargetType="ListViewItem" BasedOn="{StaticResource RynatListViewItemStyle}">
+        <Setter Property="MinHeight" Value="48" />
+        <Setter Property="Margin" Value="4,2" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="CornerRadius" Value="10" />
+    </Style>
+</ResourceDictionary>

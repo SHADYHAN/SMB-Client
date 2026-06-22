@@ -1,0 +1,18 @@
+/target/
+/build/
+/.DS_Store
+**/.DS_Store
+*.xcuserdata/
+*.xcuserstate
+DerivedData/
+bin/
+obj/
+
+# 工具与本地缓存目录（不应进入仓库）
+/.claude/
+/.agents/
+/.superpowers/
+
+# 临时文件
+/tmp_*.cs
+

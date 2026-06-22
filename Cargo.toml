@@ -1,0 +1,22 @@
+[workspace]
+members = [
+    "crates/rynat-core",
+]
+resolver = "3"
+
+[workspace.package]
+edition = "2024"
+version = "0.1.0"
+authors = ["shady"]
+license = "Proprietary"
+
+[workspace.dependencies]
+chrono = { version = "0.4", default-features = false, features = ["clock", "serde"] }
+rusqlite = { version = "0.31", features = ["bundled"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+smb2 = "0.11"
+thiserror = "2"
+tokio = { version = "1", features = ["full"] }
+url = "2"
+uuid = { version = "1", features = ["v4", "v5"] }
