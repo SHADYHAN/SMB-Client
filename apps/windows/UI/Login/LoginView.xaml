@@ -25,6 +25,11 @@
                 <TextBlock Text="服务器"
                            Foreground="{StaticResource TextSecondaryBrush}"
                            Margin="0,0,0,6" />
+                <ComboBox ItemsSource="{Binding ServerProfiles}"
+                          SelectedItem="{Binding SelectedProfile, Mode=TwoWay}"
+                          DisplayMemberPath="DisplayName"
+                          MinHeight="34"
+                          Margin="0,0,0,8" />
                 <TextBox Text="{Binding ServerHost, UpdateSourceTrigger=PropertyChanged}"
                          KeyDown="LoginInput_OnKeyDown"
                          Margin="0,0,0,14" />
@@ -42,7 +47,18 @@
                 <PasswordBox x:Name="PasswordInput"
                              PasswordChanged="PasswordInput_OnPasswordChanged"
                              KeyDown="LoginInput_OnKeyDown"
-                             Margin="0,0,0,20" />
+                             Margin="0,0,0,12" />
+
+                <StackPanel Orientation="Horizontal"
+                            Margin="0,0,0,18">
+                    <CheckBox Content="记住密码"
+                              IsChecked="{Binding RememberPassword, Mode=TwoWay}"
+                              VerticalAlignment="Center" />
+                    <CheckBox Content="自动登录"
+                              IsChecked="{Binding AutoLogin, Mode=TwoWay}"
+                              VerticalAlignment="Center"
+                              Margin="18,0,0,0" />
+                </StackPanel>
 
                 <Button Content="登录"
                         Command="{Binding LoginCommand}"

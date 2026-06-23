@@ -10,5 +10,7 @@ public interface IBootstrapService
 public sealed record BootstrapState(
     IReadOnlyList<ServerProfile> ServerProfiles,
     ServerProfile? ActiveServer,
-    string? ActiveUsername
+    string? ActiveUsername,
+    bool RememberPassword,
+    bool AutoLogin
 );

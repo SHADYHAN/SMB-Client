@@ -1,4 +1,6 @@
+using System.Collections.ObjectModel;
 using System.Windows.Input;
+using Rynat.WindowsClient.Domain;
 using Rynat.WindowsClient.UI.Infrastructure;
 
 namespace Rynat.WindowsClient.UI.Login;
@@ -6,11 +8,31 @@ namespace Rynat.WindowsClient.UI.Login;
 public sealed class LoginViewModel : ObservableObject
 {
     private ICommand _loginCommand = new RelayCommand(() => { });
+    private ServerProfile? _selectedProfile;
     private string _serverHost = "192.168.102.136";
     private string _username = string.Empty;
     private string _password = string.Empty;
     private string _message = "请输入账号密码登录共享网盘";
+    private bool _rememberPassword = true;
+    private bool _autoLogin;
     private bool _isBusy;
+
+    public ObservableCollection<ServerProfile> ServerProfiles { get; } = new();
+
+    public ServerProfile? SelectedProfile
+    {
+        get => _selectedProfile;
+        set
+        {
+            if (SetProperty(ref _selectedProfile, value) && value is not null)
+            {
+                ServerHost = value.Host;
+                Username = value.Username ?? Username;
+                RememberPassword = value.HasStoredCredential;
+                AutoLogin = value.AutoLogin;
+            }
+        }
+    }
 
     public string ServerHost
     {
@@ -54,6 +76,24 @@ public sealed class LoginViewModel : ObservableObject
         set => SetProperty(ref _message, value);
     }
 
+    public bool RememberPassword
+    {
+        get => _rememberPassword;
+        set
+        {
+            if (SetProperty(ref _rememberPassword, value) && !value)
+            {
+                AutoLogin = false;
+            }
+        }
+    }
+
+    public bool AutoLogin
+    {
+        get => _autoLogin;
+        set => SetProperty(ref _autoLogin, value && RememberPassword);
+    }
+
     public bool IsBusy
     {
         get => _isBusy;
@@ -76,6 +116,50 @@ public sealed class LoginViewModel : ObservableObject
                 RefreshLoginCommand();
             }
         }
+    }
+
+    public void LoadServerProfiles(
+        IReadOnlyList<ServerProfile> profiles,
+        ServerProfile? activeProfile,
+        string? activeUsername,
+        bool rememberPassword,
+        bool autoLogin
+    )
+    {
+        ServerProfiles.Clear();
+        foreach (var profile in profiles)
+        {
+            ServerProfiles.Add(profile);
+        }
+
+        SelectedProfile = activeProfile is null
+            ? ServerProfiles.FirstOrDefault()
+            : ServerProfiles.FirstOrDefault(profile => profile.Id == activeProfile.Id) ?? activeProfile;
+
+        if (SelectedProfile is not null)
+        {
+            ServerHost = SelectedProfile.Host;
+            Username = activeUsername ?? SelectedProfile.Username ?? Username;
+        }
+
+        RememberPassword = rememberPassword || SelectedProfile?.HasStoredCredential == true;
+        AutoLogin = autoLogin || SelectedProfile?.AutoLogin == true;
+    }
+
+    public void UpsertProfile(ServerProfile profile)
+    {
+        var existing = ServerProfiles.FirstOrDefault(item => item.Id == profile.Id);
+        if (existing is not null)
+        {
+            var index = ServerProfiles.IndexOf(existing);
+            ServerProfiles[index] = profile;
+        }
+        else
+        {
+            ServerProfiles.Add(profile);
+        }
+
+        SelectedProfile = profile;
     }
 
     private void RefreshLoginCommand()

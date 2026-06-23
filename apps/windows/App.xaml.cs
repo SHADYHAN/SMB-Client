@@ -5,6 +5,7 @@ using Rynat.WindowsClient.Services.Bootstrap;
 using Rynat.WindowsClient.Services.Directory;
 using Rynat.WindowsClient.Services.Links;
 using Rynat.WindowsClient.Services.Preview;
+using Rynat.WindowsClient.Services.Profiles;
 using Rynat.WindowsClient.Services.Smb;
 using Rynat.WindowsClient.UI.Shell;
 
@@ -22,6 +23,7 @@ public partial class App : Application
         var directoryService = new DirectoryService(bridge);
         var quickLinkService = new QuickLinkService(bridge);
         var previewService = new PreviewService(bridge);
+        var serverProfileService = new ServerProfileService(bridge);
         var shellDragDropService = new WindowsShellDragDropService();
 
         var viewModel = new ShellViewModel(
@@ -30,6 +32,7 @@ public partial class App : Application
             directoryService,
             quickLinkService,
             previewService,
+            serverProfileService,
             shellDragDropService
         );
 

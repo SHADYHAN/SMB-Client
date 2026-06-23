@@ -4,6 +4,7 @@ using Rynat.WindowsClient.Services.Bootstrap;
 using Rynat.WindowsClient.Services.Directory;
 using Rynat.WindowsClient.Services.Links;
 using Rynat.WindowsClient.Services.Preview;
+using Rynat.WindowsClient.Services.Profiles;
 using Rynat.WindowsClient.Services.Smb;
 using Rynat.WindowsClient.UI.Files;
 using Rynat.WindowsClient.UI.Infrastructure;
@@ -21,6 +22,7 @@ public sealed class ShellViewModel : ObservableObject
     private readonly IDirectoryService _directoryService;
     private readonly IQuickLinkService _quickLinkService;
     private readonly IPreviewService _previewService;
+    private readonly IServerProfileService _serverProfileService;
     private readonly IWindowsShellDragDropService _shellDragDropService;
     private ServerSession? _session;
     private string? _loadingDirectoryKey;
@@ -32,6 +34,7 @@ public sealed class ShellViewModel : ObservableObject
         IDirectoryService directoryService,
         IQuickLinkService quickLinkService,
         IPreviewService previewService,
+        IServerProfileService serverProfileService,
         IWindowsShellDragDropService shellDragDropService
     )
     {
@@ -40,6 +43,7 @@ public sealed class ShellViewModel : ObservableObject
         _directoryService = directoryService;
         _quickLinkService = quickLinkService;
         _previewService = previewService;
+        _serverProfileService = serverProfileService;
         _shellDragDropService = shellDragDropService;
 
         Login.LoginCommand = new AsyncRelayCommand(LoginAsync, CanLogin);
@@ -68,11 +72,13 @@ public sealed class ShellViewModel : ObservableObject
         try
         {
             var state = await _bootstrapService.LoadAsync();
-            if (state.ActiveServer is not null)
-            {
-                Login.ServerHost = state.ActiveServer.Host;
-                Login.Username = state.ActiveUsername ?? state.ActiveServer.Username ?? "";
-            }
+            Login.LoadServerProfiles(
+                state.ServerProfiles,
+                state.ActiveServer,
+                state.ActiveUsername,
+                state.RememberPassword,
+                state.AutoLogin
+            );
 
             Status.Message = state.ServerProfiles.Count == 0
                 ? "未找到已保存服务器，已填入默认服务器地址。"
@@ -140,6 +146,7 @@ public sealed class ShellViewModel : ObservableObject
             }
 
             _session = result.Session;
+            await SaveLoginProfileAsync();
             Navigation.LoadShares(_session.Shares);
             IsLoggedIn = true;
             Login.Password = "";
@@ -160,6 +167,40 @@ public sealed class ShellViewModel : ObservableObject
         {
             Login.IsBusy = false;
         }
+    }
+
+
+    private async Task SaveLoginProfileAsync()
+    {
+        var saveResult = await _serverProfileService.SaveLoginAsync(
+            MatchingSelectedProfile(),
+            Login.ServerHost,
+            Login.Username,
+            Login.Password,
+            Login.RememberPassword,
+            Login.AutoLogin
+        );
+
+        if (saveResult.Succeeded && saveResult.Profile is not null)
+        {
+            Login.UpsertProfile(saveResult.Profile);
+            return;
+        }
+
+        Status.Message = saveResult.Summary;
+    }
+
+    private ServerProfile? MatchingSelectedProfile()
+    {
+        var selected = Login.SelectedProfile;
+        if (selected is null)
+        {
+            return null;
+        }
+
+        return selected.Host.Equals(Login.ServerHost.Trim(), StringComparison.OrdinalIgnoreCase)
+            ? selected
+            : null;
     }
 
     private bool CanLogin()

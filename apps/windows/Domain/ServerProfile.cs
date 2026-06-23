@@ -4,5 +4,7 @@ public sealed record ServerProfile(
     string Id,
     string DisplayName,
     string Host,
-    string? Username
+    string? Username,
+    bool HasStoredCredential = false,
+    bool AutoLogin = false
 );

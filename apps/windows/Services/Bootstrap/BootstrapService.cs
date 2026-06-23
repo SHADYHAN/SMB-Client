@@ -22,14 +22,26 @@ public sealed class BootstrapService : IBootstrapService
             var snapshot = _bridge.AppBootstrap();
 
             return new BootstrapState(
-                snapshot.ServerProfiles.Select(MapProfile).ToArray(),
-                snapshot.ActiveServer is null ? null : MapProfile(snapshot.ActiveServer),
-                snapshot.ActiveCredential?.Username
+                snapshot.ServerProfiles.Select(profile => MapProfile(profile, CredentialFor(snapshot, profile.Id))).ToArray(),
+                snapshot.ActiveServer is null ? null : MapProfile(snapshot.ActiveServer, snapshot.ActiveCredential),
+                snapshot.ActiveCredential?.Username,
+                snapshot.ActiveCredential?.RememberPassword ?? false,
+                snapshot.ActiveCredential?.AutoLogin ?? false
             );
         }, cancellationToken);
     }
 
-    private static ServerProfile MapProfile(StoredServerProfile profile)
+    private static StoredServerCredential? CredentialFor(AppBootstrapState snapshot, string profileId)
+    {
+        return snapshot.ActiveCredential?.ServerProfileId == profileId
+            ? snapshot.ActiveCredential
+            : null;
+    }
+
+    private static ServerProfile MapProfile(
+        StoredServerProfile profile,
+        StoredServerCredential? credential
+    )
     {
         return new ServerProfile(
             profile.Id,
@@ -37,7 +49,9 @@ public sealed class BootstrapService : IBootstrapService
             profile.Endpoint.Port is null
                 ? profile.Endpoint.Host
                 : $"{profile.Endpoint.Host}:{profile.Endpoint.Port}",
-            profile.Username
+            profile.Username ?? credential?.Username,
+            credential is not null,
+            credential?.AutoLogin ?? false
         );
     }
 
