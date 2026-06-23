@@ -252,7 +252,7 @@ public sealed class FileDownloadService
         bool updateTaskState = true
     )
     {
-        var parentDirectory = BuildDragDirectoryCacheParent(session);
+        var parentDirectory = BuildDragDirectoryCacheParent(session, item);
         return DownloadDirectoryAsync(session, item, parentDirectory, task, cancellationToken, updateTaskState);
     }
 
@@ -264,7 +264,7 @@ public sealed class FileDownloadService
         bool updateTaskState = true
     )
     {
-        var parentDirectory = BuildDragDirectoryCacheParent(session);
+        var parentDirectory = BuildDragDirectoryCacheParent(session, item);
         return DownloadDirectory(session, item, parentDirectory, task, cancellationToken, updateTaskState);
     }
 
@@ -398,32 +398,27 @@ public sealed class FileDownloadService
 
     private static string BuildDragCachePath(WindowsServerSession session, DirectoryItemViewModel item)
     {
-        var dragDirectory = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "Rynat",
-            "DragDownloadCache",
-            session.Profile.Id
-        );
-        System.IO.Directory.CreateDirectory(dragDirectory);
-
-        var safeName = SafeFileName(item.Name);
-
-        return Path.Combine(
-            dragDirectory,
-            $"{Path.GetFileNameWithoutExtension(safeName)}-{StableCacheKey.FromParts(session.Profile.Id, item.ShareName, item.RemotePath, item.DisplayPath)}{Path.GetExtension(safeName)}"
-        );
+        var itemCacheDirectory = BuildDragItemCacheDirectory(session, item);
+        System.IO.Directory.CreateDirectory(itemCacheDirectory);
+        return Path.Combine(itemCacheDirectory, SafeFileName(item.Name));
     }
 
-    private static string BuildDragDirectoryCacheParent(WindowsServerSession session)
+    private static string BuildDragDirectoryCacheParent(WindowsServerSession session, DirectoryItemViewModel item)
     {
-        var dragDirectory = Path.Combine(
+        var itemCacheDirectory = BuildDragItemCacheDirectory(session, item);
+        System.IO.Directory.CreateDirectory(itemCacheDirectory);
+        return itemCacheDirectory;
+    }
+
+    private static string BuildDragItemCacheDirectory(WindowsServerSession session, DirectoryItemViewModel item)
+    {
+        return Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "Rynat",
             "DragDownloadCache",
-            session.Profile.Id
+            session.Profile.Id,
+            StableCacheKey.FromParts(session.Profile.Id, item.ShareName, item.RemotePath, item.DisplayPath)
         );
-        System.IO.Directory.CreateDirectory(dragDirectory);
-        return dragDirectory;
     }
 
     private static string SafeFileName(string name)

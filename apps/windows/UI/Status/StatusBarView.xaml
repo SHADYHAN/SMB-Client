@@ -1,0 +1,10 @@
+<UserControl x:Class="Rynat.WindowsClient.UI.Status.StatusBarView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Border Background="{StaticResource SubtleBackgroundBrush}"
+            Padding="12,0">
+        <TextBlock Text="{Binding Message}"
+                   Foreground="{StaticResource TextSecondaryBrush}"
+                   VerticalAlignment="Center" />
+    </Border>
+</UserControl>

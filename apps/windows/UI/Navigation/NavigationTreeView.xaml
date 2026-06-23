@@ -1,0 +1,26 @@
+<UserControl x:Class="Rynat.WindowsClient.UI.Navigation.NavigationTreeView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:navigation="clr-namespace:Rynat.WindowsClient.UI.Navigation">
+    <Border Background="{StaticResource PanelBackgroundBrush}"
+            Padding="12,14">
+        <DockPanel>
+            <TextBlock DockPanel.Dock="Top"
+                       Text="共享"
+                       FontWeight="SemiBold"
+                       Margin="4,0,0,12" />
+            <TreeView ItemsSource="{Binding Roots}"
+                      SelectedItemChanged="TreeView_OnSelectedItemChanged"
+                      BorderThickness="0"
+                      Background="Transparent">
+                <TreeView.Resources>
+                    <HierarchicalDataTemplate DataType="{x:Type navigation:NavigationNodeViewModel}"
+                                              ItemsSource="{Binding Children}">
+                        <TextBlock Text="{Binding Title}"
+                                   Padding="4,3" />
+                    </HierarchicalDataTemplate>
+                </TreeView.Resources>
+            </TreeView>
+        </DockPanel>
+    </Border>
+</UserControl>
