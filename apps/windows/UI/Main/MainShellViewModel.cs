@@ -299,6 +299,8 @@ public sealed class MainShellViewModel : ObservableObject, IDisposable
 
     public bool CanUploadFiles => _session is not null && CurrentPath != "/";
 
+    public bool CanUploadToDirectory => _session is not null;
+
     public bool CanRenameSelectedItem =>
         _session is not null &&
         SelectedDirectoryItem is not null &&
@@ -405,6 +407,11 @@ public sealed class MainShellViewModel : ObservableObject, IDisposable
     }
 
     public bool HasStatusMessage => !string.IsNullOrWhiteSpace(StatusText);
+
+    public void ShowStatus(string message)
+    {
+        StatusText = message;
+    }
 
     public string CurrentPath
     {
@@ -719,7 +726,6 @@ public sealed class MainShellViewModel : ObservableObject, IDisposable
             }
 
             _ = LoadPreviewForSelectionAsync();
-            _ = PrepareDragDownloadForSelectionAsync();
         }
     }
 
@@ -1528,6 +1534,68 @@ public sealed class MainShellViewModel : ObservableObject, IDisposable
         );
     }
 
+    public IReadOnlyList<FileDragDownloadPreparedItem> GetPreparedDragDownloadItems(
+        IReadOnlyList<DirectoryItemViewModel> items
+    )
+    {
+        if (_fileDragDownloadPreparationService is null || items.Count == 0)
+        {
+            return [];
+        }
+
+        var preparedItems = new List<FileDragDownloadPreparedItem>(items.Count);
+        foreach (var item in items)
+        {
+            var prepared = _fileDragDownloadPreparationService.TryGetPrepared(item);
+            if (prepared?.Succeeded != true
+                || string.IsNullOrWhiteSpace(prepared.LocalPath)
+                || !PreparedDragDownloadPathExists(item, prepared.LocalPath))
+            {
+                return [];
+            }
+
+            preparedItems.Add(new FileDragDownloadPreparedItem(item, prepared.LocalPath));
+        }
+
+        return preparedItems;
+    }
+
+    private static bool PreparedDragDownloadPathExists(DirectoryItemViewModel item, string localPath)
+    {
+        return item.IsDirectory
+            ? Directory.Exists(localPath)
+            : File.Exists(localPath);
+    }
+
+    public void PrepareItemsForDragDownloadInBackground(IReadOnlyList<DirectoryItemViewModel> items)
+    {
+        if (_session is null || _fileDragDownloadPreparationService is null || items.Count == 0)
+        {
+            return;
+        }
+
+        _ = PrepareItemsForDragDownloadInBackgroundAsync(items.ToArray());
+    }
+
+    private async Task PrepareItemsForDragDownloadInBackgroundAsync(IReadOnlyList<DirectoryItemViewModel> items)
+    {
+        try
+        {
+            var result = await PrepareItemsForDragDownloadAsync(items);
+            if (result.Succeeded)
+            {
+                StatusText = result.Summary;
+            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex) when (BridgeExceptionClassifier.IsBridgeFailure(ex) || ex is IOException or UnauthorizedAccessException)
+        {
+            _diagnostics.Error(ex, "拖出下载准备失败");
+        }
+    }
+
     public async Task<FileDragDownloadPreparationResult> PrepareItemsForDragDownloadAsync(
         IReadOnlyList<DirectoryItemViewModel> items
     )
@@ -1650,7 +1718,10 @@ public sealed class MainShellViewModel : ObservableObject, IDisposable
         }
     }
 
-    public async Task<IReadOnlyList<FileUploadConflict>> FindUploadConflictsAsync(IReadOnlyList<string> localPaths)
+    public async Task<IReadOnlyList<FileUploadConflict>> FindUploadConflictsAsync(
+        IReadOnlyList<string> localPaths,
+        string? targetDisplayPath = null
+    )
     {
         if (_session is null || localPaths.Count == 0)
         {
@@ -1658,10 +1729,23 @@ public sealed class MainShellViewModel : ObservableObject, IDisposable
         }
 
         // FileWriteService conflict probing covers both files and directories.
-        return await _fileWriteService.FindUploadConflictsAsync(_session, CurrentPath, localPaths);
+        return await _fileWriteService.FindUploadConflictsAsync(
+            _session,
+            targetDisplayPath ?? CurrentPath,
+            localPaths
+        );
     }
 
     public async Task UploadFilesAsync(
+        IReadOnlyList<string> localPaths,
+        IReadOnlyDictionary<string, UploadConflictDecision>? conflictDecisions = null
+    )
+    {
+        await UploadFilesToPathAsync(CurrentPath, localPaths, conflictDecisions);
+    }
+
+    public async Task UploadFilesToPathAsync(
+        string targetDisplayPath,
         IReadOnlyList<string> localPaths,
         IReadOnlyDictionary<string, UploadConflictDecision>? conflictDecisions = null
     )
@@ -1671,6 +1755,7 @@ public sealed class MainShellViewModel : ObservableObject, IDisposable
             return;
         }
 
+        var normalizedTarget = WindowsServerSession.NormalizeDisplayPath(targetDisplayPath);
         IsBusy = true;
         StatusText = localPaths.Count == 1
             ? $"正在上传：{Path.GetFileName(localPaths[0])}..."
@@ -1688,14 +1773,14 @@ public sealed class MainShellViewModel : ObservableObject, IDisposable
             var result = _fileBatchOperationService is not null
                 ? await _fileBatchOperationService.UploadLocalPathsAsync(
                     _session,
-                    CurrentPath,
+                    normalizedTarget,
                     localPaths,
                     conflictDecisions,
                     uploadTask
                 )
                 : ConvertFileOperationResult(await _fileWriteService.UploadFilesAsync(
                     _session,
-                    CurrentPath,
+                    normalizedTarget,
                     localPaths,
                     conflictDecisions,
                     uploadTask
@@ -1704,7 +1789,11 @@ public sealed class MainShellViewModel : ObservableObject, IDisposable
 
             if (result.Succeeded)
             {
-                await OpenPathAsync(CurrentPath, keepExistingSelection: false, forceReload: true);
+                _session.InvalidateDirectory(normalizedTarget);
+                if (string.Equals(normalizedTarget, CurrentPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    await OpenPathAsync(CurrentPath, keepExistingSelection: false, forceReload: true);
+                }
             }
         }
         finally
@@ -1767,6 +1856,81 @@ public sealed class MainShellViewModel : ObservableObject, IDisposable
             CurrentPath,
             _fileClipboard
         );
+    }
+
+    public async Task<IReadOnlyList<FilePasteConflict>> FindMoveConflictsAsync(
+        IReadOnlyList<DirectoryItemViewModel> items,
+        string targetDisplayPath
+    )
+    {
+        if (_session is null || items.Count == 0)
+        {
+            return [];
+        }
+
+        var clipboard = new FileClipboardState(
+            FileClipboardMode.Cut,
+            items.Select(FileClipboardEntry.FromDirectoryItem).ToArray()
+        );
+        return await _fileWriteService.FindPasteConflictsAsync(
+            _session,
+            targetDisplayPath,
+            clipboard
+        );
+    }
+
+    public async Task MoveItemsToPathAsync(
+        IReadOnlyList<DirectoryItemViewModel> items,
+        string targetDisplayPath,
+        IReadOnlyDictionary<string, UploadConflictDecision>? conflictDecisions = null
+    )
+    {
+        if (_session is null || items.Count == 0)
+        {
+            return;
+        }
+
+        var normalizedTarget = WindowsServerSession.NormalizeDisplayPath(targetDisplayPath);
+        if (string.Equals(normalizedTarget, CurrentPath, StringComparison.OrdinalIgnoreCase))
+        {
+            StatusText = "已取消移动。";
+            return;
+        }
+
+        var clipboard = new FileClipboardState(
+            FileClipboardMode.Cut,
+            items.Select(FileClipboardEntry.FromDirectoryItem).ToArray()
+        );
+
+        IsBusy = true;
+        StatusText = items.Count == 1
+            ? $"正在移动：{items[0].Name}..."
+            : $"正在移动 {items.Count} 项...";
+
+        try
+        {
+            var result = await _fileWriteService.PasteAsync(
+                _session,
+                normalizedTarget,
+                clipboard,
+                conflictDecisions
+            );
+            StatusText = result.Summary;
+
+            if (result.Succeeded)
+            {
+                foreach (var entry in clipboard.Entries)
+                {
+                    _session.InvalidateDirectory(WindowsServerSession.GetParentDisplayPath(entry.DisplayPath));
+                }
+                _session.InvalidateDirectory(normalizedTarget);
+                await OpenPathAsync(CurrentPath, keepExistingSelection: false, forceReload: true);
+            }
+        }
+        finally
+        {
+            IsBusy = false;
+        }
     }
 
     public async Task PasteClipboardAsync(
@@ -2720,7 +2884,7 @@ public sealed class MainShellViewModel : ObservableObject, IDisposable
         // 避免断开连接后预览/拖拽预热/文件传输仍持有旧 session 引用继续跑到 FFI 失败。
         _previewEntryService.CancelActivePreview();
         _fileDragDownloadPreparationService?.CancelActive();
-        _fileTaskService.CancelAll();
+        _fileTaskService?.CancelAll();
         _activeTaskId = null;
 
         IsWorkspaceVisible = false;

@@ -23,14 +23,18 @@ public sealed class AppBootstrapService
             {
                 // 先打开持久化存储（rynat.sqlite），否则 Core 会回退到内存数据库，
                 // 服务器配置/凭据/收藏重启后全部丢失，自动登录也失效。
-                // 失败时降级到内存模式（Core 内部兜底），仅记日志，不阻断启动。
                 try
                 {
                     _bridge.OpenStore(new OpenStoreRequest(ResolveStorePath()));
                 }
                 catch (Exception storeEx) when (BridgeExceptionClassifier.IsBridgeFailure(storeEx))
                 {
-                    System.Diagnostics.Debug.WriteLine($"Open store failed, falling back to in-memory: {storeEx.Message}");
+                    return new AppBootstrapLoadResult(
+                        false,
+                        null,
+                        "本地配置保存失败，请重启应用或检查权限。",
+                        "store.open_failed"
+                    );
                 }
 
                 var snapshot = _bridge.AppBootstrap();
@@ -86,7 +90,7 @@ public sealed class AppBootstrapService
     {
         var appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
         var directory = Path.Combine(appData, "Rynat");
-        Directory.CreateDirectory(directory);
+        System.IO.Directory.CreateDirectory(directory);
         return Path.Combine(directory, "rynat.sqlite");
     }
 

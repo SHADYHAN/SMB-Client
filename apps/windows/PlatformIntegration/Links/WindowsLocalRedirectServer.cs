@@ -94,7 +94,9 @@ public sealed class WindowsLocalRedirectServer : IDisposable
             client.SendTimeout = 2000;
             using var stream = client.GetStream();
             using var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true, leaveOpen: true);
-            var request = await ReadHttpRequestAsync(reader, cancellationToken);
+            using var requestTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            requestTimeout.CancelAfter(TimeSpan.FromSeconds(2));
+            var request = await ReadHttpRequestAsync(reader, requestTimeout.Token);
             if (string.IsNullOrWhiteSpace(request))
             {
                 return;
@@ -148,6 +150,10 @@ public sealed class WindowsLocalRedirectServer : IDisposable
                 BuildRedirectPage(target),
                 cancellationToken
             );
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            _diagnostics.Info("本地链接助手读取请求超时，已关闭连接。");
         }
         catch (Exception ex)
         {
@@ -299,8 +305,9 @@ public sealed class WindowsLocalRedirectServer : IDisposable
     private bool IsAllowedTarget(string query)
     {
         var parameters = ParseQuery(query);
-        if (!parameters.TryGetValue("h", out var host)
-            || string.IsNullOrWhiteSpace(host))
+        if (!parameters.TryGetValue("h", out var rawHost)
+            || string.IsNullOrWhiteSpace(rawHost)
+            || !TryParseLinkHost(rawHost, out var targetHost, out var targetPort))
         {
             return false;
         }
@@ -309,7 +316,7 @@ public sealed class WindowsLocalRedirectServer : IDisposable
         {
             var snapshot = _bridge.AppBootstrap();
             return snapshot.ServerProfiles.Any(profile =>
-                profile.Endpoint.Host.Equals(host, StringComparison.OrdinalIgnoreCase)
+                EndpointMatches(profile.Endpoint, targetHost, targetPort)
             );
         }
         catch (Exception ex) when (BridgeExceptionClassifier.IsBridgeFailure(ex))
@@ -318,6 +325,52 @@ public sealed class WindowsLocalRedirectServer : IDisposable
             return false;
         }
     }
+
+    private static bool TryParseLinkHost(string rawHost, out string host, out int? port)
+    {
+        host = string.Empty;
+        port = null;
+
+        var value = rawHost.Trim();
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        var candidate = value.Contains("://", StringComparison.Ordinal)
+            ? value
+            : "smb://" + value;
+        if (!Uri.TryCreate(candidate, UriKind.Absolute, out var uri)
+            || string.IsNullOrWhiteSpace(uri.Host))
+        {
+            return false;
+        }
+
+        host = uri.Host.TrimEnd('.');
+        port = uri.IsDefaultPort ? null : uri.Port;
+        return true;
+    }
+
+    private static bool EndpointMatches(StoredServerEndpoint endpoint, string targetHost, int? targetPort)
+    {
+        if (!endpoint.Host.TrimEnd('.').Equals(targetHost.TrimEnd('.'), StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        return PortsMatch(endpoint.Port, targetPort);
+    }
+
+    private static bool PortsMatch(ushort? profilePort, int? targetPort)
+    {
+        var normalizedProfilePort = NormalizeDefaultSmbPort(profilePort);
+        var normalizedTargetPort = NormalizeDefaultSmbPort(targetPort);
+        return normalizedProfilePort == normalizedTargetPort;
+    }
+
+    private static int NormalizeDefaultSmbPort(int? port) => port is null or 445 ? 445 : port.Value;
+
+    private static int NormalizeDefaultSmbPort(ushort? port) => port is null or 445 ? 445 : port.Value;
 
     private static Dictionary<string, string> ParseQuery(string query)
     {

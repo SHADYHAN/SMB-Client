@@ -501,7 +501,12 @@
                         <ListView
                             x:Name="SidebarListView"
                             Grid.Row="1"
+                            AllowDrop="True"
                             DoubleTapped="SidebarListView_DoubleTapped"
+                            DragEnter="SidebarListView_DragEnter"
+                            DragLeave="SidebarListView_DragLeave"
+                            DragOver="SidebarListView_DragOver"
+                            Drop="SidebarListView_Drop"
                             Tapped="SidebarListView_Tapped"
                             ItemContainerStyle="{StaticResource RynatSidebarListViewItemStyle}"
                             ItemsSource="{x:Bind ViewModel.SidebarItems, Mode=OneWay}"
@@ -688,11 +693,19 @@
                         x:Name="DirectoryDropTarget"
                         AllowDrop="True"
                         Background="{ThemeResource RynatSurfaceBrush}"
+                        BorderBrush="Transparent"
+                        BorderThickness="1"
+                        DragEnter="DirectoryDropTarget_DragEnter"
+                        DragLeave="DirectoryDropTarget_DragLeave"
                         DragOver="DirectoryDropTarget_DragOver"
                         Drop="DirectoryDropTarget_Drop">
                         <ListView
                             x:Name="DirectoryItemsListView"
+                            CanDragItems="True"
+                            CanReorderItems="False"
                             DoubleTapped="DirectoryItemsListView_DoubleTapped"
+                            DragItemsCompleted="DirectoryItemsListView_DragItemsCompleted"
+                            DragItemsStarting="DirectoryItemsListView_DragItemsStarting"
                             IsItemClickEnabled="False"
                             ItemContainerStyle="{StaticResource RynatDirectoryListViewItemStyle}"
                             ItemsSource="{x:Bind ViewModel.DirectoryItems, Mode=OneWay}"
@@ -727,7 +740,14 @@
                             </ListView.ItemsPanel>
                             <ListView.ItemTemplate>
                                 <DataTemplate x:DataType="x:Object">
-                                    <Grid>
+                                    <Border
+                                        AllowDrop="True"
+                                        Background="{Binding DropBackground}"
+                                        CornerRadius="8"
+                                        DragEnter="DirectoryItem_DragEnter"
+                                        DragLeave="DirectoryItem_DragLeave"
+                                        DragOver="DirectoryItem_DragOver"
+                                        Drop="DirectoryItem_Drop">
                                         <Grid
                                             MinHeight="36"
                                             Padding="8,0,10,0">
@@ -785,7 +805,7 @@
                                                 Style="{StaticResource RynatMutedTextStyle}"
                                                 Text="{Binding ModifiedLabel}" />
                                         </Grid>
-                                    </Grid>
+                                    </Border>
                                 </DataTemplate>
                             </ListView.ItemTemplate>
                         </ListView>

@@ -323,10 +323,29 @@ final class SidebarView: NSView, NSOutlineViewDataSource, NSOutlineViewDelegate 
         guard row >= 0 else { return }
         if let item = outline.item(atRow: row) as? RynatFileItem {
             selectedFavoriteID = nil
+            selectRowWithoutOpening(row)
             delegate?.sidebarView(self, didSelectPath: item.path)
+            toggleExpansion(for: item)
         } else if let fav = favoriteItem(atRow: row) {
             selectedFavoriteID = fav.id
+            selectRowWithoutOpening(row)
             delegate?.sidebarView(self, didSelectFavorite: fav.link)
+        }
+    }
+
+    private func selectRowWithoutOpening(_ row: Int) {
+        guard outline.selectedRow != row else { return }
+        isSyncingSelection = true
+        defer { isSyncingSelection = false }
+        outline.selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false)
+    }
+
+    private func toggleExpansion(for item: RynatFileItem) {
+        guard activeTab == .shares else { return }
+        if outline.isItemExpanded(item) {
+            outline.collapseItem(item)
+        } else {
+            outline.expandItem(item)
         }
     }
 

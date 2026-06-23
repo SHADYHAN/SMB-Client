@@ -1,5 +1,7 @@
 using System;
+using System.ComponentModel;
 using System.IO;
+using System.Runtime.CompilerServices;
 using Microsoft.UI;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Media;
@@ -7,7 +9,7 @@ using Windows.UI.Text;
 
 namespace Rynat.WindowsClient.UI.Main;
 
-public sealed class DirectoryItemViewModel
+public sealed class DirectoryItemViewModel : INotifyPropertyChanged
 {
     private static readonly SolidColorBrush DirectoryAccentBrush = new(ColorHelper.FromArgb(255, 36, 148, 105));
     private static readonly SolidColorBrush FileAccentBrush = new(ColorHelper.FromArgb(255, 71, 85, 105));
@@ -15,6 +17,10 @@ public sealed class DirectoryItemViewModel
     private static readonly SolidColorBrush VideoAccentBrush = new(ColorHelper.FromArgb(255, 216, 178, 20));
     private static readonly SolidColorBrush PdfAccentBrush = new(ColorHelper.FromArgb(255, 190, 78, 64));
     private static readonly SolidColorBrush OfficeAccentBrush = new(ColorHelper.FromArgb(255, 37, 99, 199));
+    private static readonly SolidColorBrush DropTargetBrush = new(ColorHelper.FromArgb(255, 232, 241, 254));
+    private static readonly SolidColorBrush TransparentBrush = new(Colors.Transparent);
+
+    private bool _isDropTarget;
 
     public DirectoryItemViewModel(
         string name,
@@ -34,6 +40,8 @@ public sealed class DirectoryItemViewModel
         SizeBytes = sizeBytes;
         ModifiedAt = modifiedAt;
     }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
 
     public string Name { get; }
 
@@ -99,6 +107,21 @@ public sealed class DirectoryItemViewModel
         ? new FontWeight { Weight = 600 }
         : new FontWeight { Weight = 400 };
 
+    public Brush DropBackground => _isDropTarget
+        ? DropTargetBrush
+        : TransparentBrush;
+
+    public void SetDropTarget(bool isDropTarget)
+    {
+        if (_isDropTarget == isDropTarget)
+        {
+            return;
+        }
+
+        _isDropTarget = isDropTarget;
+        OnPropertyChanged(nameof(DropBackground));
+    }
+
     public Thickness RowPadding => new(6, 0, 6, 0);
 
     public string TypeLabel
@@ -159,6 +182,11 @@ public sealed class DirectoryItemViewModel
             "mp3" or "wav" or "aac" or "flac" or "m4a" or "ogg" => DirectoryItemFileKind.Audio,
             _ => DirectoryItemFileKind.File,
         };
+    }
+
+    private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
+    {
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }
 
     private static string FormatBytes(ulong bytes)

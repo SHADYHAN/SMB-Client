@@ -66,12 +66,13 @@ public sealed class SmbSessionService
             catch (Exception ex) when (IsBridgeFailure(ex))
             {
                 DisconnectQuietly(connectionId);
+                var errorCode = ErrorCodeFor(ex);
                 return new SmbConnectFlowResult(
                     false,
                     null,
                     null,
-                    $"使用已保存凭据连接失败：{ex.Message}",
-                    ErrorCodeFor(ex)
+                    UserFacingConnectError(errorCode),
+                    errorCode
                 );
             }
             catch (OperationCanceledException)
@@ -192,12 +193,13 @@ public sealed class SmbSessionService
             catch (Exception ex) when (IsBridgeFailure(ex))
             {
                 DisconnectQuietly(connectionId);
+                var errorCode = ErrorCodeFor(ex);
                 return new SmbConnectFlowResult(
                     false,
                     null,
                     null,
-                    $"使用账号密码连接失败：{ex.Message}",
-                    ErrorCodeFor(ex)
+                    UserFacingConnectError(errorCode),
+                    errorCode
                 );
             }
             catch (OperationCanceledException)
@@ -259,4 +261,27 @@ public sealed class SmbSessionService
         ex is RynatCoreBridgeException bridgeEx
             ? bridgeEx.ErrorCode ?? "bridge.failed"
             : "bridge.failed";
+
+    private static string UserFacingConnectError(string errorCode)
+    {
+        if (errorCode.Equals("auth", StringComparison.OrdinalIgnoreCase)
+            || errorCode.EndsWith(".auth", StringComparison.OrdinalIgnoreCase))
+        {
+            return "账号或密码错误。";
+        }
+
+        if (errorCode.Equals("not_found", StringComparison.OrdinalIgnoreCase)
+            || errorCode.EndsWith(".not_found", StringComparison.OrdinalIgnoreCase))
+        {
+            return "找不到服务器。";
+        }
+
+        if (errorCode.Equals("permission", StringComparison.OrdinalIgnoreCase)
+            || errorCode.EndsWith(".permission", StringComparison.OrdinalIgnoreCase))
+        {
+            return "没有权限访问。";
+        }
+
+        return "连接失败。";
+    }
 }

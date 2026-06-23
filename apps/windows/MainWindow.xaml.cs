@@ -72,6 +72,9 @@ public sealed partial class MainWindow : Window
     private IReadOnlyList<DirectoryItemViewModel>? _contextMenuDirectoryItems;
     private IReadOnlyList<DirectoryItemViewModel> _lastDirectorySelection = [];
     private IReadOnlyList<DirectoryItemViewModel> _lastDirectoryMultiSelection = [];
+    private IReadOnlyList<DirectoryItemViewModel> _activeInternalDragItems = [];
+    private SidebarItemViewModel? _activeSidebarDropTarget;
+    private DirectoryItemViewModel? _activeDirectoryDropTarget;
     private bool _isRestoringDirectorySelection;
 
     public MainWindow(MainShellViewModel viewModel)
@@ -285,7 +288,7 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        await ViewModel.OpenAndToggleSidebarItemAsync(item);
+        await ViewModel.ToggleSidebarItemExpansionAsync(item);
         e.Handled = true;
     }
 
@@ -311,7 +314,8 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        QueueSidebarTapOpen(item);
+        CancelPendingSidebarTapOpen();
+        await ViewModel.OpenSidebarItemAsync(item);
         e.Handled = true;
     }
 
@@ -359,6 +363,184 @@ public sealed partial class MainWindow : Window
 
         _sidebarTapOpenCancellation = null;
         cancellation.Cancel();
+    }
+
+    private void SidebarListView_DragEnter(object sender, DragEventArgs e)
+    {
+        UpdateSidebarDropFeedback(e);
+    }
+
+    private void SidebarListView_DragLeave(object sender, DragEventArgs e)
+    {
+        ClearSidebarDropTarget();
+        e.Handled = true;
+    }
+
+    private void SidebarListView_DragOver(object sender, DragEventArgs e)
+    {
+        UpdateSidebarDropFeedback(e);
+    }
+
+    private async void SidebarListView_Drop(object sender, DragEventArgs e)
+    {
+        e.Handled = true;
+        var target = FindSidebarDropTarget(e);
+        ClearSidebarDropTarget();
+        if (target is null)
+        {
+            return;
+        }
+
+        if (e.DataView.Contains(InternalDirectoryDragFormat))
+        {
+            await DropInternalItemsToPathAsync(target.DisplayPath, IsValidSidebarMoveTarget(target));
+            return;
+        }
+
+        if (e.DataView.Contains(StandardDataFormats.StorageItems) && IsValidSidebarUploadTarget(target))
+        {
+            await DropLocalItemsToPathAsync(e, target.DisplayPath);
+        }
+    }
+
+    private void UpdateSidebarDropFeedback(DragEventArgs e)
+    {
+        var target = FindSidebarDropTarget(e);
+        var isInternalDrag = e.DataView.Contains(InternalDirectoryDragFormat);
+        if (isInternalDrag)
+        {
+            var canMove = IsValidSidebarMoveTarget(target);
+            e.AcceptedOperation = canMove
+                ? DataPackageOperation.Move
+                : DataPackageOperation.None;
+            SetSidebarDropTarget(canMove ? target : null);
+            ConfigureDragCaption(e, canMove ? "移动到此处" : "无法放到此处", showGlyph: false);
+            e.Handled = true;
+            return;
+        }
+
+        var canUpload = e.DataView.Contains(StandardDataFormats.StorageItems)
+            && IsValidSidebarUploadTarget(target);
+        e.AcceptedOperation = canUpload
+            ? DataPackageOperation.Copy
+            : DataPackageOperation.None;
+        SetSidebarDropTarget(canUpload ? target : null);
+        ConfigureDragCaption(e, canUpload ? "复制到此处" : "无法放到此处", showGlyph: canUpload);
+        e.Handled = true;
+    }
+
+    private SidebarItemViewModel? FindSidebarDropTarget(DragEventArgs e)
+    {
+        if (e.OriginalSource is not DependencyObject sourceElement)
+        {
+            return null;
+        }
+
+        return FindAncestor<ListViewItem>(sourceElement)?.Content as SidebarItemViewModel;
+    }
+
+    private bool IsValidSidebarMoveTarget(SidebarItemViewModel? target)
+    {
+        return target?.IsDirectory == true
+            && !target.IsFavorite
+            && IsValidMoveTarget(target.DisplayPath);
+    }
+
+    private bool IsValidSidebarUploadTarget(SidebarItemViewModel? target)
+    {
+        return target?.IsDirectory == true
+            && !target.IsFavorite
+            && ViewModel.CanUploadToDirectory;
+    }
+
+    private bool IsValidDirectoryMoveTarget(DirectoryItemViewModel? target)
+    {
+        return target?.IsDirectory == true
+            && IsValidMoveTarget(target.DisplayPath);
+    }
+
+    private bool IsValidDirectoryUploadTarget(DirectoryItemViewModel? target)
+    {
+        return target?.IsDirectory == true
+            && ViewModel.CanUploadToDirectory;
+    }
+
+    private bool IsValidMoveTarget(string? targetDisplayPath)
+    {
+        if (string.IsNullOrWhiteSpace(targetDisplayPath) || _activeInternalDragItems.Count == 0)
+        {
+            return false;
+        }
+
+        var targetPath = WindowsServerSession.NormalizeDisplayPath(targetDisplayPath);
+        var targetShareName = ShareNameForDisplayPath(targetPath);
+        if (string.IsNullOrWhiteSpace(targetShareName))
+        {
+            return false;
+        }
+
+        return _activeInternalDragItems.All(item =>
+            string.Equals(item.ShareName, targetShareName, StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(item.DisplayPath, targetPath, StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(
+                WindowsServerSession.GetParentDisplayPath(item.DisplayPath),
+                targetPath,
+                StringComparison.OrdinalIgnoreCase
+            )
+            && !(item.IsDirectory && IsSameOrDescendantPath(targetPath, item.DisplayPath))
+        );
+    }
+
+    private static string ShareNameForDisplayPath(string displayPath)
+    {
+        var normalizedPath = WindowsServerSession.NormalizeDisplayPath(displayPath);
+        var parts = normalizedPath.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length == 0 ? string.Empty : parts[0];
+    }
+
+    private void SetSidebarDropTarget(SidebarItemViewModel? target)
+    {
+        if (ReferenceEquals(_activeSidebarDropTarget, target))
+        {
+            return;
+        }
+
+        if (_activeSidebarDropTarget is { } previousTarget)
+        {
+            previousTarget.SetSelected(ReferenceEquals(ViewModel.SelectedSidebarItem, previousTarget));
+        }
+
+        _activeSidebarDropTarget = target;
+        _activeSidebarDropTarget?.SetSelected(true);
+    }
+
+    private void ClearSidebarDropTarget()
+    {
+        if (_activeSidebarDropTarget is null)
+        {
+            return;
+        }
+
+        var target = _activeSidebarDropTarget;
+        _activeSidebarDropTarget = null;
+        target.SetSelected(ReferenceEquals(ViewModel.SelectedSidebarItem, target));
+    }
+
+    private static bool IsSameOrDescendantPath(string candidatePath, string parentPath)
+    {
+        var candidate = WindowsServerSession.NormalizeDisplayPath(candidatePath).TrimEnd('/');
+        var parent = WindowsServerSession.NormalizeDisplayPath(parentPath).TrimEnd('/');
+        if (string.IsNullOrEmpty(candidate))
+        {
+            candidate = "/";
+        }
+        if (string.IsNullOrEmpty(parent))
+        {
+            parent = "/";
+        }
+
+        return candidate.Equals(parent, StringComparison.OrdinalIgnoreCase)
+            || candidate.StartsWith(parent + "/", StringComparison.OrdinalIgnoreCase);
     }
 
     private void SidebarListView_RightTapped(object sender, RightTappedRoutedEventArgs e)
@@ -748,34 +930,221 @@ public sealed partial class MainWindow : Window
         e.Handled = true;
     }
 
-    private void DirectoryDropTarget_DragOver(object sender, DragEventArgs e)
+    private void DirectoryItem_DragEnter(object sender, DragEventArgs e)
     {
-        HideDragDropBadge(e);
+        UpdateDirectoryItemDropFeedback(sender, e);
+    }
+
+    private void DirectoryItem_DragLeave(object sender, DragEventArgs e)
+    {
+        ClearDirectoryItemDropTarget();
+        e.Handled = true;
+    }
+
+    private void DirectoryItem_DragOver(object sender, DragEventArgs e)
+    {
+        UpdateDirectoryItemDropFeedback(sender, e);
+    }
+
+    private async void DirectoryItem_Drop(object sender, DragEventArgs e)
+    {
+        e.Handled = true;
+        var target = FindDirectoryDropTarget(sender);
+        ClearDirectoryItemDropTarget();
+        ClearDirectoryDropFeedback();
+        if (target is null)
+        {
+            return;
+        }
+
         if (e.DataView.Contains(InternalDirectoryDragFormat))
         {
-            e.AcceptedOperation = DataPackageOperation.None;
+            await DropInternalItemsToPathAsync(target.DisplayPath, IsValidDirectoryMoveTarget(target));
+            return;
+        }
+
+        if (e.DataView.Contains(StandardDataFormats.StorageItems) && IsValidDirectoryUploadTarget(target))
+        {
+            await DropLocalItemsToPathAsync(e, target.DisplayPath);
+        }
+    }
+
+    private void UpdateDirectoryItemDropFeedback(object sender, DragEventArgs e)
+    {
+        var target = FindDirectoryDropTarget(sender);
+        var isInternalDrag = e.DataView.Contains(InternalDirectoryDragFormat);
+        if (isInternalDrag)
+        {
+            var canMove = IsValidDirectoryMoveTarget(target);
+            e.AcceptedOperation = canMove
+                ? DataPackageOperation.Move
+                : DataPackageOperation.None;
+            SetDirectoryItemDropTarget(canMove ? target : null);
+            ConfigureDragCaption(e, canMove ? "移动到此处" : "无法放到此处", showGlyph: false);
             e.Handled = true;
             return;
         }
 
-        e.AcceptedOperation = ViewModel.CanUploadFiles && e.DataView.Contains(StandardDataFormats.StorageItems)
+        var canUpload = e.DataView.Contains(StandardDataFormats.StorageItems)
+            && IsValidDirectoryUploadTarget(target);
+        e.AcceptedOperation = canUpload
             ? DataPackageOperation.Copy
             : DataPackageOperation.None;
+        SetDirectoryItemDropTarget(canUpload ? target : null);
+        ConfigureDragCaption(e, canUpload ? "复制到此处" : "无法放到此处", showGlyph: canUpload);
         e.Handled = true;
     }
 
-    private static void HideDragDropBadge(DragEventArgs e)
+    private static DirectoryItemViewModel? FindDirectoryDropTarget(object sender)
     {
-        e.DragUIOverride.IsCaptionVisible = false;
+        return sender switch
+        {
+            FrameworkElement { DataContext: DirectoryItemViewModel item } => item,
+            _ => null
+        };
+    }
+
+    private void SetDirectoryItemDropTarget(DirectoryItemViewModel? target)
+    {
+        if (ReferenceEquals(_activeDirectoryDropTarget, target))
+        {
+            return;
+        }
+
+        _activeDirectoryDropTarget?.SetDropTarget(false);
+        _activeDirectoryDropTarget = target;
+        _activeDirectoryDropTarget?.SetDropTarget(true);
+    }
+
+    private void ClearDirectoryItemDropTarget()
+    {
+        if (_activeDirectoryDropTarget is null)
+        {
+            return;
+        }
+
+        _activeDirectoryDropTarget.SetDropTarget(false);
+        _activeDirectoryDropTarget = null;
+    }
+
+    private async Task DropInternalItemsToPathAsync(string targetDisplayPath, bool isValidTarget)
+    {
+        if (!isValidTarget)
+        {
+            return;
+        }
+
+        var draggedItems = _activeInternalDragItems;
+        if (draggedItems.Count == 0)
+        {
+            return;
+        }
+
+        var conflicts = await ViewModel.FindMoveConflictsAsync(draggedItems, targetDisplayPath);
+        var decisions = await ResolveDragMoveConflictsAsync(conflicts);
+        if (decisions is null)
+        {
+            return;
+        }
+
+        await ViewModel.MoveItemsToPathAsync(draggedItems, targetDisplayPath, decisions);
+    }
+
+    private async Task DropLocalItemsToPathAsync(DragEventArgs e, string targetDisplayPath)
+    {
+        if (!ViewModel.CanUploadToDirectory || !e.DataView.Contains(StandardDataFormats.StorageItems))
+        {
+            return;
+        }
+
+        var items = await e.DataView.GetStorageItemsAsync();
+        var localPaths = items
+            .Select(item => item.Path)
+            .Where(path => !string.IsNullOrWhiteSpace(path))
+            .ToArray();
+
+        if (localPaths.Length == 0)
+        {
+            await ShowMessageAsync("无法上传", "请拖入一个或多个本地文件或文件夹。");
+            return;
+        }
+
+        var conflictDecisions = await ResolveUploadConflictsAsync(localPaths, targetDisplayPath);
+        if (conflictDecisions is null)
+        {
+            return;
+        }
+
+        await ViewModel.UploadFilesToPathAsync(targetDisplayPath, localPaths, conflictDecisions);
+    }
+
+    private void DirectoryDropTarget_DragEnter(object sender, DragEventArgs e)
+    {
+        UpdateDirectoryDropFeedback(e);
+    }
+
+    private void DirectoryDropTarget_DragLeave(object sender, DragEventArgs e)
+    {
+        ClearDirectoryDropFeedback();
+        e.Handled = true;
+    }
+
+    private void DirectoryDropTarget_DragOver(object sender, DragEventArgs e)
+    {
+        UpdateDirectoryDropFeedback(e);
+    }
+
+    private void UpdateDirectoryDropFeedback(DragEventArgs e)
+    {
+        if (e.DataView.Contains(InternalDirectoryDragFormat))
+        {
+            e.AcceptedOperation = DataPackageOperation.None;
+            SetDirectoryDropFeedback(false);
+            ConfigureDragCaption(e, "无法放到当前位置", showGlyph: false);
+            e.Handled = true;
+            return;
+        }
+
+        var canUpload = ViewModel.CanUploadFiles && e.DataView.Contains(StandardDataFormats.StorageItems);
+        e.AcceptedOperation = canUpload
+            ? DataPackageOperation.Copy
+            : DataPackageOperation.None;
+        SetDirectoryDropFeedback(canUpload);
+        ConfigureDragCaption(e, canUpload ? "复制到此处" : "无法放到此处", showGlyph: canUpload);
+        e.Handled = true;
+    }
+
+    private void SetDirectoryDropFeedback(bool isActive)
+    {
+        DirectoryDropTarget.BorderBrush = isActive
+            ? (Brush)Application.Current.Resources["RynatSelectionStrongBrush"]
+            : new SolidColorBrush(Microsoft.UI.Colors.Transparent);
+        DirectoryDropTarget.Background = isActive
+            ? (Brush)Application.Current.Resources["RynatHoverBrush"]
+            : (Brush)Application.Current.Resources["RynatSurfaceBrush"];
+    }
+
+    private void ClearDirectoryDropFeedback()
+    {
+        DirectoryDropTarget.BorderBrush = new SolidColorBrush(Microsoft.UI.Colors.Transparent);
+        DirectoryDropTarget.Background = (Brush)Application.Current.Resources["RynatSurfaceBrush"];
+    }
+
+    private static void ConfigureDragCaption(DragEventArgs e, string caption, bool showGlyph)
+    {
+        _ = showGlyph;
+        e.DragUIOverride.Caption = caption;
+        e.DragUIOverride.IsCaptionVisible = true;
         e.DragUIOverride.IsGlyphVisible = false;
         e.DragUIOverride.IsContentVisible = false;
     }
 
     private async void DirectoryDropTarget_Drop(object sender, DragEventArgs e)
     {
+        e.Handled = true;
+        ClearDirectoryDropFeedback();
         if (e.DataView.Contains(InternalDirectoryDragFormat))
         {
-            e.Handled = true;
             return;
         }
 
@@ -803,10 +1172,9 @@ public sealed partial class MainWindow : Window
         }
 
         await ViewModel.UploadFilesAsync(localPaths, conflictDecisions);
-        e.Handled = true;
     }
 
-    private async void DirectoryItemsListView_DragItemsStarting(object sender, DragItemsStartingEventArgs e)
+    private void DirectoryItemsListView_DragItemsStarting(object sender, DragItemsStartingEventArgs e)
     {
         if (e.Items.FirstOrDefault() is not DirectoryItemViewModel item)
         {
@@ -815,38 +1183,75 @@ public sealed partial class MainWindow : Window
         }
 
         ViewModel.SelectedDirectoryItem = item;
+        var selectedItems = GetSelectedDirectoryItems();
+        if (!selectedItems.Contains(item))
+        {
+            selectedItems = [item];
+        }
+
+        _activeInternalDragItems = selectedItems.ToArray();
+        e.Data.SetData(InternalDirectoryDragFormat, "1");
+        e.Data.Properties.Title = BuildDragTitle(_activeInternalDragItems);
+        e.Data.Properties.Description = "RYNAT 共享网盘";
+        e.Data.RequestedOperation = DataPackageOperation.Move | DataPackageOperation.Copy;
+
+        var preparedItems = ViewModel.GetPreparedDragDownloadItems(_activeInternalDragItems);
+        if (preparedItems.Count == _activeInternalDragItems.Count)
+        {
+            var storageItems = preparedItems
+                .Select(CreateStorageItemForPreparedDragDownload)
+                .Where(item => item is not null)
+                .Cast<IStorageItem>()
+                .ToArray();
+
+            if (storageItems.Length == preparedItems.Count)
+            {
+                e.Data.SetStorageItems(storageItems);
+            }
+            else
+            {
+                e.Data.RequestedOperation = DataPackageOperation.Move;
+            }
+        }
+        else
+        {
+            ViewModel.PrepareItemsForDragDownloadInBackground(_activeInternalDragItems);
+            ViewModel.ShowStatus("正在准备拖出，稍后再拖。");
+        }
+    }
+
+    private static IStorageItem? CreateStorageItemForPreparedDragDownload(FileDragDownloadPreparedItem preparedItem)
+    {
         try
         {
-            var selectedItems = GetSelectedDirectoryItems();
-            if (!selectedItems.Contains(item))
-            {
-                selectedItems = [item];
-            }
-
-            var result = await ViewModel.PrepareItemsForDragDownloadAsync(selectedItems);
-            if (!result.Succeeded || result.Items.Count == 0)
-            {
-                e.Cancel = true;
-                return;
-            }
-
-            var storageItems = new List<IStorageItem>(result.Items.Count);
-            foreach (var preparedItem in result.Items)
-            {
-                var storageItem = preparedItem.Source.IsDirectory
-                    ? await StorageFolder.GetFolderFromPathAsync(preparedItem.LocalPath)
-                    : (IStorageItem)await StorageFile.GetFileFromPathAsync(preparedItem.LocalPath);
-                storageItems.Add(storageItem);
-            }
-
-            e.Data.SetStorageItems(storageItems);
-            e.Data.SetData(InternalDirectoryDragFormat, "1");
-            e.Data.RequestedOperation = DataPackageOperation.Copy;
+            return preparedItem.Source.IsDirectory
+                ? StorageFolder.GetFolderFromPathAsync(preparedItem.LocalPath).GetAwaiter().GetResult()
+                : StorageFile.GetFileFromPathAsync(preparedItem.LocalPath).GetAwaiter().GetResult();
         }
         catch
         {
-            e.Cancel = true;
+            return null;
         }
+    }
+
+    private void DirectoryItemsListView_DragItemsCompleted(ListViewBase sender, DragItemsCompletedEventArgs args)
+    {
+        _activeInternalDragItems = [];
+        ClearSidebarDropTarget();
+        ClearDirectoryItemDropTarget();
+        ClearDirectoryDropFeedback();
+    }
+
+    private static string BuildDragTitle(IReadOnlyList<DirectoryItemViewModel> items)
+    {
+        if (items.Count == 0)
+        {
+            return "项目";
+        }
+
+        return items.Count == 1
+            ? items[0].Name
+            : $"{items.Count} 个项目";
     }
 
     private async void DirectoryItemsListView_DoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
@@ -1035,6 +1440,14 @@ public sealed partial class MainWindow : Window
     private async void DirectoryItemsListView_KeyDown(object sender, KeyRoutedEventArgs e)
     {
         var ctrlPressed = IsCtrlPressed();
+        var altPressed = IsAltPressed();
+        if (ctrlPressed && e.Key == VirtualKey.A)
+        {
+            SelectAllDirectoryItems();
+            e.Handled = true;
+            return;
+        }
+
         if (ctrlPressed && e.Key == VirtualKey.C)
         {
             ViewModel.CopySelectedItems(GetSelectedDirectoryItems());
@@ -1062,6 +1475,18 @@ public sealed partial class MainWindow : Window
                 await ViewModel.OpenSelectedItemAsync();
                 e.Handled = true;
                 break;
+            case VirtualKey.Back:
+                await ViewModel.NavigateUpAsync();
+                e.Handled = true;
+                break;
+            case VirtualKey.Up when altPressed:
+                await ViewModel.NavigateUpAsync();
+                e.Handled = true;
+                break;
+            case VirtualKey.F5:
+                await ViewModel.RefreshCurrentDirectoryAsync();
+                e.Handled = true;
+                break;
             case VirtualKey.Delete:
                 await ConfirmAndDeleteSelectedItemAsync();
                 e.Handled = true;
@@ -1070,6 +1495,15 @@ public sealed partial class MainWindow : Window
                 await PromptAndRenameSelectedItemAsync();
                 e.Handled = true;
                 break;
+        }
+    }
+
+    private void SelectAllDirectoryItems()
+    {
+        DirectoryItemsListView.SelectedItems.Clear();
+        foreach (var item in ViewModel.DirectoryItems)
+        {
+            DirectoryItemsListView.SelectedItems.Add(item);
         }
     }
 
@@ -1190,6 +1624,12 @@ public sealed partial class MainWindow : Window
     {
         var ctrlState = Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Control);
         return ctrlState.HasFlag(CoreVirtualKeyStates.Down);
+    }
+
+    private static bool IsAltPressed()
+    {
+        var altState = Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Menu);
+        return altState.HasFlag(CoreVirtualKeyStates.Down);
     }
 
     private static bool IsRightButtonPressed()
@@ -2347,10 +2787,11 @@ public sealed partial class MainWindow : Window
     }
 
     private async Task<IReadOnlyDictionary<string, UploadConflictDecision>?> ResolveUploadConflictsAsync(
-        IReadOnlyList<string> localPaths
+        IReadOnlyList<string> localPaths,
+        string? targetDisplayPath = null
     )
     {
-        var conflicts = await ViewModel.FindUploadConflictsAsync(localPaths);
+        var conflicts = await ViewModel.FindUploadConflictsAsync(localPaths, targetDisplayPath);
         var decisions = new Dictionary<string, UploadConflictDecision>(StringComparer.OrdinalIgnoreCase);
         UploadConflictDecision? applyAllDecision = null;
 
@@ -2363,6 +2804,30 @@ public sealed partial class MainWindow : Window
             }
 
             decisions[conflict.LocalPath] = decision.Value;
+            if (_lastConflictApplyAll)
+            {
+                applyAllDecision = decision.Value;
+            }
+        }
+
+        return decisions;
+    }
+
+    private async Task<IReadOnlyDictionary<string, UploadConflictDecision>?> ResolveDragMoveConflictsAsync(
+        IReadOnlyList<FilePasteConflict> conflicts
+    )
+    {
+        var decisions = new Dictionary<string, UploadConflictDecision>(StringComparer.OrdinalIgnoreCase);
+        UploadConflictDecision? applyAllDecision = null;
+        foreach (var conflict in conflicts)
+        {
+            var decision = applyAllDecision ?? await PromptPasteConflictAsync(conflict);
+            if (decision is null)
+            {
+                return null;
+            }
+
+            decisions[conflict.Source.DisplayPath] = decision.Value;
             if (_lastConflictApplyAll)
             {
                 applyAllDecision = decision.Value;
