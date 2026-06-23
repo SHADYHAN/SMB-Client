@@ -13,4 +13,11 @@ public interface IServerProfileService
         bool autoLogin,
         CancellationToken cancellationToken = default
     );
+
+    Task<ServerProfileSaveResult> UpdateCredentialOptionsAsync(
+        ServerProfile profile,
+        bool rememberPassword,
+        bool autoLogin,
+        CancellationToken cancellationToken = default
+    );
 }

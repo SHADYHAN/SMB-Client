@@ -83,6 +83,8 @@ public sealed class ShellViewModel : ObservableObject
             Status.Message = state.ServerProfiles.Count == 0
                 ? "未找到已保存服务器，已填入默认服务器地址。"
                 : $"已加载 {state.ServerProfiles.Count} 个服务器配置。";
+
+            await TryAutoLoginAsync();
         }
         catch (Exception ex)
         {
@@ -132,11 +134,11 @@ public sealed class ShellViewModel : ObservableObject
 
         try
         {
-            var result = await _sessionService.ConnectAsync(
-                Login.ServerHost,
-                Login.Username,
-                Login.Password
-            );
+            var storedProfile = StoredCredentialProfileForLogin();
+            var useStoredCredential = storedProfile is not null && string.IsNullOrEmpty(Login.Password);
+            var result = useStoredCredential && storedProfile is not null
+                ? await _sessionService.ConnectStoredCredentialAsync(storedProfile)
+                : await _sessionService.ConnectAsync(Login.ServerHost, Login.Username, Login.Password);
 
             if (!result.Succeeded || result.Session is null)
             {
@@ -145,18 +147,16 @@ public sealed class ShellViewModel : ObservableObject
                 return;
             }
 
-            _session = result.Session;
-            await SaveLoginProfileAsync();
-            Navigation.LoadShares(_session.Shares);
-            IsLoggedIn = true;
-            Login.Password = "";
-            Status.Message = $"已连接 {_session.Host}，协议 {_session.DialectLabel}。";
-
-            var firstShare = Navigation.Roots.FirstOrDefault();
-            if (firstShare is not null)
+            if (useStoredCredential && storedProfile is not null)
             {
-                await LoadDirectoryAsync(firstShare.Share, firstShare.Path, firstShare);
+                await UpdateStoredCredentialOptionsAsync(storedProfile);
             }
+            else
+            {
+                await SaveLoginProfileAsync();
+            }
+
+            await CompleteLoginAsync(result.Session);
         }
         catch (Exception ex)
         {
@@ -169,6 +169,55 @@ public sealed class ShellViewModel : ObservableObject
         }
     }
 
+    private async Task TryAutoLoginAsync()
+    {
+        var profile = StoredCredentialProfileForLogin();
+        if (IsLoggedIn || profile is null || !profile.AutoLogin)
+        {
+            return;
+        }
+
+        Login.IsBusy = true;
+        Login.Message = "正在自动登录...";
+        Status.Message = $"正在自动连接 {profile.DisplayName}...";
+
+        try
+        {
+            var result = await _sessionService.ConnectStoredCredentialAsync(profile);
+            if (!result.Succeeded || result.Session is null)
+            {
+                Login.Message = "自动登录失败，请手动登录。";
+                Status.Message = result.Summary;
+                return;
+            }
+
+            await CompleteLoginAsync(result.Session);
+        }
+        catch (Exception ex)
+        {
+            Login.Message = "自动登录失败，请手动登录。";
+            Status.Message = UserFacingError(ex, "自动登录失败");
+        }
+        finally
+        {
+            Login.IsBusy = false;
+        }
+    }
+
+    private async Task CompleteLoginAsync(ServerSession session)
+    {
+        _session = session;
+        Navigation.LoadShares(_session.Shares);
+        IsLoggedIn = true;
+        Login.Password = "";
+        Status.Message = $"已连接 {_session.Host}，协议 {_session.DialectLabel}。";
+
+        var firstShare = Navigation.Roots.FirstOrDefault();
+        if (firstShare is not null)
+        {
+            await LoadDirectoryAsync(firstShare.Share, firstShare.Path, firstShare);
+        }
+    }
 
     private async Task SaveLoginProfileAsync()
     {
@@ -177,6 +226,23 @@ public sealed class ShellViewModel : ObservableObject
             Login.ServerHost,
             Login.Username,
             Login.Password,
+            Login.RememberPassword,
+            Login.AutoLogin
+        );
+
+        if (saveResult.Succeeded && saveResult.Profile is not null)
+        {
+            Login.UpsertProfile(saveResult.Profile);
+            return;
+        }
+
+        Status.Message = saveResult.Summary;
+    }
+
+    private async Task UpdateStoredCredentialOptionsAsync(ServerProfile profile)
+    {
+        var saveResult = await _serverProfileService.UpdateCredentialOptionsAsync(
+            profile,
             Login.RememberPassword,
             Login.AutoLogin
         );
@@ -203,12 +269,26 @@ public sealed class ShellViewModel : ObservableObject
             : null;
     }
 
+    private ServerProfile? StoredCredentialProfileForLogin()
+    {
+        var profile = MatchingSelectedProfile();
+        if (profile?.HasStoredCredential != true)
+        {
+            return null;
+        }
+
+        var profileUsername = profile.Username?.Trim() ?? string.Empty;
+        return profileUsername.Equals(Login.Username.Trim(), StringComparison.OrdinalIgnoreCase)
+            ? profile
+            : null;
+    }
+
     private bool CanLogin()
     {
         return !Login.IsBusy
             && !string.IsNullOrWhiteSpace(Login.ServerHost)
             && !string.IsNullOrWhiteSpace(Login.Username)
-            && !string.IsNullOrEmpty(Login.Password);
+            && (!string.IsNullOrEmpty(Login.Password) || StoredCredentialProfileForLogin() is not null);
     }
 
     private async Task OpenSelectedItemAsync()

@@ -11,5 +11,10 @@ public interface ISmbSessionService
         CancellationToken cancellationToken = default
     );
 
+    Task<SmbConnectionFlowResult> ConnectStoredCredentialAsync(
+        ServerProfile profile,
+        CancellationToken cancellationToken = default
+    );
+
     Task DisconnectAsync(ServerSession session, CancellationToken cancellationToken = default);
 }

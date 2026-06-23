@@ -33,41 +33,52 @@ public sealed class SmbSessionService : ISmbSessionService
                     password,
                     connectionId
                 ));
+                cancellationToken.ThrowIfCancellationRequested();
 
-                var session = new ServerSession(
-                    result.ConnectionId,
-                    result.Host,
-                    result.DialectLabel,
-                    result.Shares.Select(share => new ServerShare(share.Name, share.Comment)).ToArray()
-                );
-
-                return new SmbConnectionFlowResult(
-                    true,
-                    session,
-                    $"已连接 {result.Host}，发现 {result.Shares.Length} 个共享。",
-                    null
-                );
+                return Success(result);
             }
             catch (OperationCanceledException)
             {
                 DisconnectQuietly(connectionId);
-                return new SmbConnectionFlowResult(
-                    false,
-                    null,
-                    "已取消连接。",
-                    "connect.cancelled"
-                );
+                return Cancelled();
             }
             catch (Exception ex) when (BridgeExceptionClassifier.IsBridgeFailure(ex))
             {
                 DisconnectQuietly(connectionId);
-                var errorCode = BridgeExceptionClassifier.ErrorCodeFor(ex);
-                return new SmbConnectionFlowResult(
-                    false,
-                    null,
-                    UserFacingConnectError(errorCode),
-                    errorCode
-                );
+                return Failure(ex);
+            }
+        }, cancellationToken);
+    }
+
+    public Task<SmbConnectionFlowResult> ConnectStoredCredentialAsync(
+        ServerProfile profile,
+        CancellationToken cancellationToken = default
+    )
+    {
+        return Task.Run(() =>
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var connectionId = profile.Id;
+
+            try
+            {
+                var result = _bridge.SmbConnectStoredCredential(new SmbConnectStoredCredentialRequest(
+                    profile.Id,
+                    profile.Id
+                ));
+                cancellationToken.ThrowIfCancellationRequested();
+
+                return Success(result);
+            }
+            catch (OperationCanceledException)
+            {
+                DisconnectQuietly(connectionId);
+                return Cancelled();
+            }
+            catch (Exception ex) when (BridgeExceptionClassifier.IsBridgeFailure(ex))
+            {
+                DisconnectQuietly(connectionId);
+                return Failure(ex);
             }
         }, cancellationToken);
     }
@@ -79,6 +90,37 @@ public sealed class SmbSessionService : ISmbSessionService
             cancellationToken.ThrowIfCancellationRequested();
             _bridge.SmbDisconnect(new SmbConnectionScopedRequest(session.ConnectionId));
         }, cancellationToken);
+    }
+
+    private static SmbConnectionFlowResult Success(SmbConnectResult result)
+    {
+        var session = new ServerSession(
+            result.ConnectionId,
+            result.Host,
+            result.DialectLabel,
+            result.Shares.Select(share => new ServerShare(share.Name, share.Comment)).ToArray()
+        );
+
+        return new SmbConnectionFlowResult(
+            true,
+            session,
+            $"已连接 {result.Host}，发现 {result.Shares.Length} 个共享。",
+            null
+        );
+    }
+
+    private static SmbConnectionFlowResult Cancelled() =>
+        new(false, null, "已取消连接。", "connect.cancelled");
+
+    private static SmbConnectionFlowResult Failure(Exception ex)
+    {
+        var errorCode = BridgeExceptionClassifier.ErrorCodeFor(ex);
+        return new SmbConnectionFlowResult(
+            false,
+            null,
+            UserFacingConnectError(errorCode),
+            errorCode
+        );
     }
 
     private void DisconnectQuietly(string? connectionId)

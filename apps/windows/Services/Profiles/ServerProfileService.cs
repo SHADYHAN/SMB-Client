@@ -82,6 +82,49 @@ public sealed class ServerProfileService : IServerProfileService
         }, cancellationToken);
     }
 
+    public Task<ServerProfileSaveResult> UpdateCredentialOptionsAsync(
+        ServerProfile profile,
+        bool rememberPassword,
+        bool autoLogin,
+        CancellationToken cancellationToken = default
+    )
+    {
+        return Task.Run(() =>
+        {
+            try
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (string.IsNullOrWhiteSpace(profile.Id))
+                {
+                    return Failure("服务器保存失败。", "server_profile.invalid");
+                }
+
+                var credential = _bridge.UpdateServerCredentialOptions(new UpdateServerCredentialOptionsRequest(
+                    profile.Id,
+                    rememberPassword,
+                    autoLogin
+                ));
+                cancellationToken.ThrowIfCancellationRequested();
+
+                return new ServerProfileSaveResult(
+                    true,
+                    profile with
+                    {
+                        HasStoredCredential = credential is not null,
+                        AutoLogin = credential?.AutoLogin ?? false,
+                        Username = credential?.Username ?? profile.Username
+                    },
+                    credential is null ? "已关闭记住密码。" : "登录选项已更新。",
+                    null
+                );
+            }
+            catch (Exception ex) when (BridgeExceptionClassifier.IsBridgeFailure(ex))
+            {
+                return Failure("登录选项保存失败。", BridgeExceptionClassifier.ErrorCodeFor(ex));
+            }
+        }, cancellationToken);
+    }
+
     private static ServerProfileSaveResult Failure(string summary, string errorCode) =>
         new(false, null, summary, errorCode);
 

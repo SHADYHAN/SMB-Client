@@ -24,13 +24,20 @@ public sealed class LoginViewModel : ObservableObject
         get => _selectedProfile;
         set
         {
-            if (SetProperty(ref _selectedProfile, value) && value is not null)
+            if (!SetProperty(ref _selectedProfile, value))
+            {
+                return;
+            }
+
+            if (value is not null)
             {
                 ServerHost = value.Host;
                 Username = value.Username ?? Username;
                 RememberPassword = value.HasStoredCredential;
                 AutoLogin = value.AutoLogin;
             }
+
+            RefreshLoginCommand();
         }
     }
 
