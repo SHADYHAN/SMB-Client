@@ -1,4 +1,5 @@
 using Rynat.WindowsClient.Domain;
+using Rynat.WindowsClient.Platform.Clipboard;
 using Rynat.WindowsClient.Platform.Shell;
 using Rynat.WindowsClient.Services.Bootstrap;
 using Rynat.WindowsClient.Services.Directory;
@@ -23,6 +24,7 @@ public sealed class ShellViewModel : ObservableObject
     private readonly IQuickLinkService _quickLinkService;
     private readonly IPreviewService _previewService;
     private readonly IServerProfileService _serverProfileService;
+    private readonly IClipboardService _clipboardService;
     private readonly IWindowsShellDragDropService _shellDragDropService;
     private ServerSession? _session;
     private string? _loadingDirectoryKey;
@@ -35,6 +37,7 @@ public sealed class ShellViewModel : ObservableObject
         IQuickLinkService quickLinkService,
         IPreviewService previewService,
         IServerProfileService serverProfileService,
+        IClipboardService clipboardService,
         IWindowsShellDragDropService shellDragDropService
     )
     {
@@ -44,11 +47,14 @@ public sealed class ShellViewModel : ObservableObject
         _quickLinkService = quickLinkService;
         _previewService = previewService;
         _serverProfileService = serverProfileService;
+        _clipboardService = clipboardService;
         _shellDragDropService = shellDragDropService;
 
         Login.LoginCommand = new AsyncRelayCommand(LoginAsync, CanLogin);
         FileList.OpenItemCommand = new AsyncRelayCommand(OpenSelectedItemAsync, () => FileList.SelectedItem is not null);
+        FileList.CopyLinkCommand = new AsyncRelayCommand(CopySelectedFileLinkAsync, () => FileList.SelectedItem is not null && _session is not null);
         Preview.ToggleCommand = new RelayCommand(() => Preview.IsVisible = !Preview.IsVisible);
+        Preview.CopyLinkCommand = new AsyncRelayCommand(CopyPreviewLinkAsync, () => Preview.SelectedItem is not null && _session is not null);
     }
 
     public LoginViewModel Login { get; } = new();
@@ -106,6 +112,7 @@ public sealed class ShellViewModel : ObservableObject
     {
         FileList.SelectedItem = item;
         Preview.ShowSelection(item?.Item);
+        RefreshItemCommands();
 
         if (item?.Item is { IsDirectory: false } selected)
         {
@@ -209,6 +216,7 @@ public sealed class ShellViewModel : ObservableObject
         _session = session;
         Navigation.LoadShares(_session.Shares);
         IsLoggedIn = true;
+        RefreshItemCommands();
         Login.Password = "";
         Status.Message = $"已连接 {_session.Host}，协议 {_session.DialectLabel}。";
 
@@ -289,6 +297,49 @@ public sealed class ShellViewModel : ObservableObject
             && !string.IsNullOrWhiteSpace(Login.ServerHost)
             && !string.IsNullOrWhiteSpace(Login.Username)
             && (!string.IsNullOrEmpty(Login.Password) || StoredCredentialProfileForLogin() is not null);
+    }
+
+    private async Task CopySelectedFileLinkAsync()
+    {
+        await CopyLinkAsync(FileList.SelectedItem?.Item);
+    }
+
+    private async Task CopyPreviewLinkAsync()
+    {
+        await CopyLinkAsync(Preview.SelectedItem);
+    }
+
+    private async Task CopyLinkAsync(RemoteFileItem? item)
+    {
+        if (_session is null || item is null)
+        {
+            return;
+        }
+
+        try
+        {
+            Status.Message = "正在生成链接...";
+            var link = await _quickLinkService.BuildAsync(_session, item);
+            _clipboardService.SetText(link.HttpUrl);
+            Status.Message = "链接已复制。";
+        }
+        catch (Exception ex)
+        {
+            Status.Message = UserFacingError(ex, "链接复制失败");
+        }
+    }
+
+    private void RefreshItemCommands()
+    {
+        if (FileList.CopyLinkCommand is AsyncRelayCommand fileCommand)
+        {
+            fileCommand.RaiseCanExecuteChanged();
+        }
+
+        if (Preview.CopyLinkCommand is AsyncRelayCommand previewCommand)
+        {
+            previewCommand.RaiseCanExecuteChanged();
+        }
     }
 
     private async Task OpenSelectedItemAsync()

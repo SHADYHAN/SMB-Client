@@ -40,8 +40,15 @@
             <ListView ItemsSource="{Binding Items}"
                       SelectedItem="{Binding SelectedItem, Mode=TwoWay}"
                       MouseDoubleClick="ListView_OnMouseDoubleClick"
+                      PreviewMouseRightButtonDown="ListView_OnPreviewMouseRightButtonDown"
                       SelectionChanged="ListView_OnSelectionChanged"
                       BorderThickness="0">
+                <ListView.ContextMenu>
+                    <ContextMenu>
+                        <MenuItem Header="复制链接"
+                                  Command="{Binding PlacementTarget.DataContext.CopyLinkCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                    </ContextMenu>
+                </ListView.ContextMenu>
                 <ListView.View>
                     <GridView>
                         <GridViewColumn Header="名称" Width="320">

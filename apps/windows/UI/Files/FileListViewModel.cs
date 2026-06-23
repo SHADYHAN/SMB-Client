@@ -39,6 +39,8 @@ public sealed class FileListViewModel : ObservableObject
 
     public ICommand OpenItemCommand { get; set; } = new RelayCommand(_ => { });
 
+    public ICommand CopyLinkCommand { get; set; } = new RelayCommand(_ => { });
+
     private void RefreshOpenItemCommand()
     {
         if (OpenItemCommand is AsyncRelayCommand asyncCommand)

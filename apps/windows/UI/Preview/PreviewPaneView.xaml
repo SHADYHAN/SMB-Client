@@ -9,11 +9,18 @@
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <TextBlock Text="预览"
                            FontWeight="SemiBold"
                            VerticalAlignment="Center" />
                 <Button Grid.Column="1"
+                        Content="复制链接"
+                        MinHeight="28"
+                        Padding="10,4"
+                        Margin="0,0,8,0"
+                        Command="{Binding CopyLinkCommand}" />
+                <Button Grid.Column="2"
                         Content="收起"
                         MinHeight="28"
                         Padding="10,4"

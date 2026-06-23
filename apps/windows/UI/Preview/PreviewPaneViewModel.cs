@@ -9,6 +9,7 @@ public sealed class PreviewPaneViewModel : ObservableObject
     private string _title = "预览";
     private string _subtitle = "选择一个文件查看信息";
     private string _contentType = "";
+    private RemoteFileItem? _selectedItem;
     private bool _isVisible = true;
 
     public string Title
@@ -29,6 +30,18 @@ public sealed class PreviewPaneViewModel : ObservableObject
         set => SetProperty(ref _contentType, value);
     }
 
+    public RemoteFileItem? SelectedItem
+    {
+        get => _selectedItem;
+        private set
+        {
+            if (SetProperty(ref _selectedItem, value))
+            {
+                RefreshCopyLinkCommand();
+            }
+        }
+    }
+
     public bool IsVisible
     {
         get => _isVisible;
@@ -37,8 +50,11 @@ public sealed class PreviewPaneViewModel : ObservableObject
 
     public ICommand ToggleCommand { get; set; } = new RelayCommand(() => { });
 
+    public ICommand CopyLinkCommand { get; set; } = new RelayCommand(_ => { });
+
     public void ShowSelection(RemoteFileItem? item)
     {
+        SelectedItem = item;
         if (item is null)
         {
             Title = "预览";
@@ -55,6 +71,18 @@ public sealed class PreviewPaneViewModel : ObservableObject
     public void ShowPreviewInfo(PreviewInfo info)
     {
         ContentType = info.ContentType;
+    }
+
+    private void RefreshCopyLinkCommand()
+    {
+        if (CopyLinkCommand is AsyncRelayCommand asyncCommand)
+        {
+            asyncCommand.RaiseCanExecuteChanged();
+        }
+        else if (CopyLinkCommand is RelayCommand relayCommand)
+        {
+            relayCommand.RaiseCanExecuteChanged();
+        }
     }
 
     private static string FormatSize(ulong bytes)

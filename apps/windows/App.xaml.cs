@@ -1,5 +1,6 @@
 using System.Windows;
 using Rynat.Client;
+using Rynat.WindowsClient.Platform.Clipboard;
 using Rynat.WindowsClient.Platform.Shell;
 using Rynat.WindowsClient.Services.Bootstrap;
 using Rynat.WindowsClient.Services.Directory;
@@ -24,6 +25,7 @@ public partial class App : Application
         var quickLinkService = new QuickLinkService(bridge);
         var previewService = new PreviewService(bridge);
         var serverProfileService = new ServerProfileService(bridge);
+        var clipboardService = new WindowsClipboardService();
         var shellDragDropService = new WindowsShellDragDropService();
 
         var viewModel = new ShellViewModel(
@@ -33,6 +35,7 @@ public partial class App : Application
             quickLinkService,
             previewService,
             serverProfileService,
+            clipboardService,
             shellDragDropService
         );
 
