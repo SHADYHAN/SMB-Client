@@ -45,7 +45,7 @@ public sealed class BootstrapService : IBootstrapService
     {
         var appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
         var directory = Path.Combine(appData, "Rynat");
-        Directory.CreateDirectory(directory);
+        System.IO.Directory.CreateDirectory(directory);
         return Path.Combine(directory, "rynat.sqlite");
     }
 }
