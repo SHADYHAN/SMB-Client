@@ -4,7 +4,7 @@ namespace Rynat.WindowsClient.Services.Smb;
 
 public interface ISmbSessionService
 {
-    Task<ServerSession> ConnectAsync(
+    Task<SmbConnectionFlowResult> ConnectAsync(
         string host,
         string username,
         string password,

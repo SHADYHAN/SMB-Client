@@ -26,12 +26,14 @@
                            Foreground="{StaticResource TextSecondaryBrush}"
                            Margin="0,0,0,6" />
                 <TextBox Text="{Binding ServerHost, UpdateSourceTrigger=PropertyChanged}"
+                         KeyDown="LoginInput_OnKeyDown"
                          Margin="0,0,0,14" />
 
                 <TextBlock Text="用户名"
                            Foreground="{StaticResource TextSecondaryBrush}"
                            Margin="0,0,0,6" />
                 <TextBox Text="{Binding Username, UpdateSourceTrigger=PropertyChanged}"
+                         KeyDown="LoginInput_OnKeyDown"
                          Margin="0,0,0,14" />
 
                 <TextBlock Text="密码"
@@ -39,10 +41,12 @@
                            Margin="0,0,0,6" />
                 <PasswordBox x:Name="PasswordInput"
                              PasswordChanged="PasswordInput_OnPasswordChanged"
+                             KeyDown="LoginInput_OnKeyDown"
                              Margin="0,0,0,20" />
 
                 <Button Content="登录"
                         Command="{Binding LoginCommand}"
+                        IsDefault="True"
                         Height="38" />
                 <TextBlock Text="{Binding Message}"
                            Foreground="{StaticResource TextSecondaryBrush}"

@@ -9,6 +9,7 @@ public sealed class FileListViewModel : ObservableObject
 {
     private FileItemViewModel? _selectedItem;
     private string _pathTitle = "未连接";
+    private bool _isLoading;
 
     public ObservableCollection<FileItemViewModel> Items { get; } = new();
 
@@ -21,10 +22,34 @@ public sealed class FileListViewModel : ObservableObject
     public FileItemViewModel? SelectedItem
     {
         get => _selectedItem;
-        set => SetProperty(ref _selectedItem, value);
+        set
+        {
+            if (SetProperty(ref _selectedItem, value))
+            {
+                RefreshOpenItemCommand();
+            }
+        }
+    }
+
+    public bool IsLoading
+    {
+        get => _isLoading;
+        set => SetProperty(ref _isLoading, value);
     }
 
     public ICommand OpenItemCommand { get; set; } = new RelayCommand(_ => { });
+
+    private void RefreshOpenItemCommand()
+    {
+        if (OpenItemCommand is AsyncRelayCommand asyncCommand)
+        {
+            asyncCommand.RaiseCanExecuteChanged();
+        }
+        else if (OpenItemCommand is RelayCommand relayCommand)
+        {
+            relayCommand.RaiseCanExecuteChanged();
+        }
+    }
 
     public void ShowDirectory(RemoteDirectory directory)
     {

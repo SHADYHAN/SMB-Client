@@ -1,5 +1,6 @@
 using Rynat.Client;
 using Rynat.WindowsClient.Domain;
+using Rynat.WindowsClient.Infrastructure;
 
 namespace Rynat.WindowsClient.Services.Smb;
 
@@ -12,7 +13,7 @@ public sealed class SmbSessionService : ISmbSessionService
         _bridge = bridge;
     }
 
-    public Task<ServerSession> ConnectAsync(
+    public Task<SmbConnectionFlowResult> ConnectAsync(
         string host,
         string username,
         string password,
@@ -22,19 +23,52 @@ public sealed class SmbSessionService : ISmbSessionService
         return Task.Run(() =>
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var result = _bridge.SmbConnect(new SmbConnectRequest(
-                host.Trim(),
-                username.Trim(),
-                password,
-                Guid.NewGuid().ToString("N")
-            ));
+            var connectionId = Guid.NewGuid().ToString("N");
 
-            return new ServerSession(
-                result.ConnectionId,
-                result.Host,
-                result.DialectLabel,
-                result.Shares.Select(share => new ServerShare(share.Name, share.Comment)).ToArray()
-            );
+            try
+            {
+                var result = _bridge.SmbConnect(new SmbConnectRequest(
+                    host.Trim(),
+                    username.Trim(),
+                    password,
+                    connectionId
+                ));
+
+                var session = new ServerSession(
+                    result.ConnectionId,
+                    result.Host,
+                    result.DialectLabel,
+                    result.Shares.Select(share => new ServerShare(share.Name, share.Comment)).ToArray()
+                );
+
+                return new SmbConnectionFlowResult(
+                    true,
+                    session,
+                    $"已连接 {result.Host}，发现 {result.Shares.Length} 个共享。",
+                    null
+                );
+            }
+            catch (OperationCanceledException)
+            {
+                DisconnectQuietly(connectionId);
+                return new SmbConnectionFlowResult(
+                    false,
+                    null,
+                    "已取消连接。",
+                    "connect.cancelled"
+                );
+            }
+            catch (Exception ex) when (BridgeExceptionClassifier.IsBridgeFailure(ex))
+            {
+                DisconnectQuietly(connectionId);
+                var errorCode = BridgeExceptionClassifier.ErrorCodeFor(ex);
+                return new SmbConnectionFlowResult(
+                    false,
+                    null,
+                    UserFacingConnectError(errorCode),
+                    errorCode
+                );
+            }
         }, cancellationToken);
     }
 
@@ -45,5 +79,44 @@ public sealed class SmbSessionService : ISmbSessionService
             cancellationToken.ThrowIfCancellationRequested();
             _bridge.SmbDisconnect(new SmbConnectionScopedRequest(session.ConnectionId));
         }, cancellationToken);
+    }
+
+    private void DisconnectQuietly(string? connectionId)
+    {
+        if (string.IsNullOrWhiteSpace(connectionId))
+        {
+            return;
+        }
+
+        try
+        {
+            _bridge.SmbDisconnect(new SmbConnectionScopedRequest(connectionId));
+        }
+        catch (Exception ex) when (BridgeExceptionClassifier.IsBridgeFailure(ex))
+        {
+        }
+    }
+
+    private static string UserFacingConnectError(string errorCode)
+    {
+        if (errorCode.Equals("auth", StringComparison.OrdinalIgnoreCase)
+            || errorCode.EndsWith(".auth", StringComparison.OrdinalIgnoreCase))
+        {
+            return "账号或密码错误。";
+        }
+
+        if (errorCode.Equals("not_found", StringComparison.OrdinalIgnoreCase)
+            || errorCode.EndsWith(".not_found", StringComparison.OrdinalIgnoreCase))
+        {
+            return "找不到服务器。";
+        }
+
+        if (errorCode.Equals("permission", StringComparison.OrdinalIgnoreCase)
+            || errorCode.EndsWith(".permission", StringComparison.OrdinalIgnoreCase))
+        {
+            return "没有权限访问。";
+        }
+
+        return "连接失败。";
     }
 }

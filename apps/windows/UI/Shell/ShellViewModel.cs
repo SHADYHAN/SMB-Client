@@ -23,6 +23,7 @@ public sealed class ShellViewModel : ObservableObject
     private readonly IPreviewService _previewService;
     private readonly IWindowsShellDragDropService _shellDragDropService;
     private ServerSession? _session;
+    private string? _loadingDirectoryKey;
     private bool _isLoggedIn;
 
     public ShellViewModel(
@@ -125,12 +126,20 @@ public sealed class ShellViewModel : ObservableObject
 
         try
         {
-            _session = await _sessionService.ConnectAsync(
+            var result = await _sessionService.ConnectAsync(
                 Login.ServerHost,
                 Login.Username,
                 Login.Password
             );
 
+            if (!result.Succeeded || result.Session is null)
+            {
+                Login.Message = result.Summary;
+                Status.Message = result.Summary;
+                return;
+            }
+
+            _session = result.Session;
             Navigation.LoadShares(_session.Shares);
             IsLoggedIn = true;
             Login.Password = "";
@@ -183,6 +192,14 @@ public sealed class ShellViewModel : ObservableObject
             return;
         }
 
+        var normalizedKey = $"{share}:{NormalizeDirectoryPath(path)}";
+        if (_loadingDirectoryKey == normalizedKey)
+        {
+            return;
+        }
+
+        _loadingDirectoryKey = normalizedKey;
+        FileList.IsLoading = true;
         Status.Message = "正在加载目录...";
 
         try
@@ -207,6 +224,26 @@ public sealed class ShellViewModel : ObservableObject
         {
             Status.Message = UserFacingError(ex, "目录加载失败");
         }
+        finally
+        {
+            if (_loadingDirectoryKey == normalizedKey)
+            {
+                _loadingDirectoryKey = null;
+            }
+
+            FileList.IsLoading = false;
+        }
+    }
+
+    private static string NormalizeDirectoryPath(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path) || path == "/")
+        {
+            return "/";
+        }
+
+        var normalized = path.Replace('\\', '/').Trim();
+        return normalized.StartsWith('/') ? normalized : "/" + normalized;
     }
 
     private static string UserFacingError(Exception ex, string fallback)
