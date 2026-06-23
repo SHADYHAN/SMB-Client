@@ -11,8 +11,15 @@
                        Margin="4,0,0,12" />
             <TreeView ItemsSource="{Binding Roots}"
                       SelectedItemChanged="TreeView_OnSelectedItemChanged"
+                      MouseDoubleClick="TreeView_OnMouseDoubleClick"
                       BorderThickness="0"
                       Background="Transparent">
+                <TreeView.ItemContainerStyle>
+                    <Style TargetType="TreeViewItem">
+                        <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
+                        <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}" />
+                    </Style>
+                </TreeView.ItemContainerStyle>
                 <TreeView.Resources>
                     <HierarchicalDataTemplate DataType="{x:Type navigation:NavigationNodeViewModel}"
                                               ItemsSource="{Binding Children}">

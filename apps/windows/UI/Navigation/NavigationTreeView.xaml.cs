@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 using Rynat.WindowsClient.UI.Shell;
 
@@ -26,6 +27,37 @@ public partial class NavigationTreeView : UserControl
         {
             await shell.SelectNavigationNodeAsync(node);
         }
+    }
+
+    private async void TreeView_OnMouseDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        var item = FindAncestor<TreeViewItem>((DependencyObject)e.OriginalSource);
+        if (item?.DataContext is not NavigationNodeViewModel node)
+        {
+            return;
+        }
+
+        item.IsSelected = true;
+        if (FindShellViewModel() is { } shell)
+        {
+            await shell.ToggleNavigationNodeAsync(node);
+            e.Handled = true;
+        }
+    }
+
+    private static T? FindAncestor<T>(DependencyObject? current) where T : DependencyObject
+    {
+        while (current is not null)
+        {
+            if (current is T match)
+            {
+                return match;
+            }
+
+            current = VisualTreeHelper.GetParent(current);
+        }
+
+        return null;
     }
 
     private ShellViewModel? FindShellViewModel()

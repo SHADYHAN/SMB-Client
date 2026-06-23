@@ -105,7 +105,19 @@ public sealed class ShellViewModel : ObservableObject
             return;
         }
 
-        await LoadDirectoryAsync(node.Share, node.Path, node);
+        await LoadDirectoryAsync(node.Share, node.Path, node, expandNavigationNode: null);
+    }
+
+    public async Task ToggleNavigationNodeAsync(NavigationNodeViewModel node)
+    {
+        if (_session is null)
+        {
+            return;
+        }
+
+        var shouldExpand = !node.IsExpanded;
+        await LoadDirectoryAsync(node.Share, node.Path, node, expandNavigationNode: shouldExpand);
+        node.IsExpanded = shouldExpand;
     }
 
     public async Task SelectFileAsync(FileItemViewModel? item)
@@ -223,7 +235,7 @@ public sealed class ShellViewModel : ObservableObject
         var firstShare = Navigation.Roots.FirstOrDefault();
         if (firstShare is not null)
         {
-            await LoadDirectoryAsync(firstShare.Share, firstShare.Path, firstShare);
+            await LoadDirectoryAsync(firstShare.Share, firstShare.Path, firstShare, expandNavigationNode: true);
         }
     }
 
@@ -350,13 +362,14 @@ public sealed class ShellViewModel : ObservableObject
             return;
         }
 
-        await LoadDirectoryAsync(selected.Share, selected.Path, null);
+        await LoadDirectoryAsync(selected.Share, selected.Path, null, expandNavigationNode: false);
     }
 
     private async Task LoadDirectoryAsync(
         string share,
         string path,
-        NavigationNodeViewModel? navigationNode
+        NavigationNodeViewModel? navigationNode,
+        bool? expandNavigationNode
     )
     {
         if (_session is null)
@@ -367,6 +380,11 @@ public sealed class ShellViewModel : ObservableObject
         var normalizedKey = $"{share}:{NormalizeDirectoryPath(path)}";
         if (_loadingDirectoryKey == normalizedKey)
         {
+            if (navigationNode is not null && expandNavigationNode is bool requestedExpansion)
+            {
+                navigationNode.IsExpanded = requestedExpansion;
+            }
+
             return;
         }
 
@@ -386,7 +404,12 @@ public sealed class ShellViewModel : ObservableObject
                     navigationNode,
                     directory.Items.Where(item => item.IsDirectory).ToArray()
                 );
-                navigationNode.IsExpanded = true;
+                if (expandNavigationNode is bool requestedExpansion)
+                {
+                    navigationNode.IsExpanded = requestedExpansion;
+                }
+
+                navigationNode.IsSelected = true;
                 Navigation.SelectedNode = navigationNode;
             }
 
