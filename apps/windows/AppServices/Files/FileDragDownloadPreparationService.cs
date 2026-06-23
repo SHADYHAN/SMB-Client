@@ -146,7 +146,7 @@ public sealed class FileDragDownloadPreparationService
             return single.Succeeded && !string.IsNullOrWhiteSpace(single.LocalPath)
                 ? new FileDragDownloadPreparationResult(
                     true,
-                    single.Summary,
+                    $"已准备好，可拖出到本地：{items[0].Name}",
                     [new FileDragDownloadPreparedItem(items[0], single.LocalPath)]
                 )
                 : new FileDragDownloadPreparationResult(false, single.Summary, [], single.ErrorCode);

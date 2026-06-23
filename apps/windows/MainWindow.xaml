@@ -706,6 +706,7 @@
                             DoubleTapped="DirectoryItemsListView_DoubleTapped"
                             DragItemsCompleted="DirectoryItemsListView_DragItemsCompleted"
                             DragItemsStarting="DirectoryItemsListView_DragItemsStarting"
+                            DragStarting="DirectoryItemsListView_DragStarting"
                             IsItemClickEnabled="False"
                             ItemContainerStyle="{StaticResource RynatDirectoryListViewItemStyle}"
                             ItemsSource="{x:Bind ViewModel.DirectoryItems, Mode=OneWay}"

@@ -410,11 +410,9 @@ public sealed partial class MainWindow : Window
         if (isInternalDrag)
         {
             var canMove = IsValidSidebarMoveTarget(target);
-            e.AcceptedOperation = canMove
-                ? DataPackageOperation.Move
-                : DataPackageOperation.None;
+            e.AcceptedOperation = DataPackageOperation.Copy;
             SetSidebarDropTarget(canMove ? target : null);
-            ConfigureDragCaption(e, canMove ? "移动到此处" : "无法放到此处", showGlyph: false);
+            ConfigureInternalDragVisual(e);
             e.Handled = true;
             return;
         }
@@ -976,11 +974,9 @@ public sealed partial class MainWindow : Window
         if (isInternalDrag)
         {
             var canMove = IsValidDirectoryMoveTarget(target);
-            e.AcceptedOperation = canMove
-                ? DataPackageOperation.Move
-                : DataPackageOperation.None;
+            e.AcceptedOperation = DataPackageOperation.Copy;
             SetDirectoryItemDropTarget(canMove ? target : null);
-            ConfigureDragCaption(e, canMove ? "移动到此处" : "无法放到此处", showGlyph: false);
+            ConfigureInternalDragVisual(e);
             e.Handled = true;
             return;
         }
@@ -1098,9 +1094,9 @@ public sealed partial class MainWindow : Window
     {
         if (e.DataView.Contains(InternalDirectoryDragFormat))
         {
-            e.AcceptedOperation = DataPackageOperation.None;
+            e.AcceptedOperation = DataPackageOperation.Copy;
             SetDirectoryDropFeedback(false);
-            ConfigureDragCaption(e, "无法放到当前位置", showGlyph: false);
+            ConfigureInternalDragVisual(e);
             e.Handled = true;
             return;
         }
@@ -1128,6 +1124,11 @@ public sealed partial class MainWindow : Window
     {
         DirectoryDropTarget.BorderBrush = new SolidColorBrush(Microsoft.UI.Colors.Transparent);
         DirectoryDropTarget.Background = (Brush)Application.Current.Resources["RynatSurfaceBrush"];
+    }
+
+    private void ConfigureInternalDragVisual(DragEventArgs e)
+    {
+        ConfigureDragCaption(e, BuildDragTitle(_activeInternalDragItems), showGlyph: false);
     }
 
     private static void ConfigureDragCaption(DragEventArgs e, string caption, bool showGlyph)
@@ -1174,6 +1175,12 @@ public sealed partial class MainWindow : Window
         await ViewModel.UploadFilesAsync(localPaths, conflictDecisions);
     }
 
+    private void DirectoryItemsListView_DragStarting(UIElement sender, DragStartingEventArgs e)
+    {
+        e.AllowedOperations = DataPackageOperation.Copy;
+        e.DragUI.SetContentFromDataPackage();
+    }
+
     private void DirectoryItemsListView_DragItemsStarting(object sender, DragItemsStartingEventArgs e)
     {
         if (e.Items.FirstOrDefault() is not DirectoryItemViewModel item)
@@ -1190,43 +1197,66 @@ public sealed partial class MainWindow : Window
         }
 
         _activeInternalDragItems = selectedItems.ToArray();
+        var draggedItems = _activeInternalDragItems;
         e.Data.SetData(InternalDirectoryDragFormat, "1");
-        e.Data.Properties.Title = BuildDragTitle(_activeInternalDragItems);
+        e.Data.Properties.Title = BuildDragTitle(draggedItems);
         e.Data.Properties.Description = "RYNAT 共享网盘";
-        e.Data.RequestedOperation = DataPackageOperation.Move | DataPackageOperation.Copy;
-
-        var preparedItems = ViewModel.GetPreparedDragDownloadItems(_activeInternalDragItems);
-        if (preparedItems.Count == _activeInternalDragItems.Count)
+        e.Data.RequestedOperation = DataPackageOperation.Copy;
+        e.Data.SetDataProvider(StandardDataFormats.StorageItems, request =>
         {
-            var storageItems = preparedItems
-                .Select(CreateStorageItemForPreparedDragDownload)
-                .Where(item => item is not null)
-                .Cast<IStorageItem>()
-                .ToArray();
+            ProvideDragDownloadStorageItemsAsync(request, draggedItems);
+        });
+    }
 
-            if (storageItems.Length == preparedItems.Count)
+    private async void ProvideDragDownloadStorageItemsAsync(
+        DataProviderRequest request,
+        IReadOnlyList<DirectoryItemViewModel> draggedItems
+    )
+    {
+        var deferral = request.GetDeferral();
+        try
+        {
+            var result = await ViewModel.PrepareItemsForDragDownloadAsync(draggedItems);
+            if (!result.Succeeded || result.Items.Count == 0)
             {
-                e.Data.SetStorageItems(storageItems);
+                request.SetData(Array.Empty<IStorageItem>());
+                return;
             }
-            else
+
+            var storageItems = new List<IStorageItem>(result.Items.Count);
+            foreach (var preparedItem in result.Items)
             {
-                e.Data.RequestedOperation = DataPackageOperation.Move;
+                var storageItem = await CreateStorageItemForPreparedDragDownloadAsync(preparedItem);
+                if (storageItem is null)
+                {
+                    request.SetData(Array.Empty<IStorageItem>());
+                    return;
+                }
+
+                storageItems.Add(storageItem);
             }
+
+            request.SetData(storageItems.ToArray());
         }
-        else
+        catch
         {
-            ViewModel.PrepareItemsForDragDownloadInBackground(_activeInternalDragItems);
-            ViewModel.ShowStatus("正在准备拖出，稍后再拖。");
+            request.SetData(Array.Empty<IStorageItem>());
+        }
+        finally
+        {
+            deferral.Complete();
         }
     }
 
-    private static IStorageItem? CreateStorageItemForPreparedDragDownload(FileDragDownloadPreparedItem preparedItem)
+    private static async Task<IStorageItem?> CreateStorageItemForPreparedDragDownloadAsync(
+        FileDragDownloadPreparedItem preparedItem
+    )
     {
         try
         {
             return preparedItem.Source.IsDirectory
-                ? StorageFolder.GetFolderFromPathAsync(preparedItem.LocalPath).GetAwaiter().GetResult()
-                : StorageFile.GetFileFromPathAsync(preparedItem.LocalPath).GetAwaiter().GetResult();
+                ? await StorageFolder.GetFolderFromPathAsync(preparedItem.LocalPath)
+                : await StorageFile.GetFileFromPathAsync(preparedItem.LocalPath);
         }
         catch
         {
