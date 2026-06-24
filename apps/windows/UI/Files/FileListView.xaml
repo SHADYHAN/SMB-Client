@@ -67,6 +67,13 @@
                       BorderThickness="0">
                 <ListView.ContextMenu>
                     <ContextMenu>
+                        <MenuItem Header="剪切"
+                                  Command="{Binding PlacementTarget.DataContext.CutCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                        <MenuItem Header="复制"
+                                  Command="{Binding PlacementTarget.DataContext.CopyFileCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                        <MenuItem Header="粘贴"
+                                  Command="{Binding PlacementTarget.DataContext.PasteCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                        <Separator />
                         <MenuItem Header="复制链接"
                                   Command="{Binding PlacementTarget.DataContext.CopyLinkCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
                         <MenuItem Header="重命名"

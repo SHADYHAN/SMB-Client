@@ -4,7 +4,7 @@ $root = Split-Path -Parent $PSScriptRoot
 $bridgeRs = Join-Path $root "crates\rynat-core\src\bridge.rs"
 $header = Join-Path $root "include\rynat_core.h"
 $swiftBridge = Join-Path $root "apps\macos\RYNATClient\RynatCore.swift"
-$csBridge = Join-Path $root "apps\windows\RynatCoreBridge.cs"
+$csNativeMethods = Join-Path $root "apps\windows\CoreAdapter\NativeMethods.cs"
 
 function Get-UniqueSorted([string[]]$values) {
     return $values | Where-Object { $_ } | Sort-Object -Unique
@@ -15,7 +15,7 @@ function Filter-BridgeSurface([string[]]$values) {
 }
 
 function Extract-RustExports {
-    $pattern = 'pub extern "C" fn (rynat_[a-z0-9_]+)'
+    $pattern = 'pub (?:unsafe )?extern "C" fn (rynat_[a-z0-9_]+)'
     return Filter-BridgeSurface ((Get-Content $bridgeRs) | ForEach-Object {
         if ($_ -match $pattern) { $matches[1] }
     })
@@ -37,7 +37,7 @@ function Extract-SwiftExports {
 
 function Extract-CSharpExports {
     $pattern = 'internal static extern (?:IntPtr|void)\s+(rynat_[a-z0-9_]+)\('
-    return Filter-BridgeSurface ((Get-Content $csBridge) | ForEach-Object {
+    return Filter-BridgeSurface ((Get-Content $csNativeMethods) | ForEach-Object {
         if ($_ -match $pattern) { $matches[1] }
     })
 }

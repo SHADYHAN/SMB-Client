@@ -88,8 +88,16 @@ public partial class FileListView : UserControl
         {
             switch (e.Key)
             {
-                case Key.C when viewModel.CopyLinkCommand.CanExecute(null):
-                    viewModel.CopyLinkCommand.Execute(null);
+                case Key.X when viewModel.CutCommand.CanExecute(null):
+                    viewModel.CutCommand.Execute(null);
+                    e.Handled = true;
+                    return;
+                case Key.C when viewModel.CopyFileCommand.CanExecute(null):
+                    viewModel.CopyFileCommand.Execute(null);
+                    e.Handled = true;
+                    return;
+                case Key.V when viewModel.PasteCommand.CanExecute(null):
+                    viewModel.PasteCommand.Execute(null);
                     e.Handled = true;
                     return;
                 case Key.F:
@@ -98,6 +106,14 @@ public partial class FileListView : UserControl
                     e.Handled = true;
                     return;
             }
+        }
+        else if (Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift)
+            && e.Key == Key.C
+            && viewModel.CopyLinkCommand.CanExecute(null))
+        {
+            viewModel.CopyLinkCommand.Execute(null);
+            e.Handled = true;
+            return;
         }
 
         switch (e.Key)

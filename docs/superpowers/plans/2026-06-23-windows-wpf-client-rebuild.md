@@ -33,11 +33,14 @@
 - Windows build was confirmed by the user after the build script was simplified.
 - Link activation now brings the client to the foreground in the tested cases.
 - Local short-link browser tabs now return an already-activated close page instead of reopening `rynat://`.
+- Current macOS-side validation also covers `scripts/check-bridge-surface.sh` and `scripts/ffi-smoke-test.sh`.
+- Windows WPF has single-item remote copy / move / paste plumbing with same-name confirmation, pending Windows SMB validation.
+- Remote copy/move implementation is isolated in `RemoteCopyMoveService`; paste state and conflict flow are isolated in `RemoteClipboardCoordinator`.
 
 ## Remaining Product Work
 
-- [ ] Remote copy / move / paste inside the client.
-- [ ] Same-name conflict confirmation for remote copy / move flows.
+- [ ] Validate and refine remote copy / move / paste on real Windows SMB shares.
+- [ ] Expand remote copy / move / paste to multi-select if Windows parity requires it.
 - [ ] In-app drag/drop for remote move/copy: dragging without a valid cross-directory target should be visual only.
 - [ ] Further refine Explorer/Desktop drag-out visuals and same-name overwrite behavior on real Windows.
 - [ ] Improve preview performance: avoid caching large videos when a lightweight thumbnail/first-frame path is available.
@@ -47,8 +50,8 @@
 
 ## Remaining Architecture Work
 
-- [ ] Continue splitting `UI/Shell/ShellViewModel.cs` as features grow. It is much smaller than the old WinUI ViewModel, but at about 800 lines it is still the next pressure point.
-- [ ] Consider extracting dedicated coordinators/use cases for link activation, directory navigation, preview loading, and file drag/drop.
+- [ ] Continue splitting `UI/Shell/ShellViewModel.cs`; next candidates are link activation, directory navigation, preview loading, and file drag/drop.
+- [ ] Keep heavier recursive/long-running file workflows out of `FileOperationService`; put them behind dedicated use-case services like `RemoteCopyMoveService`.
 - [ ] Keep `MainWindow.xaml.cs` thin and prevent Shell/platform logic from leaking into UI code.
 - [ ] Add Windows-side automated smoke checks for bridge surface, startup parsing, and link activation helpers.
 - [ ] Revisit Cloud Files API only if the product later needs Explorer-level virtual drive / placeholder-file behavior.

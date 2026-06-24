@@ -31,6 +31,7 @@ This is the active WPF client for the rebuilt Windows line. It currently include
 - SMB session connection and share navigation
 - Explorer-style navigation tree basics
 - File list with refresh, search, rename, delete, create folder, and copy link
+- Single-item remote cut/copy/paste with same-name overwrite confirmation
 - Local file drop upload
 - Shell drag-out download foundation using virtual file data
 - Preview pane for image/video cache playback basics
@@ -45,13 +46,15 @@ Remaining feature migration should be added module by module rather than porting
 - Link activation works through `rynat://`, local HTTP redirect, single-instance forwarding, and foreground activation.
 - Compact `/s/<code>` quick links are supported.
 - Local short-link pages now close through an already-activated page instead of reopening the protocol.
+- WPF smoke checks now target the current `CoreAdapter` / `Services` / `Platform` / `UI` layout instead of the old WinUI app-services tree.
+- Remote copy/move logic is isolated in `RemoteCopyMoveService`, and shell paste state is isolated in `RemoteClipboardCoordinator`.
 
 ## Remaining Work
 
 Near-term product work:
 
-- Add in-app remote copy, move, and paste.
-- Add same-name conflict confirmation to remote copy/move flows.
+- Validate and refine in-app remote copy, move, and paste on real Windows SMB shares.
+- Expand remote copy/move beyond the current single-item flow if multi-select parity is needed.
 - Refine internal drag visuals so dragging without a valid cross-directory target is visual only.
 - Validate and refine shell drag-out visuals and same-name behavior on the Desktop.
 - Decide whether Windows needs the same favorites/quick-link library UI as macOS.
@@ -60,5 +63,5 @@ Follow-up quality work:
 
 - Improve preview performance with thumbnails/video first frames instead of caching large media when possible.
 - Add cache cleanup policy for preview and drag cache files.
-- Continue splitting `ShellViewModel` into smaller coordinators as file operations grow.
-- Add smoke checks around bridge surface, startup argument parsing, and local redirect handling.
+- Continue splitting `ShellViewModel` into link activation, navigation, preview, and drag/drop coordinators as those areas grow.
+- Broaden smoke checks around startup argument parsing and local redirect handling.

@@ -129,11 +129,12 @@ scripts/ffi-smoke-test-windows.ps1
 - Rust Core 是共享业务底座，链接、SMB、存储、凭据、任务、错误码、预览计划等能力已形成双平台共用边界。
 - macOS AppKit 客户端作为当前 macOS 主线继续演进，后续重点是拆薄 `WorkspaceController` 和 `RynatCore.swift`。
 - Windows 主线已切换为 WPF 客户端，旧 WinUI 3 版本只保留在 `apps/windows-winui-legacy` 作为历史参考。
+- Windows WPF 已接入单项远端复制 / 移动 / 粘贴和同名确认基础流程，仍需 Windows 实机验证构建、交互和 SMB 真实行为。
 - 快速链接已切换为紧凑 `/s/<短码>` 格式；本地短链接命中客户端后，浏览器页只负责尝试关闭，不再重复唤醒协议。
 
 ## 后续重点
 
-- Windows：补齐远端复制 / 移动 / 粘贴，以及复制 / 移动同名确认。
+- Windows：实机验证并打磨远端复制 / 移动 / 粘贴，包括目录递归、跨共享限制和同名覆盖行为。
 - Windows：继续实机打磨软件内拖拽、拖出桌面视觉影子和 Explorer 同名行为。
 - Windows：优化预览性能和缓存清理。
 - macOS：按 `docs/macos-architecture-evolution-plan.md` 渐进拆分桥接、服务和状态。

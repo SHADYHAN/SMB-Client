@@ -15,6 +15,8 @@ public sealed class FileListViewModel : ObservableObject
 
     public ObservableCollection<FileItemViewModel> Items { get; } = new();
 
+    public IEnumerable<string> AllNames => _allItems.Select(item => item.Name);
+
     public string PathTitle
     {
         get => _pathTitle;
@@ -54,6 +56,12 @@ public sealed class FileListViewModel : ObservableObject
     public ICommand OpenItemCommand { get; set; } = new RelayCommand(_ => { });
 
     public ICommand CopyLinkCommand { get; set; } = new RelayCommand(_ => { });
+
+    public ICommand CutCommand { get; set; } = new RelayCommand(_ => { });
+
+    public ICommand CopyFileCommand { get; set; } = new RelayCommand(_ => { });
+
+    public ICommand PasteCommand { get; set; } = new RelayCommand(_ => { });
 
     public ICommand RefreshCommand { get; set; } = new RelayCommand(_ => { });
 
@@ -101,6 +109,11 @@ public sealed class FileListViewModel : ObservableObject
         Items.Clear();
         SelectedItem = null;
         IsLoading = false;
+    }
+
+    public bool ContainsName(string name)
+    {
+        return _allItems.Any(item => item.Name.Equals(name, StringComparison.CurrentCultureIgnoreCase));
     }
 
     private void ApplyFilter()

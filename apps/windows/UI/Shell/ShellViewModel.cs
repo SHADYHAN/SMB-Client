@@ -27,6 +27,7 @@ public sealed class ShellViewModel : ObservableObject
     private readonly ISmbSessionService _sessionService;
     private readonly IDirectoryService _directoryService;
     private readonly IFileOperationService _fileOperationService;
+    private readonly IRemoteCopyMoveService _remoteCopyMoveService;
     private readonly IFileTransferService _fileTransferService;
     private readonly IQuickLinkService _quickLinkService;
     private readonly ILinkActivationService _linkActivationService;
@@ -42,6 +43,7 @@ public sealed class ShellViewModel : ObservableObject
     private string _currentPath = "/";
     private string? _loadingDirectoryKey;
     private LinkOpenRequest? _pendingLinkOpenRequest;
+    private readonly RemoteClipboardCoordinator _remoteClipboardCoordinator;
     private int _previewLoadVersion;
     private bool _isLoggedIn;
 
@@ -50,6 +52,7 @@ public sealed class ShellViewModel : ObservableObject
         ISmbSessionService sessionService,
         IDirectoryService directoryService,
         IFileOperationService fileOperationService,
+        IRemoteCopyMoveService remoteCopyMoveService,
         IFileTransferService fileTransferService,
         IQuickLinkService quickLinkService,
         ILinkActivationService linkActivationService,
@@ -65,6 +68,7 @@ public sealed class ShellViewModel : ObservableObject
         _sessionService = sessionService;
         _directoryService = directoryService;
         _fileOperationService = fileOperationService;
+        _remoteCopyMoveService = remoteCopyMoveService;
         _fileTransferService = fileTransferService;
         _quickLinkService = quickLinkService;
         _linkActivationService = linkActivationService;
@@ -74,11 +78,18 @@ public sealed class ShellViewModel : ObservableObject
         _userDialogService = userDialogService;
         _serverSettingsDialogService = serverSettingsDialogService;
         _shellDragDropService = shellDragDropService;
+        _remoteClipboardCoordinator = new RemoteClipboardCoordinator(
+            _remoteCopyMoveService,
+            names => _userDialogService.ConfirmOverwrite(names)
+        );
 
         Login.LoginCommand = new AsyncRelayCommand(LoginAsync, CanLogin);
         Login.ServerSettingsCommand = new AsyncRelayCommand(OpenServerSettingsAsync, () => !Login.IsBusy);
         FileList.OpenItemCommand = new AsyncRelayCommand(OpenSelectedItemAsync, () => FileList.SelectedItem is not null);
         FileList.CopyLinkCommand = new AsyncRelayCommand(CopySelectedFileLinkAsync, () => FileList.SelectedItem is not null && _session is not null);
+        FileList.CutCommand = new RelayCommand(CutSelectedItem, () => FileList.SelectedItem is not null && _session is not null);
+        FileList.CopyFileCommand = new RelayCommand(CopySelectedItem, () => FileList.SelectedItem is not null && _session is not null);
+        FileList.PasteCommand = new AsyncRelayCommand(PasteRemoteClipboardAsync, CanPasteRemoteClipboard);
         FileList.RefreshCommand = new AsyncRelayCommand(RefreshCurrentDirectoryAsync, CanUseCurrentDirectory);
         FileList.CreateFolderCommand = new AsyncRelayCommand(CreateFolderAsync, CanUseCurrentDirectory);
         FileList.DeleteCommand = new AsyncRelayCommand(DeleteSelectedItemAsync, () => FileList.SelectedItem is not null && _session is not null);
@@ -231,7 +242,7 @@ public sealed class ShellViewModel : ObservableObject
         }
 
         var existingNames = new HashSet<string>(
-            FileList.Items.Select(item => item.Name),
+            FileList.AllNames,
             StringComparer.CurrentCultureIgnoreCase
         );
         var conflicts = localPaths
@@ -354,12 +365,13 @@ public sealed class ShellViewModel : ObservableObject
     private async Task CompleteLoginAsync(ServerSession session)
     {
         _session = session;
+        _remoteClipboardCoordinator.Clear();
         Navigation.LoadShares(_session.Shares);
         IsLoggedIn = true;
-        RefreshFileCommands();
         Login.Password = "";
         FileList.Clear("");
         Preview.ShowSelection(null);
+        RefreshFileCommands();
         Status.Message = $"已连接 {_session.Host}。";
         await ConsumePendingLinkIfPossibleAsync();
     }
@@ -632,11 +644,90 @@ public sealed class ShellViewModel : ObservableObject
         }
     }
 
+    private void CutSelectedItem()
+    {
+        if (FileList.SelectedItem?.Item is not { } item)
+        {
+            return;
+        }
+
+        Status.Message = _remoteClipboardCoordinator.Cut(item);
+        RefreshFileCommands();
+    }
+
+    private void CopySelectedItem()
+    {
+        if (FileList.SelectedItem?.Item is not { } item)
+        {
+            return;
+        }
+
+        Status.Message = _remoteClipboardCoordinator.Copy(item);
+        RefreshFileCommands();
+    }
+
+    private async Task PasteRemoteClipboardAsync()
+    {
+        if (_session is null || _currentShare is null)
+        {
+            return;
+        }
+
+        try
+        {
+            Status.Message = "正在粘贴...";
+            var pasteResult = await _remoteClipboardCoordinator.PasteAsync(
+                _session,
+                _currentShare,
+                _currentPath,
+                FileList.ContainsName
+            );
+            if (pasteResult is null)
+            {
+                return;
+            }
+
+            Status.Message = pasteResult.OperationResult.Summary;
+            if (pasteResult.ClearClipboard)
+            {
+                _remoteClipboardCoordinator.Clear();
+            }
+
+            if (pasteResult.OperationResult.Succeeded)
+            {
+                await RefreshCurrentDirectoryAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            Status.Message = UserFacingError(ex, "粘贴失败");
+        }
+        finally
+        {
+            RefreshFileCommands();
+        }
+    }
+
     private void RefreshFileCommands()
     {
         if (FileList.CopyLinkCommand is AsyncRelayCommand copyLinkCommand)
         {
             copyLinkCommand.RaiseCanExecuteChanged();
+        }
+
+        if (FileList.CutCommand is RelayCommand cutCommand)
+        {
+            cutCommand.RaiseCanExecuteChanged();
+        }
+
+        if (FileList.CopyFileCommand is RelayCommand copyFileCommand)
+        {
+            copyFileCommand.RaiseCanExecuteChanged();
+        }
+
+        if (FileList.PasteCommand is AsyncRelayCommand pasteCommand)
+        {
+            pasteCommand.RaiseCanExecuteChanged();
         }
 
         if (FileList.RefreshCommand is AsyncRelayCommand refreshCommand)
@@ -666,6 +757,8 @@ public sealed class ShellViewModel : ObservableObject
     }
 
     private bool CanUseCurrentDirectory() => _session is not null && _currentShare is not null;
+
+    private bool CanPasteRemoteClipboard() => CanUseCurrentDirectory() && _remoteClipboardCoordinator.CanPaste;
 
     private NavigationNodeViewModel? CurrentNavigationNode()
     {
