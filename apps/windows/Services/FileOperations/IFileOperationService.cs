@@ -17,4 +17,13 @@ public interface IFileOperationService
         RemoteFileItem item,
         CancellationToken cancellationToken = default
     );
+
+    Task<FileOperationResult> UploadFilesAsync(
+        ServerSession session,
+        string share,
+        string parentPath,
+        IReadOnlyList<string> localPaths,
+        bool replaceExisting,
+        CancellationToken cancellationToken = default
+    );
 }

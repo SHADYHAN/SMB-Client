@@ -201,6 +201,51 @@ public sealed class ShellViewModel : ObservableObject
         }
     }
 
+    public async Task UploadDroppedFilesAsync(IReadOnlyList<string> localPaths)
+    {
+        if (_session is null || _currentShare is null)
+        {
+            return;
+        }
+
+        var existingNames = new HashSet<string>(
+            FileList.Items.Select(item => item.Name),
+            StringComparer.CurrentCultureIgnoreCase
+        );
+        var conflicts = localPaths
+            .Select(System.IO.Path.GetFileName)
+            .Where(name => !string.IsNullOrWhiteSpace(name) && existingNames.Contains(name))
+            .Cast<string>()
+            .Distinct(StringComparer.CurrentCultureIgnoreCase)
+            .ToArray();
+        if (conflicts.Length > 0 && !_userDialogService.ConfirmOverwrite(conflicts))
+        {
+            Status.Message = "已取消上传。";
+            return;
+        }
+
+        try
+        {
+            Status.Message = "正在上传...";
+            var result = await _fileOperationService.UploadFilesAsync(
+                _session,
+                _currentShare,
+                _currentPath,
+                localPaths,
+                replaceExisting: conflicts.Length > 0
+            );
+            Status.Message = result.Summary;
+            if (result.Succeeded)
+            {
+                await RefreshCurrentDirectoryAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            Status.Message = UserFacingError(ex, "上传失败");
+        }
+    }
+
     private async Task LoginAsync()
     {
         if (!CanLogin())

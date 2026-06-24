@@ -54,6 +54,29 @@ public partial class FileListView : UserControl
         }
     }
 
+    private void ListView_OnDragOver(object sender, DragEventArgs e)
+    {
+        e.Effects = HasFileDrop(e) ? DragDropEffects.Copy : DragDropEffects.None;
+        e.Handled = true;
+    }
+
+    private async void ListView_OnDrop(object sender, DragEventArgs e)
+    {
+        e.Handled = true;
+        if (!HasFileDrop(e) || e.Data.GetData(DataFormats.FileDrop) is not string[] paths)
+        {
+            return;
+        }
+
+        if (FindShellViewModel() is { } shell)
+        {
+            await shell.UploadDroppedFilesAsync(paths);
+        }
+    }
+
+    private static bool HasFileDrop(DragEventArgs e) =>
+        e.Data.GetDataPresent(DataFormats.FileDrop);
+
     private void ListView_OnMouseDoubleClick(object sender, MouseButtonEventArgs e)
     {
         if (DataContext is FileListViewModel viewModel

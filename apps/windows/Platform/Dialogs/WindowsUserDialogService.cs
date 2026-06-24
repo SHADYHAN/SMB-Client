@@ -66,4 +66,12 @@ public sealed class WindowsUserDialogService : IUserDialogService
             MessageBoxImage.Question
         ) == MessageBoxResult.OK;
     }
+
+    public bool ConfirmOverwrite(IReadOnlyList<string> names)
+    {
+        var message = names.Count == 1
+            ? $"{names[0]} 已存在，是否覆盖？"
+            : $"有 {names.Count} 个同名文件，是否覆盖？";
+        return Confirm("确认覆盖", message);
+    }
 }

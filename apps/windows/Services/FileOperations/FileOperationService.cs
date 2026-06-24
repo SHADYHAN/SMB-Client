@@ -1,3 +1,4 @@
+using System.IO;
 using Rynat.Client;
 using Rynat.WindowsClient.Domain;
 using Rynat.WindowsClient.Infrastructure;
@@ -72,6 +73,65 @@ public sealed class FileOperationService : IFileOperationService
             catch (Exception ex) when (BridgeExceptionClassifier.IsBridgeFailure(ex))
             {
                 return Failure("删除失败。", BridgeExceptionClassifier.ErrorCodeFor(ex));
+            }
+        }, cancellationToken);
+    }
+
+    public Task<FileOperationResult> UploadFilesAsync(
+        ServerSession session,
+        string share,
+        string parentPath,
+        IReadOnlyList<string> localPaths,
+        bool replaceExisting,
+        CancellationToken cancellationToken = default
+    )
+    {
+        return Task.Run(() =>
+        {
+            try
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (localPaths.Count == 0)
+                {
+                    return Failure("请选择文件。", "upload.no_files");
+                }
+
+                if (localPaths.Any(Directory.Exists))
+                {
+                    return Failure("暂不支持上传文件夹。", "upload.directory_not_supported");
+                }
+
+                var uploaded = 0;
+                foreach (var localPath in localPaths)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (!File.Exists(localPath))
+                    {
+                        return Failure("上传失败。", "upload.missing_file");
+                    }
+
+                    var fileName = Path.GetFileName(localPath);
+                    if (!IsValidNewDirectoryName(fileName))
+                    {
+                        return Failure("文件名不可用。", "upload.invalid_name");
+                    }
+
+                    _bridge.SmbUploadFile(new SmbUploadFileRequest(
+                        share,
+                        localPath,
+                        JoinRemotePath(parentPath, fileName),
+                        replaceExisting,
+                        session.ConnectionId,
+                        OperationId("upload")
+                    ));
+                    uploaded++;
+                }
+
+                return new FileOperationResult(true, uploaded == 1 ? "上传完成。" : $"已上传 {uploaded} 个文件。");
+            }
+            catch (Exception ex) when (BridgeExceptionClassifier.IsBridgeFailure(ex) || ex is IOException or UnauthorizedAccessException)
+            {
+                return Failure("上传失败。", BridgeExceptionClassifier.ErrorCodeFor(ex, "upload.failed"));
             }
         }, cancellationToken);
     }
