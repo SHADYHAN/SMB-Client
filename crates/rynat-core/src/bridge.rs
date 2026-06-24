@@ -1451,7 +1451,7 @@ mod tests {
         let link = response.data.unwrap();
 
         assert!(response.ok);
-        assert!(link.http_url.starts_with("http://127.0.0.1:19527/s?d="));
+        assert!(link.http_url.starts_with("http://127.0.0.1:19527/s/"));
         assert_eq!(
             crate::link::parse_quick_link(&link.http_url).unwrap().kind,
             crate::link::LinkKind::File
@@ -1476,7 +1476,7 @@ mod tests {
             serde_json::from_str(&list_json).unwrap();
 
         assert!(response.ok);
-        assert!(link.http_url.starts_with("http://127.0.0.1:19527/s?"));
+        assert!(link.http_url.starts_with("http://127.0.0.1:19527/s/"));
         assert!(list_response.data.unwrap().is_empty());
     }
 

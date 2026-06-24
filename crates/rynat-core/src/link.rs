@@ -199,6 +199,13 @@ struct QuickLinkPayload {
     t: Option<String>,
 }
 
+struct DecodedQuickLinkPayload {
+    server_host: String,
+    share: String,
+    path: String,
+    kind: LinkKind,
+}
+
 pub fn normalize_remote_path(raw: &str) -> String {
     let mut path = raw.trim().replace('\\', "/");
     if path.is_empty() {
@@ -218,8 +225,11 @@ pub fn normalize_remote_path(raw: &str) -> String {
 
 pub fn build_deep_link(protocol: &str, target: &QuickLinkTarget) -> CoreResult<String> {
     target.validate()?;
-    let mut url = Url::parse(&format!("{protocol}://s"))?;
-    append_target_payload(&mut url, target)?;
+    let payload = target_payload(target)?;
+    let mut url = Url::parse(&format!("{protocol}://s/"))?;
+    url.path_segments_mut()
+        .map_err(|_| CoreError::InvalidLink("link cannot contain path segments".to_string()))?
+        .push(&payload);
     Ok(url.to_string())
 }
 
@@ -238,15 +248,31 @@ pub fn build_web_redirect_link(
             "redirect endpoint must use http or https".to_string(),
         ));
     }
-    append_target_payload(&mut url, target)?;
+    let payload = target_payload(target)?;
+    url.set_query(None);
+    trim_trailing_path_slash(&mut url);
+    url.path_segments_mut()
+        .map_err(|_| CoreError::InvalidLink("link cannot contain path segments".to_string()))?
+        .push(&payload);
     Ok(url.to_string())
+}
+
+fn trim_trailing_path_slash(url: &mut Url) {
+    let path = url.path();
+    if path.len() > 1 && path.ends_with('/') {
+        let trimmed = path.trim_end_matches('/').to_string();
+        url.set_path(&trimmed);
+    }
 }
 
 pub fn parse_quick_link(input: &str) -> CoreResult<QuickLinkTarget> {
     let url = Url::parse(input)?;
-    let action = match url.scheme() {
-        DEFAULT_PROTOCOL => url.host_str().unwrap_or("s").trim_matches('/'),
-        "http" | "https" => url.path().trim_matches('/'),
+    let (action, path_payload) = match url.scheme() {
+        DEFAULT_PROTOCOL => (
+            url.host_str().unwrap_or("s").trim_matches('/').to_string(),
+            path_payload(&url),
+        ),
+        "http" | "https" => http_action_and_payload(&url),
         scheme => {
             return Err(CoreError::InvalidLink(format!(
                 "unsupported scheme '{scheme}'"
@@ -260,35 +286,146 @@ pub fn parse_quick_link(input: &str) -> CoreResult<QuickLinkTarget> {
         )));
     }
 
-    let payload = url
-        .query_pairs()
-        .find(|(key, _)| key == "d")
-        .map(|(_, value)| value.into_owned())
+    let payload = path_payload
+        .or_else(|| query_payload(&url))
         .ok_or(CoreError::MissingField("payload"))?;
-    let payload_bytes = base64url_decode(&payload)?;
-    let payload: QuickLinkPayload = serde_json::from_slice(&payload_bytes)?;
+    let payload = decode_target_payload(&payload)?;
     let target = QuickLinkTarget::new(
-        payload.h,
-        payload.s,
-        payload.p,
+        payload.server_host,
+        payload.share,
+        payload.path,
         None,
-        LinkKind::from_param(payload.t.as_deref()),
+        payload.kind,
     );
     target.validate()?;
     Ok(target)
 }
 
-fn append_target_payload(url: &mut Url, target: &QuickLinkTarget) -> CoreResult<()> {
-    let payload = QuickLinkPayload {
-        h: target.server_host.clone(),
-        s: target.share.clone(),
-        p: target.path.clone(),
-        t: target.kind.as_param().map(str::to_string),
-    };
-    let payload = serde_json::to_vec(&payload)?;
-    url.query_pairs_mut()
-        .append_pair("d", &base64url_encode(&payload));
-    Ok(())
+fn http_action_and_payload(url: &Url) -> (String, Option<String>) {
+    let path = url.path().trim_matches('/');
+    if let Some(payload) = path.strip_prefix("s/") {
+        return ("s".to_string(), Some(payload.to_string()));
+    }
+    (path.to_string(), None)
+}
+
+fn path_payload(url: &Url) -> Option<String> {
+    let path = url.path().trim_matches('/');
+    if path.is_empty() {
+        return None;
+    }
+    Some(path.to_string())
+}
+
+fn query_payload(url: &Url) -> Option<String> {
+    url.query_pairs()
+        .find(|(key, _)| key == "d")
+        .map(|(_, value)| value.into_owned())
+}
+
+fn target_payload(target: &QuickLinkTarget) -> CoreResult<String> {
+    let mut payload = Vec::new();
+    payload.push(1);
+    payload.push(kind_byte(target.kind));
+    write_payload_string(&mut payload, &target.server_host);
+    write_payload_string(&mut payload, &target.share);
+    write_payload_string(&mut payload, &target.path);
+    Ok(base64url_encode(&payload))
+}
+
+fn decode_target_payload(payload: &str) -> CoreResult<DecodedQuickLinkPayload> {
+    let bytes = base64url_decode(payload)?;
+    if bytes.first() == Some(&1) {
+        return decode_binary_target_payload(&bytes);
+    }
+
+    let payload: QuickLinkPayload = serde_json::from_slice(&bytes)?;
+    Ok(DecodedQuickLinkPayload {
+        server_host: payload.h,
+        share: payload.s,
+        path: payload.p,
+        kind: LinkKind::from_param(payload.t.as_deref()),
+    })
+}
+
+fn decode_binary_target_payload(bytes: &[u8]) -> CoreResult<DecodedQuickLinkPayload> {
+    if bytes.len() < 2 {
+        return Err(CoreError::InvalidLink("invalid payload".to_string()));
+    }
+
+    let mut cursor = 2;
+    let server_host = read_payload_string(bytes, &mut cursor)?;
+    let share = read_payload_string(bytes, &mut cursor)?;
+    let path = read_payload_string(bytes, &mut cursor)?;
+    if cursor != bytes.len() {
+        return Err(CoreError::InvalidLink("invalid payload".to_string()));
+    }
+
+    Ok(DecodedQuickLinkPayload {
+        server_host,
+        share,
+        path,
+        kind: kind_from_byte(bytes[1]),
+    })
+}
+
+fn write_payload_string(output: &mut Vec<u8>, value: &str) {
+    write_varint(output, value.len() as u64);
+    output.extend_from_slice(value.as_bytes());
+}
+
+fn read_payload_string(bytes: &[u8], cursor: &mut usize) -> CoreResult<String> {
+    let length = read_varint(bytes, cursor)? as usize;
+    let end = cursor
+        .checked_add(length)
+        .ok_or_else(|| CoreError::InvalidLink("invalid payload".to_string()))?;
+    if end > bytes.len() {
+        return Err(CoreError::InvalidLink("invalid payload".to_string()));
+    }
+    let value = std::str::from_utf8(&bytes[*cursor..end])
+        .map_err(|_| CoreError::InvalidLink("invalid payload".to_string()))?
+        .to_string();
+    *cursor = end;
+    Ok(value)
+}
+
+fn write_varint(output: &mut Vec<u8>, mut value: u64) {
+    while value >= 0x80 {
+        output.push((value as u8) | 0x80);
+        value >>= 7;
+    }
+    output.push(value as u8);
+}
+
+fn read_varint(bytes: &[u8], cursor: &mut usize) -> CoreResult<u64> {
+    let mut value = 0_u64;
+    let mut shift = 0_u32;
+    while *cursor < bytes.len() && shift <= 63 {
+        let byte = bytes[*cursor];
+        *cursor += 1;
+        value |= ((byte & 0x7f) as u64) << shift;
+        if byte & 0x80 == 0 {
+            return Ok(value);
+        }
+        shift += 7;
+    }
+    Err(CoreError::InvalidLink("invalid payload".to_string()))
+}
+
+fn kind_byte(kind: LinkKind) -> u8 {
+    match kind {
+        LinkKind::Unknown => 0,
+        LinkKind::File => 1,
+        LinkKind::Directory => 2,
+    }
+}
+
+fn kind_from_byte(value: u8) -> LinkKind {
+    match value {
+        1 => LinkKind::File,
+        2 => LinkKind::Directory,
+        _ => LinkKind::Unknown,
+    }
 }
 
 const BASE64URL: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
@@ -374,11 +511,13 @@ mod tests {
 
         let url = build_http_link(19527, &target).unwrap();
 
-        assert!(url.starts_with("http://127.0.0.1:19527/s?d="));
+        assert!(url.starts_with("http://127.0.0.1:19527/s/"));
+        assert!(!url.contains("?d="));
         assert!(!url.contains("%E5"));
         assert!(!url.contains("共享资料"));
         assert!(!url.contains("&s="));
         assert!(!url.contains("&p="));
+        assert!(url.len() < 115);
 
         let parsed = parse_quick_link(&url).unwrap();
         assert_eq!(parsed.server_host, "nas.local:445");
@@ -400,7 +539,8 @@ mod tests {
 
         let url = build_web_redirect_link("https://links.example.com/s", &target).unwrap();
 
-        assert!(url.starts_with("https://links.example.com/s?d="));
+        assert!(url.starts_with("https://links.example.com/s/"));
+        assert!(!url.contains("?d="));
         assert!(!url.contains("h=nas.local"));
         assert!(!url.contains("s=Media"));
         assert!(!url.contains("p=%2FMovies%2Fdemo.mp4"));
@@ -426,8 +566,8 @@ mod tests {
         let endpoint = LinkEndpoint::web_redirect("https://links.example.com/s");
         let link = QuickLink::create_with_endpoint(target, &endpoint).unwrap();
 
-        assert!(link.http_url.starts_with("https://links.example.com/s?"));
-        assert!(link.deep_link_url.starts_with("rynat://s?"));
+        assert!(link.http_url.starts_with("https://links.example.com/s/"));
+        assert!(link.deep_link_url.starts_with("rynat://s/"));
     }
 
     #[test]

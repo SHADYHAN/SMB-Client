@@ -102,8 +102,7 @@ final class LocalRedirectServer {
             return
         }
 
-        let query = rawPath.split(separator: "?", maxSplits: 1).dropFirst().first.map(String.init) ?? ""
-        let target = "rynat://s" + (query.isEmpty ? "" : "?\(query)")
+        let target = deepLinkTarget(from: rawPath)
         onLog("HTTP bridge page -> \(target)")
         DispatchQueue.main.async { [weak self] in
             self?.onOpenLink?(target)
@@ -118,6 +117,17 @@ final class LocalRedirectServer {
             ],
             body: bridgeHTML(target: target, onLog: onLog)
         )
+    }
+
+    private func deepLinkTarget(from rawPath: String) -> String {
+        let fragmentFreePath = rawPath.split(separator: "#", maxSplits: 1).first.map(String.init) ?? rawPath
+        let pathOnly = fragmentFreePath.split(separator: "?", maxSplits: 1).first.map(String.init) ?? fragmentFreePath
+        let query = fragmentFreePath.split(separator: "?", maxSplits: 1).dropFirst().first.map(String.init) ?? ""
+        let payload = pathOnly.hasPrefix("/s/") ? String(pathOnly.dropFirst(3)) : ""
+        if !payload.isEmpty {
+            return "rynat://s/\(payload)"
+        }
+        return "rynat://s" + (query.isEmpty ? "" : "?\(query)")
     }
 
     private func readHTTPRequest(client: Int32) -> String? {

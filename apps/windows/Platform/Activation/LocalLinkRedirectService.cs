@@ -2,6 +2,7 @@ using System.IO;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using Rynat.Client;
 
 namespace Rynat.WindowsClient.Platform.Activation;
 
@@ -14,9 +15,11 @@ public sealed class LocalLinkRedirectService : ILocalLinkRedirectService
     private CancellationTokenSource? _cancellation;
     private Task? _serverTask;
     private bool _disposed;
+    private readonly RynatCoreBridge _bridge;
 
-    public LocalLinkRedirectService()
+    public LocalLinkRedirectService(RynatCoreBridge bridge)
     {
+        _bridge = bridge;
     }
 
     public event EventHandler<ExternalActivationEventArgs>? Activated;
@@ -157,23 +160,31 @@ public sealed class LocalLinkRedirectService : ILocalLinkRedirectService
             return false;
         }
 
-        if (!string.Equals(uri.AbsolutePath.Trim('/'), "s", StringComparison.OrdinalIgnoreCase))
+        var path = uri.AbsolutePath.Trim('/');
+        if (!string.Equals(path, "s", StringComparison.OrdinalIgnoreCase)
+            && !path.StartsWith("s/", StringComparison.OrdinalIgnoreCase))
         {
             return false;
         }
 
-        var builder = new UriBuilder(uri)
-        {
-            Scheme = "rynat",
-            Host = "s",
-            Port = -1,
-            Path = string.Empty
-        };
-        deepLink = builder.Uri.ToString();
+        var payloadPath = path.Length > 2 ? path[1..] : string.Empty;
+        deepLink = "rynat://s" + payloadPath + uri.Query;
         return true;
     }
 
-    private static string BuildAcceptedPage(string deepLink)
+    private string BuildAcceptedPage(string deepLink)
+    {
+        try
+        {
+            return _bridge.RedirectPage(new RedirectPageRequest(deepLink));
+        }
+        catch
+        {
+            return BuildFallbackPage(deepLink);
+        }
+    }
+
+    private static string BuildFallbackPage(string deepLink)
     {
         var escapedUrl = WebUtility.HtmlEncode(deepLink);
         var jsUrl = System.Text.Json.JsonSerializer.Serialize(deepLink);

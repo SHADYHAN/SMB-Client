@@ -148,9 +148,9 @@ mod tests {
         assert!(html.contains("frame.src = url;"));
         assert!(html.contains("setTimeout(closeTab, 260);"));
         assert!(html.contains("document.body.style.display = \"flex\""));
-        assert!(html.contains("rynat://s?"));
-        assert!(html.contains("var url = \"rynat://s?"));
-        assert!(html.contains("href=\"rynat://s?d="));
+        assert!(html.contains("rynat://s/"));
+        assert!(html.contains("var url = \"rynat://s/"));
+        assert!(html.contains("href=\"rynat://s/"));
         assert!(!html.contains("h=nas&amp;s=Share"));
     }
 
