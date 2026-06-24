@@ -9,12 +9,26 @@
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="180" />
                 </Grid.ColumnDefinitions>
                 <TextBlock Text="{Binding PathTitle}"
                            FontWeight="SemiBold"
                            VerticalAlignment="Center" />
-                <TextBlock Grid.Column="1"
+                <Button Grid.Column="1"
+                        Content="刷新"
+                        MinHeight="30"
+                        Padding="10,4"
+                        Margin="0,0,8,0"
+                        Command="{Binding RefreshCommand}" />
+                <Button Grid.Column="2"
+                        Content="新建文件夹"
+                        MinHeight="30"
+                        Padding="10,4"
+                        Margin="0,0,12,0"
+                        Command="{Binding CreateFolderCommand}" />
+                <TextBlock Grid.Column="3"
                            Text="正在加载..."
                            Foreground="{StaticResource TextSecondaryBrush}"
                            Margin="0,0,12,0"
@@ -30,7 +44,7 @@
                         </Style>
                     </TextBlock.Style>
                 </TextBlock>
-                <TextBox Grid.Column="2"
+                <TextBox Grid.Column="4"
                          MinHeight="30"
                          Padding="8,4"
                          VerticalContentAlignment="Center"
@@ -47,6 +61,9 @@
                     <ContextMenu>
                         <MenuItem Header="复制链接"
                                   Command="{Binding PlacementTarget.DataContext.CopyLinkCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                        <Separator />
+                        <MenuItem Header="删除"
+                                  Command="{Binding PlacementTarget.DataContext.DeleteCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
                     </ContextMenu>
                 </ListView.ContextMenu>
                 <ListView.View>

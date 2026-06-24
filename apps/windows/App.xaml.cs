@@ -1,9 +1,11 @@
 using System.Windows;
 using Rynat.Client;
 using Rynat.WindowsClient.Platform.Clipboard;
+using Rynat.WindowsClient.Platform.Dialogs;
 using Rynat.WindowsClient.Platform.Shell;
 using Rynat.WindowsClient.Services.Bootstrap;
 using Rynat.WindowsClient.Services.Directory;
+using Rynat.WindowsClient.Services.FileOperations;
 using Rynat.WindowsClient.Services.Links;
 using Rynat.WindowsClient.Services.Preview;
 using Rynat.WindowsClient.Services.Profiles;
@@ -22,20 +24,24 @@ public partial class App : Application
         var bootstrapService = new BootstrapService(bridge);
         var sessionService = new SmbSessionService(bridge);
         var directoryService = new DirectoryService(bridge);
+        var fileOperationService = new FileOperationService(bridge);
         var quickLinkService = new QuickLinkService(bridge);
         var previewService = new PreviewService(bridge);
         var serverProfileService = new ServerProfileService(bridge);
         var clipboardService = new WindowsClipboardService();
+        var userDialogService = new WindowsUserDialogService();
         var shellDragDropService = new WindowsShellDragDropService();
 
         var viewModel = new ShellViewModel(
             bootstrapService,
             sessionService,
             directoryService,
+            fileOperationService,
             quickLinkService,
             previewService,
             serverProfileService,
             clipboardService,
+            userDialogService,
             shellDragDropService
         );
 

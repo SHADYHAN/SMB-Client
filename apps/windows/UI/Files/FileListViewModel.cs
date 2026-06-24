@@ -41,6 +41,12 @@ public sealed class FileListViewModel : ObservableObject
 
     public ICommand CopyLinkCommand { get; set; } = new RelayCommand(_ => { });
 
+    public ICommand RefreshCommand { get; set; } = new RelayCommand(_ => { });
+
+    public ICommand CreateFolderCommand { get; set; } = new RelayCommand(_ => { });
+
+    public ICommand DeleteCommand { get; set; } = new RelayCommand(_ => { });
+
     private void RefreshOpenItemCommand()
     {
         if (OpenItemCommand is AsyncRelayCommand asyncCommand)

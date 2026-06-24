@@ -1,9 +1,11 @@
 using System.Threading;
 using Rynat.WindowsClient.Domain;
 using Rynat.WindowsClient.Platform.Clipboard;
+using Rynat.WindowsClient.Platform.Dialogs;
 using Rynat.WindowsClient.Platform.Shell;
 using Rynat.WindowsClient.Services.Bootstrap;
 using Rynat.WindowsClient.Services.Directory;
+using Rynat.WindowsClient.Services.FileOperations;
 using Rynat.WindowsClient.Services.Links;
 using Rynat.WindowsClient.Services.Preview;
 using Rynat.WindowsClient.Services.Profiles;
@@ -22,12 +24,16 @@ public sealed class ShellViewModel : ObservableObject
     private readonly IBootstrapService _bootstrapService;
     private readonly ISmbSessionService _sessionService;
     private readonly IDirectoryService _directoryService;
+    private readonly IFileOperationService _fileOperationService;
     private readonly IQuickLinkService _quickLinkService;
     private readonly IPreviewService _previewService;
     private readonly IServerProfileService _serverProfileService;
     private readonly IClipboardService _clipboardService;
+    private readonly IUserDialogService _userDialogService;
     private readonly IWindowsShellDragDropService _shellDragDropService;
     private ServerSession? _session;
+    private string? _currentShare;
+    private string _currentPath = "/";
     private string? _loadingDirectoryKey;
     private int _previewLoadVersion;
     private bool _isLoggedIn;
@@ -36,25 +42,32 @@ public sealed class ShellViewModel : ObservableObject
         IBootstrapService bootstrapService,
         ISmbSessionService sessionService,
         IDirectoryService directoryService,
+        IFileOperationService fileOperationService,
         IQuickLinkService quickLinkService,
         IPreviewService previewService,
         IServerProfileService serverProfileService,
         IClipboardService clipboardService,
+        IUserDialogService userDialogService,
         IWindowsShellDragDropService shellDragDropService
     )
     {
         _bootstrapService = bootstrapService;
         _sessionService = sessionService;
         _directoryService = directoryService;
+        _fileOperationService = fileOperationService;
         _quickLinkService = quickLinkService;
         _previewService = previewService;
         _serverProfileService = serverProfileService;
         _clipboardService = clipboardService;
+        _userDialogService = userDialogService;
         _shellDragDropService = shellDragDropService;
 
         Login.LoginCommand = new AsyncRelayCommand(LoginAsync, CanLogin);
         FileList.OpenItemCommand = new AsyncRelayCommand(OpenSelectedItemAsync, () => FileList.SelectedItem is not null);
         FileList.CopyLinkCommand = new AsyncRelayCommand(CopySelectedFileLinkAsync, () => FileList.SelectedItem is not null && _session is not null);
+        FileList.RefreshCommand = new AsyncRelayCommand(RefreshCurrentDirectoryAsync, CanUseCurrentDirectory);
+        FileList.CreateFolderCommand = new AsyncRelayCommand(CreateFolderAsync, CanUseCurrentDirectory);
+        FileList.DeleteCommand = new AsyncRelayCommand(DeleteSelectedItemAsync, () => FileList.SelectedItem is not null && _session is not null);
         Preview.ToggleCommand = new RelayCommand(() => Preview.IsVisible = !Preview.IsVisible);
         Preview.CopyLinkCommand = new AsyncRelayCommand(CopyPreviewLinkAsync, () => Preview.SelectedItem is not null && _session is not null);
     }
@@ -126,7 +139,7 @@ public sealed class ShellViewModel : ObservableObject
     {
         FileList.SelectedItem = item;
         Preview.ShowSelection(item?.Item);
-        RefreshItemCommands();
+        RefreshFileCommands();
 
         var previewVersion = Interlocked.Increment(ref _previewLoadVersion);
         if (_session is not null && item?.Item is { IsDirectory: false } selected)
@@ -238,7 +251,7 @@ public sealed class ShellViewModel : ObservableObject
         _session = session;
         Navigation.LoadShares(_session.Shares);
         IsLoggedIn = true;
-        RefreshItemCommands();
+        RefreshFileCommands();
         Login.Password = "";
         Status.Message = $"已连接 {_session.Host}，协议 {_session.DialectLabel}。";
 
@@ -351,17 +364,96 @@ public sealed class ShellViewModel : ObservableObject
         }
     }
 
-    private void RefreshItemCommands()
+    private async Task RefreshCurrentDirectoryAsync()
     {
-        if (FileList.CopyLinkCommand is AsyncRelayCommand fileCommand)
+        if (_currentShare is null)
         {
-            fileCommand.RaiseCanExecuteChanged();
+            return;
+        }
+
+        await LoadDirectoryAsync(_currentShare, _currentPath, CurrentNavigationNode(), expandNavigationNode: null);
+    }
+
+    private async Task CreateFolderAsync()
+    {
+        if (_session is null || _currentShare is null)
+        {
+            return;
+        }
+
+        var name = _userDialogService.PromptText("新建文件夹", "文件夹名称", "新建文件夹");
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return;
+        }
+
+        var result = await _fileOperationService.CreateDirectoryAsync(_session, _currentShare, _currentPath, name);
+        Status.Message = result.Summary;
+        if (result.Succeeded)
+        {
+            await RefreshCurrentDirectoryAsync();
+        }
+    }
+
+    private async Task DeleteSelectedItemAsync()
+    {
+        if (_session is null || FileList.SelectedItem?.Item is not { } item)
+        {
+            return;
+        }
+
+        if (!_userDialogService.Confirm("删除", $"确定删除 {item.Name} 吗？"))
+        {
+            return;
+        }
+
+        var result = await _fileOperationService.DeleteAsync(_session, item);
+        Status.Message = result.Summary;
+        if (result.Succeeded)
+        {
+            await RefreshCurrentDirectoryAsync();
+        }
+    }
+
+    private void RefreshFileCommands()
+    {
+        if (FileList.CopyLinkCommand is AsyncRelayCommand copyLinkCommand)
+        {
+            copyLinkCommand.RaiseCanExecuteChanged();
+        }
+
+        if (FileList.RefreshCommand is AsyncRelayCommand refreshCommand)
+        {
+            refreshCommand.RaiseCanExecuteChanged();
+        }
+
+        if (FileList.CreateFolderCommand is AsyncRelayCommand createFolderCommand)
+        {
+            createFolderCommand.RaiseCanExecuteChanged();
+        }
+
+        if (FileList.DeleteCommand is AsyncRelayCommand deleteCommand)
+        {
+            deleteCommand.RaiseCanExecuteChanged();
         }
 
         if (Preview.CopyLinkCommand is AsyncRelayCommand previewCommand)
         {
             previewCommand.RaiseCanExecuteChanged();
         }
+    }
+
+    private bool CanUseCurrentDirectory() => _session is not null && _currentShare is not null;
+
+    private NavigationNodeViewModel? CurrentNavigationNode()
+    {
+        var selected = Navigation.SelectedNode;
+        return selected is not null
+            && _currentShare is not null
+            && selected.Share.Equals(_currentShare, StringComparison.OrdinalIgnoreCase)
+            && NormalizeDirectoryPath(selected.Path) == NormalizeDirectoryPath(_currentPath)
+                ? selected
+                : null;
     }
 
     private async Task OpenSelectedItemAsync()
@@ -405,8 +497,11 @@ public sealed class ShellViewModel : ObservableObject
         try
         {
             var directory = await _directoryService.ListAsync(_session, share, path);
+            _currentShare = directory.Share;
+            _currentPath = directory.Path;
             FileList.ShowDirectory(directory);
             Preview.ShowSelection(null);
+            RefreshFileCommands();
 
             if (navigationNode is not null)
             {
