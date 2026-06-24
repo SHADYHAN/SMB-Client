@@ -19,8 +19,6 @@ public sealed class FileItemViewModel
 
     public string ModifiedAt => Item.ModifiedAt?.LocalDateTime.ToString("yyyy-MM-dd HH:mm") ?? "";
 
-    public string Icon => Item.IsDirectory ? "DIR" : "FILE";
-
     private static string FormatSize(ulong bytes)
     {
         string[] units = ["B", "KB", "MB", "GB", "TB"];

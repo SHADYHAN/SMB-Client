@@ -75,4 +75,12 @@ public sealed class FileListViewModel : ObservableObject
             Items.Add(new FileItemViewModel(item));
         }
     }
+
+    public void Clear(string title)
+    {
+        PathTitle = title;
+        Items.Clear();
+        SelectedItem = null;
+        IsLoading = false;
+    }
 }

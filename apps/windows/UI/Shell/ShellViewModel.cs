@@ -343,13 +343,9 @@ public sealed class ShellViewModel : ObservableObject
         IsLoggedIn = true;
         RefreshFileCommands();
         Login.Password = "";
-        Status.Message = $"已连接 {_session.Host}，协议 {_session.DialectLabel}。";
-
-        var firstShare = Navigation.Roots.FirstOrDefault();
-        if (firstShare is not null)
-        {
-            await LoadDirectoryAsync(firstShare.Share, firstShare.Path, firstShare, expandNavigationNode: true);
-        }
+        FileList.Clear("请选择左侧共享目录");
+        Preview.ShowSelection(null);
+        Status.Message = $"已连接 {_session.Host}，请选择共享目录。";
     }
 
     private async Task SaveLoginProfileAsync()
