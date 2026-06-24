@@ -77,6 +77,30 @@ public partial class FileListView : UserControl
     private static bool HasFileDrop(DragEventArgs e) =>
         e.Data.GetDataPresent(DataFormats.FileDrop);
 
+    private void ListView_OnKeyDown(object sender, KeyEventArgs e)
+    {
+        if (DataContext is not FileListViewModel viewModel)
+        {
+            return;
+        }
+
+        switch (e.Key)
+        {
+            case Key.F5 when viewModel.RefreshCommand.CanExecute(null):
+                viewModel.RefreshCommand.Execute(null);
+                e.Handled = true;
+                break;
+            case Key.Delete when viewModel.DeleteCommand.CanExecute(null):
+                viewModel.DeleteCommand.Execute(null);
+                e.Handled = true;
+                break;
+            case Key.F2 when viewModel.RenameCommand.CanExecute(null):
+                viewModel.RenameCommand.Execute(null);
+                e.Handled = true;
+                break;
+        }
+    }
+
     private void ListView_OnMouseDoubleClick(object sender, MouseButtonEventArgs e)
     {
         if (DataContext is FileListViewModel viewModel

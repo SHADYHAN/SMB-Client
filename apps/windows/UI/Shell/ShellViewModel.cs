@@ -72,6 +72,7 @@ public sealed class ShellViewModel : ObservableObject
         FileList.RefreshCommand = new AsyncRelayCommand(RefreshCurrentDirectoryAsync, CanUseCurrentDirectory);
         FileList.CreateFolderCommand = new AsyncRelayCommand(CreateFolderAsync, CanUseCurrentDirectory);
         FileList.DeleteCommand = new AsyncRelayCommand(DeleteSelectedItemAsync, () => FileList.SelectedItem is not null && _session is not null);
+        FileList.RenameCommand = new AsyncRelayCommand(RenameSelectedItemAsync, () => FileList.SelectedItem is not null && _session is not null);
         Preview.ToggleCommand = new RelayCommand(() => Preview.IsVisible = !Preview.IsVisible);
         Preview.CopyLinkCommand = new AsyncRelayCommand(CopyPreviewLinkAsync, () => Preview.SelectedItem is not null && _session is not null);
     }
@@ -498,6 +499,27 @@ public sealed class ShellViewModel : ObservableObject
         }
     }
 
+    private async Task RenameSelectedItemAsync()
+    {
+        if (_session is null || FileList.SelectedItem?.Item is not { } item)
+        {
+            return;
+        }
+
+        var name = _userDialogService.PromptText("重命名", "名称", item.Name);
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return;
+        }
+
+        var result = await _fileOperationService.RenameAsync(_session, item, name);
+        Status.Message = result.Summary;
+        if (result.Succeeded)
+        {
+            await RefreshCurrentDirectoryAsync();
+        }
+    }
+
     private void RefreshFileCommands()
     {
         if (FileList.CopyLinkCommand is AsyncRelayCommand copyLinkCommand)
@@ -518,6 +540,11 @@ public sealed class ShellViewModel : ObservableObject
         if (FileList.DeleteCommand is AsyncRelayCommand deleteCommand)
         {
             deleteCommand.RaiseCanExecuteChanged();
+        }
+
+        if (FileList.RenameCommand is AsyncRelayCommand renameCommand)
+        {
+            renameCommand.RaiseCanExecuteChanged();
         }
 
         if (Preview.CopyLinkCommand is AsyncRelayCommand previewCommand)

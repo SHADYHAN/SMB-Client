@@ -18,6 +18,13 @@ public interface IFileOperationService
         CancellationToken cancellationToken = default
     );
 
+    Task<FileOperationResult> RenameAsync(
+        ServerSession session,
+        RemoteFileItem item,
+        string newName,
+        CancellationToken cancellationToken = default
+    );
+
     Task<FileOperationResult> UploadFilesAsync(
         ServerSession session,
         string share,

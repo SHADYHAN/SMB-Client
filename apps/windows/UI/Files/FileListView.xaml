@@ -58,6 +58,7 @@
                       PreviewMouseMove="ListView_OnPreviewMouseMove"
                       DragOver="ListView_OnDragOver"
                       Drop="ListView_OnDrop"
+                      KeyDown="ListView_OnKeyDown"
                       MouseDoubleClick="ListView_OnMouseDoubleClick"
                       PreviewMouseRightButtonDown="ListView_OnPreviewMouseRightButtonDown"
                       SelectionChanged="ListView_OnSelectionChanged"
@@ -66,6 +67,8 @@
                     <ContextMenu>
                         <MenuItem Header="复制链接"
                                   Command="{Binding PlacementTarget.DataContext.CopyLinkCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                        <MenuItem Header="重命名"
+                                  Command="{Binding PlacementTarget.DataContext.RenameCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
                         <Separator />
                         <MenuItem Header="删除"
                                   Command="{Binding PlacementTarget.DataContext.DeleteCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />

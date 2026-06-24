@@ -47,6 +47,8 @@ public sealed class FileListViewModel : ObservableObject
 
     public ICommand DeleteCommand { get; set; } = new RelayCommand(_ => { });
 
+    public ICommand RenameCommand { get; set; } = new RelayCommand(_ => { });
+
     private void RefreshOpenItemCommand()
     {
         if (OpenItemCommand is AsyncRelayCommand asyncCommand)

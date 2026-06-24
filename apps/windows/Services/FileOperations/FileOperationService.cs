@@ -77,6 +77,46 @@ public sealed class FileOperationService : IFileOperationService
         }, cancellationToken);
     }
 
+    public Task<FileOperationResult> RenameAsync(
+        ServerSession session,
+        RemoteFileItem item,
+        string newName,
+        CancellationToken cancellationToken = default
+    )
+    {
+        return Task.Run(() =>
+        {
+            try
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var normalizedName = newName.Trim();
+                if (!IsValidNewDirectoryName(normalizedName))
+                {
+                    return Failure("名称不可用。", "file.invalid_name");
+                }
+
+                if (normalizedName.Equals(item.Name, StringComparison.CurrentCultureIgnoreCase))
+                {
+                    return new FileOperationResult(true, "名称未改变。");
+                }
+
+                _bridge.SmbRename(new SmbRenameRequest(
+                    item.Share,
+                    item.Path,
+                    JoinRemotePath(ParentPath(item.Path), normalizedName),
+                    session.ConnectionId,
+                    OperationId("rename")
+                ));
+
+                return new FileOperationResult(true, "已重命名。");
+            }
+            catch (Exception ex) when (BridgeExceptionClassifier.IsBridgeFailure(ex))
+            {
+                return Failure("重命名失败。", BridgeExceptionClassifier.ErrorCodeFor(ex));
+            }
+        }, cancellationToken);
+    }
+
     public Task<FileOperationResult> UploadFilesAsync(
         ServerSession session,
         string share,
@@ -154,6 +194,13 @@ public sealed class FileOperationService : IFileOperationService
     {
         var parent = NormalizeRemotePath(parentPath);
         return parent == "/" ? "/" + name : parent + "/" + name;
+    }
+
+    private static string ParentPath(string path)
+    {
+        var normalized = NormalizeRemotePath(path).TrimEnd('/');
+        var index = normalized.LastIndexOf('/');
+        return index <= 0 ? "/" : normalized[..index];
     }
 
     private static string NormalizeRemotePath(string path)
