@@ -52,6 +52,7 @@ public partial class App : Application
         var userDialogService = new WindowsUserDialogService();
         var serverSettingsDialogService = new WindowsServerSettingsDialogService(serverProfileService);
         var shellDragDropService = new WindowsShellDragDropService();
+        var windowForegroundService = new WindowsWindowForegroundService();
 
         var viewModel = new ShellViewModel(
             bootstrapService,
@@ -71,11 +72,11 @@ public partial class App : Application
 
         _singleInstanceService.Activated += (_, args) =>
         {
-            ActivateArguments(viewModel, args.Arguments);
+            ActivateArguments(viewModel, args.Arguments, windowForegroundService);
         };
         _localLinkRedirectService.Activated += (_, args) =>
         {
-            ActivateArguments(viewModel, args.Arguments);
+            ActivateArguments(viewModel, args.Arguments, windowForegroundService);
         };
         _ = _localLinkRedirectService.StartAsync();
 
@@ -91,19 +92,15 @@ public partial class App : Application
 
     private void ActivateArguments(
         ShellViewModel viewModel,
-        IReadOnlyList<string> arguments
+        IReadOnlyList<string> arguments,
+        IWindowForegroundService windowForegroundService
     )
     {
         _ = Dispatcher.InvokeAsync(() =>
         {
             if (MainWindow is { } activeWindow)
             {
-                activeWindow.Show();
-                if (activeWindow.WindowState == WindowState.Minimized)
-                {
-                    activeWindow.WindowState = WindowState.Normal;
-                }
-                activeWindow.Activate();
+                windowForegroundService.BringToFront(activeWindow);
             }
 
             _ = viewModel.ActivateExternalArgumentsAsync(arguments);
