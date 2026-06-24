@@ -33,6 +33,7 @@ public sealed class ShellViewModel : ObservableObject
     private readonly IClipboardService _clipboardService;
     private readonly IUserDialogService _userDialogService;
     private readonly IWindowsShellDragDropService _shellDragDropService;
+    private readonly SemaphoreSlim _directoryLoadLock = new(1, 1);
     private ServerSession? _session;
     private string? _currentShare;
     private string _currentPath = "/";
@@ -126,6 +127,11 @@ public sealed class ShellViewModel : ObservableObject
         }
 
         await LoadDirectoryAsync(node.Share, node.Path, node, expandNavigationNode: null);
+    }
+
+    public void ReportUiError(Exception exception, string fallback)
+    {
+        Status.Message = UserFacingError(exception, fallback);
     }
 
     public async Task ToggleNavigationNodeAsync(NavigationNodeViewModel node)
@@ -590,58 +596,71 @@ public sealed class ShellViewModel : ObservableObject
         }
 
         var normalizedKey = $"{share}:{NormalizeDirectoryPath(path)}";
-        if (_loadingDirectoryKey == normalizedKey)
-        {
-            if (navigationNode is not null && expandNavigationNode is bool requestedExpansion)
-            {
-                navigationNode.IsExpanded = requestedExpansion;
-            }
-
-            return;
-        }
-
-        _loadingDirectoryKey = normalizedKey;
-        FileList.IsLoading = true;
-        Status.Message = "正在加载目录...";
-
+        await _directoryLoadLock.WaitAsync();
         try
         {
-            var directory = await _directoryService.ListAsync(_session, share, path);
-            _currentShare = directory.Share;
-            _currentPath = directory.Path;
-            FileList.ShowDirectory(directory);
-            Preview.ShowSelection(null);
-            RefreshFileCommands();
-
-            if (navigationNode is not null)
+            if (_session is null)
             {
-                Navigation.ReplaceChildren(
-                    navigationNode,
-                    directory.Items.Where(item => item.IsDirectory).ToArray()
-                );
-                if (expandNavigationNode is bool requestedExpansion)
+                return;
+            }
+
+            if (_loadingDirectoryKey == normalizedKey)
+            {
+                if (navigationNode is not null && expandNavigationNode is bool requestedExpansion)
                 {
                     navigationNode.IsExpanded = requestedExpansion;
                 }
 
-                navigationNode.IsSelected = true;
-                Navigation.SelectedNode = navigationNode;
+                return;
             }
 
-            Status.Message = $"{directory.Items.Count} 个项目";
-        }
-        catch (Exception ex)
-        {
-            Status.Message = UserFacingError(ex, "目录加载失败");
+            _loadingDirectoryKey = normalizedKey;
+            FileList.IsLoading = true;
+            Status.Message = "正在加载目录...";
+
+            try
+            {
+                var directory = await _directoryService.ListAsync(_session, share, path);
+                _currentShare = directory.Share;
+                _currentPath = directory.Path;
+                FileList.ShowDirectory(directory);
+                Preview.ShowSelection(null);
+                RefreshFileCommands();
+
+                if (navigationNode is not null)
+                {
+                    Navigation.ReplaceChildren(
+                        navigationNode,
+                        directory.Items.Where(item => item.IsDirectory).ToArray()
+                    );
+                    if (expandNavigationNode is bool requestedExpansion)
+                    {
+                        navigationNode.IsExpanded = requestedExpansion;
+                    }
+
+                    navigationNode.IsSelected = true;
+                    Navigation.SelectedNode = navigationNode;
+                }
+
+                Status.Message = $"{directory.Items.Count} 个项目";
+            }
+            catch (Exception ex)
+            {
+                Status.Message = UserFacingError(ex, "目录加载失败");
+            }
+            finally
+            {
+                if (_loadingDirectoryKey == normalizedKey)
+                {
+                    _loadingDirectoryKey = null;
+                }
+
+                FileList.IsLoading = false;
+            }
         }
         finally
         {
-            if (_loadingDirectoryKey == normalizedKey)
-            {
-                _loadingDirectoryKey = null;
-            }
-
-            FileList.IsLoading = false;
+            _directoryLoadLock.Release();
         }
     }
 

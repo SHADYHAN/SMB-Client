@@ -23,9 +23,19 @@ public partial class NavigationTreeView : UserControl
             return;
         }
 
-        if (FindShellViewModel() is { } shell)
+        var shell = FindShellViewModel();
+        if (shell is null)
+        {
+            return;
+        }
+
+        try
         {
             await shell.SelectNavigationNodeAsync(node);
+        }
+        catch (Exception ex)
+        {
+            shell.ReportUiError(ex, "目录打开失败");
         }
     }
 
@@ -38,10 +48,21 @@ public partial class NavigationTreeView : UserControl
         }
 
         item.IsSelected = true;
-        if (FindShellViewModel() is { } shell)
+        e.Handled = true;
+
+        var shell = FindShellViewModel();
+        if (shell is null)
+        {
+            return;
+        }
+
+        try
         {
             await shell.ToggleNavigationNodeAsync(node);
-            e.Handled = true;
+        }
+        catch (Exception ex)
+        {
+            shell.ReportUiError(ex, "目录打开失败");
         }
     }
 
