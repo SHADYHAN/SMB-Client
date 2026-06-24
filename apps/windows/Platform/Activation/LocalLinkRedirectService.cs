@@ -176,7 +176,7 @@ public sealed class LocalLinkRedirectService : ILocalLinkRedirectService
     {
         try
         {
-            return _bridge.RedirectPage(new RedirectPageRequest(deepLink));
+            return _bridge.RedirectPage(new RedirectPageRequest(deepLink, AlreadyActivated: true));
         }
         catch
         {

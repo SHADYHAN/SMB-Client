@@ -121,6 +121,65 @@ a.secondary{{color:#1f2933;background:#fff;}}
     ))
 }
 
+pub fn build_local_activation_close_page_for_url(
+    deep_link_url: &str,
+    options: &RedirectPageOptions,
+) -> CoreResult<String> {
+    let url = Url::parse(deep_link_url)?;
+    if url.scheme() != DEFAULT_PROTOCOL {
+        return Err(CoreError::InvalidLink(format!(
+            "redirect page can only open {DEFAULT_PROTOCOL}:// links"
+        )));
+    }
+
+    let escaped_url = escape_html_attr(deep_link_url);
+    let escaped_app = escape_html_text(&options.app_name);
+
+    Ok(format!(
+        r#"<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{escaped_app}</title>
+<style>
+html,body{{margin:0;width:100%;height:100%;}}
+body{{display:none;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;background:#f6f7f9;color:#1f2933;}}
+.fallback{{box-sizing:border-box;width:min(360px,calc(100vw - 48px));margin:auto;padding:24px;border:1px solid #d9dee7;background:#fff;box-shadow:0 18px 50px rgba(31,41,51,.12);}}
+.mark{{width:36px;height:36px;margin-bottom:14px;background:#1f2933;color:#fff;display:grid;place-items:center;font-weight:700;}}
+h1{{margin:0 0 8px;font-size:17px;line-height:1.35;font-weight:650;}}
+p{{margin:0 0 16px;color:#667085;font-size:13px;line-height:1.6;}}
+.actions{{display:flex;gap:10px;}}
+a{{box-sizing:border-box;height:34px;padding:0 14px;display:inline-flex;align-items:center;justify-content:center;text-decoration:none;font-size:13px;border:1px solid #1f2933;color:#fff;background:#1f2933;}}
+a.secondary{{color:#1f2933;background:#fff;}}
+</style>
+</head>
+<body>
+<main class="fallback">
+  <div class="mark">R</div>
+  <h1>已打开 RYNAT 共享网盘</h1>
+  <p>如果页面没有自动关闭，可以直接关闭此标签页。</p>
+  <div class="actions">
+    <a class="secondary" href="javascript:window.close()">关闭页面</a>
+    <a href="{escaped_url}">重试打开</a>
+  </div>
+</main>
+<script>
+(function(){{
+  function closeTab(){{
+    try {{ window.open("", "_self"); window.close(); }} catch (_) {{}}
+  }}
+  setTimeout(closeTab, 40);
+  setTimeout(closeTab, 180);
+  setTimeout(closeTab, 700);
+  setTimeout(function(){{ document.body.style.display = "flex"; }}, 1100);
+}})();
+</script>
+</body>
+</html>"#
+    ))
+}
+
 fn escape_html_text(input: &str) -> String {
     input
         .replace('&', "&amp;")
@@ -152,6 +211,20 @@ mod tests {
         assert!(html.contains("var url = \"rynat://s/"));
         assert!(html.contains("href=\"rynat://s/"));
         assert!(!html.contains("h=nas&amp;s=Share"));
+    }
+
+    #[test]
+    fn local_activation_page_closes_without_reopening_protocol() {
+        let html = build_local_activation_close_page_for_url(
+            "rynat://s/abc123",
+            &RedirectPageOptions::default(),
+        )
+        .unwrap();
+
+        assert!(html.contains("已打开 RYNAT 共享网盘"));
+        assert!(html.contains("setTimeout(closeTab, 40);"));
+        assert!(!html.contains("location.href = url;"));
+        assert!(!html.contains("frame.src = url;"));
     }
 
     #[test]

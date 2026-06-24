@@ -55,8 +55,9 @@ public sealed record UploadPlanRequest(
 );
 
 public sealed record RedirectPageRequest(
-    [property: JsonPropertyName("target_url")]
-    string TargetUrl
+    [property: JsonPropertyName("target_url")] string TargetUrl,
+    [property: JsonPropertyName("already_activated")]
+    bool AlreadyActivated = false
 );
 
 public sealed record OpenStoreRequest(

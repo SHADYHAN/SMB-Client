@@ -169,7 +169,7 @@ final class LocalRedirectServer {
 
     private func bridgeHTML(target: String, onLog: (String) -> Void) -> String {
         do {
-            return try core.redirectPage(targetURL: target)
+            return try core.redirectPage(targetURL: target, alreadyActivated: true)
         } catch {
             onLog("Redirect page generation failed: \(error.localizedDescription)")
             return """

@@ -68,6 +68,8 @@ pub struct UploadPlanRequest {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RedirectPageRequest {
     pub target_url: String,
+    #[serde(default)]
+    pub already_activated: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -353,10 +355,15 @@ pub fn upload_plan_json(input: &str) -> CoreResult<String> {
 
 pub fn redirect_page_json(input: &str) -> CoreResult<String> {
     let request: RedirectPageRequest = serde_json::from_str(input)?;
-    let html = crate::redirect_page::build_invisible_redirect_page_for_url(
-        &request.target_url,
-        &crate::redirect_page::RedirectPageOptions::default(),
-    )?;
+    let options = crate::redirect_page::RedirectPageOptions::default();
+    let html = if request.already_activated {
+        crate::redirect_page::build_local_activation_close_page_for_url(
+            &request.target_url,
+            &options,
+        )?
+    } else {
+        crate::redirect_page::build_invisible_redirect_page_for_url(&request.target_url, &options)?
+    };
     serde_json::to_string(&BridgeResponse::ok(html)).map_err(CoreError::from)
 }
 

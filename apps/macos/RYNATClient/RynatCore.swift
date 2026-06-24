@@ -201,8 +201,8 @@ struct RynatCore {
         return try unwrap(response)
     }
 
-    func redirectPage(targetURL: String) throws -> String {
-        let request = RedirectPageRequest(targetURL: targetURL)
+    func redirectPage(targetURL: String, alreadyActivated: Bool = false) throws -> String {
+        let request = RedirectPageRequest(targetURL: targetURL, alreadyActivated: alreadyActivated)
         let response: BridgeResponse<String> = try call(
             request,
             function: rynatRedirectPageJSON
@@ -654,9 +654,11 @@ struct UploadPlanRequest: Encodable {
 
 struct RedirectPageRequest: Encodable {
     let targetURL: String
+    let alreadyActivated: Bool
 
     enum CodingKeys: String, CodingKey {
         case targetURL = "target_url"
+        case alreadyActivated = "already_activated"
     }
 }
 
