@@ -107,6 +107,9 @@ dotnet build apps/windows/Rynat.WindowsClient.csproj
 
 # Windows 拉取最新代码、构建并启动
 powershell -ExecutionPolicy Bypass -File scripts\pull-build-run-windows.ps1
+
+# Windows 双击一键执行
+scripts\pull-build-run-windows.bat
 ```
 
 macOS 构建脚本先 `cargo build -p rynat-core --release`，再把 `librynat_core.dylib` 打包进 `.app`。Windows 工程 `csproj` 内置 cargo 构建目标，编译 Rust Core 并复制 `rynat_core.dll`。
