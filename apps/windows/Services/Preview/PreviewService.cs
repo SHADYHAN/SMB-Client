@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Rynat.Client;
 using Rynat.WindowsClient.Domain;
+using Rynat.WindowsClient.Services.Cache;
 
 namespace Rynat.WindowsClient.Services.Preview;
 
@@ -11,6 +12,8 @@ public sealed class PreviewService : IPreviewService
     private const uint DefaultPreviewEdgePx = 640;
     private const ulong ImagePreviewMaxBytes = 32UL * 1024 * 1024;
     private const ulong VideoPreviewMaxBytes = 512UL * 1024 * 1024;
+    private const long PreviewCacheMaxBytes = 2L * 1024 * 1024 * 1024;
+    private static readonly TimeSpan PreviewCacheMaxAge = TimeSpan.FromDays(14);
     private readonly RynatCoreBridge _bridge;
 
     public PreviewService(RynatCoreBridge bridge)
@@ -81,13 +84,16 @@ public sealed class PreviewService : IPreviewService
         CancellationToken cancellationToken
     )
     {
-        var previewDirectory = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "Rynat",
+        var previewDirectory = WindowsCacheCleanupService.AppCacheDirectory(
             "PreviewCache",
             SafeFileName(session.ConnectionId)
         );
         System.IO.Directory.CreateDirectory(previewDirectory);
+        WindowsCacheCleanupService.CleanupDirectory(
+            previewDirectory,
+            PreviewCacheMaxBytes,
+            PreviewCacheMaxAge
+        );
 
         var extension = Path.GetExtension(item.Name);
         if (string.IsNullOrWhiteSpace(extension))

@@ -48,6 +48,11 @@ Remaining feature migration should be added module by module rather than porting
 - Local short-link pages now close through an already-activated page instead of reopening the protocol.
 - WPF smoke checks now target the current `CoreAdapter` / `Services` / `Platform` / `UI` layout instead of the old WinUI app-services tree.
 - Remote copy/move logic is isolated in `RemoteCopyMoveService`, and shell paste state is isolated in `RemoteClipboardCoordinator`.
+- Link startup parsing, pending activation, and session matching are isolated in `LinkActivationCoordinator`.
+- Directory loading, current path/share state, and navigation-tree selection are isolated in `DirectoryNavigationCoordinator`.
+- File selection preview loading is isolated in `PreviewCoordinator`.
+- File drag-out and local drop upload coordination are isolated in `FileDragDropCoordinator`.
+- Preview and drag caches now have age/size cleanup with stale `.part` removal.
 
 ## Remaining Work
 
@@ -62,6 +67,6 @@ Near-term product work:
 Follow-up quality work:
 
 - Improve preview performance with thumbnails/video first frames instead of caching large media when possible.
-- Add cache cleanup policy for preview and drag cache files.
-- Continue splitting `ShellViewModel` into link activation, navigation, preview, and drag/drop coordinators as those areas grow.
+- Observe preview/drag cache cleanup behavior during Windows real-use testing.
+- Keep `ShellViewModel` focused on composition and command routing; continue extracting login/server-setting coordination only if it starts to grow.
 - Broaden smoke checks around startup argument parsing and local redirect handling.

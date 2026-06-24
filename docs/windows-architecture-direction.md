@@ -163,7 +163,7 @@ WinUI 3 可以做现代 Windows UI，但对本项目不是最优主线。
 1. 在真实 Windows SMB 环境验证并打磨远端复制 / 移动 / 粘贴，尤其是目录递归、跨共享限制和同名覆盖行为。
 2. 打磨拖拽体验：软件内拖动只做视觉反馈，跨目录后才触发移动 / 复制；拖出桌面的视觉影子和同名行为继续贴近 Explorer。
 3. 优化预览：图片缩略图、视频首帧、大视频避免整文件缓存、缓存清理策略。
-4. 继续拆薄 `ShellViewModel`。远端剪贴板已抽到 `RemoteClipboardCoordinator`，后续优先抽链接激活、目录导航、预览和拖拽协调器。
+4. 继续拆薄 `ShellViewModel`。远端剪贴板已抽到 `RemoteClipboardCoordinator`，链接激活已抽到 `LinkActivationCoordinator`，目录导航已抽到 `DirectoryNavigationCoordinator`，预览加载已抽到 `PreviewCoordinator`，文件拖入/拖出协调已抽到 `FileDragDropCoordinator`；后续只在登录 / 服务器设置继续膨胀时再拆。
 5. 继续补充 Windows 侧 smoke checks，覆盖启动参数、本地中转和链接唤醒。
 
 `apps/windows-winui-legacy` 代码建议定位为：

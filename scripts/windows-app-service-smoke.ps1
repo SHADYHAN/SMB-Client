@@ -13,6 +13,10 @@ $nativeMethods = Join-Path $root "apps\windows\CoreAdapter\NativeMethods.cs"
 $coreBridge = Join-Path $root "apps\windows\CoreAdapter\RynatCoreBridge.cs"
 $jsonContext = Join-Path $root "apps\windows\CoreAdapter\RynatJsonContext.cs"
 $shellViewModel = Join-Path $root "apps\windows\UI\Shell\ShellViewModel.cs"
+$directoryNavigationCoordinator = Join-Path $root "apps\windows\UI\Shell\DirectoryNavigationCoordinator.cs"
+$fileDragDropCoordinator = Join-Path $root "apps\windows\UI\Shell\FileDragDropCoordinator.cs"
+$linkActivationCoordinator = Join-Path $root "apps\windows\UI\Shell\LinkActivationCoordinator.cs"
+$previewCoordinator = Join-Path $root "apps\windows\UI\Shell\PreviewCoordinator.cs"
 $remoteClipboardCoordinator = Join-Path $root "apps\windows\UI\Shell\RemoteClipboardCoordinator.cs"
 $mainWindow = Join-Path $root "apps\windows\MainWindow.xaml.cs"
 $fileListView = Join-Path $root "apps\windows\UI\Files\FileListView.xaml.cs"
@@ -20,6 +24,7 @@ $fileOperationInterface = Join-Path $root "apps\windows\Services\FileOperations\
 $fileOperationService = Join-Path $root "apps\windows\Services\FileOperations\FileOperationService.cs"
 $remoteCopyMoveService = Join-Path $root "apps\windows\Services\FileOperations\RemoteCopyMoveService.cs"
 $fileTransferService = Join-Path $root "apps\windows\Services\FileTransfers\FileTransferService.cs"
+$cacheCleanupService = Join-Path $root "apps\windows\Services\Cache\WindowsCacheCleanupService.cs"
 $previewService = Join-Path $root "apps\windows\Services\Preview\PreviewService.cs"
 $linkActivationService = Join-Path $root "apps\windows\Services\LinkActivation\LinkActivationService.cs"
 $localRedirectService = Join-Path $root "apps\windows\Platform\Activation\LocalLinkRedirectService.cs"
@@ -95,6 +100,7 @@ $requiredFiles = @(
     "apps\windows\Services\FileOperations\FileOperationService.cs",
     "apps\windows\Services\FileOperations\IRemoteCopyMoveService.cs",
     "apps\windows\Services\FileOperations\RemoteCopyMoveService.cs",
+    "apps\windows\Services\Cache\WindowsCacheCleanupService.cs",
     "apps\windows\Services\FileTransfers\FileTransferService.cs",
     "apps\windows\Services\LinkActivation\LinkActivationService.cs",
     "apps\windows\Services\Links\QuickLinkService.cs",
@@ -109,6 +115,10 @@ $requiredFiles = @(
     "apps\windows\Platform\Shell\WindowsShellDragDropService.cs",
     "apps\windows\Platform\Shell\WindowsWindowForegroundService.cs",
     "apps\windows\UI\Shell\ShellViewModel.cs",
+    "apps\windows\UI\Shell\DirectoryNavigationCoordinator.cs",
+    "apps\windows\UI\Shell\FileDragDropCoordinator.cs",
+    "apps\windows\UI\Shell\LinkActivationCoordinator.cs",
+    "apps\windows\UI\Shell\PreviewCoordinator.cs",
     "apps\windows\UI\Shell\RemoteClipboardCoordinator.cs",
     "apps\windows\UI\Shell\RemoteClipboardPasteResult.cs",
     "apps\windows\UI\Files\FileListView.xaml",
@@ -160,18 +170,38 @@ Assert-FileContains -Path $shellViewModel -Pattern "CopyLinkCommand" -Descriptio
 Assert-FileContains -Path $shellViewModel -Pattern "CutCommand" -Description "shell exposes cut command"
 Assert-FileContains -Path $shellViewModel -Pattern "CopyFileCommand" -Description "shell exposes remote copy command"
 Assert-FileContains -Path $shellViewModel -Pattern "PasteCommand" -Description "shell exposes remote paste command"
+Assert-FileContains -Path $shellViewModel -Pattern "DirectoryNavigationCoordinator" -Description "shell delegates directory navigation workflow"
 Assert-FileContains -Path $shellViewModel -Pattern "RemoteClipboardCoordinator" -Description "shell delegates remote clipboard workflow"
 Assert-FileContains -Path $shellViewModel -Pattern "PasteRemoteClipboardAsync" -Description "shell pastes remote clipboard"
+Assert-FileContains -Path $directoryNavigationCoordinator -Pattern "LoadAsync" -Description "directory navigation coordinator owns directory loading"
+Assert-FileContains -Path $directoryNavigationCoordinator -Pattern "CurrentShare" -Description "directory navigation coordinator tracks current share"
+Assert-FileContains -Path $directoryNavigationCoordinator -Pattern "CurrentPath" -Description "directory navigation coordinator tracks current path"
+Assert-FileContains -Path $directoryNavigationCoordinator -Pattern "CurrentNavigationNode" -Description "directory navigation coordinator resolves current tree node"
+Assert-FileContains -Path $directoryNavigationCoordinator -Pattern "NormalizeDirectoryPath" -Description "directory navigation coordinator normalizes directory paths"
 Assert-FileContains -Path $remoteClipboardCoordinator -Pattern "RemoteClipboardItem" -Description "clipboard coordinator tracks remote clipboard item"
 Assert-FileContains -Path $remoteClipboardCoordinator -Pattern "PasteAsync" -Description "clipboard coordinator owns paste workflow"
 Assert-FileContains -Path $shellViewModel -Pattern "CreateFolderCommand" -Description "shell exposes create-folder command"
 Assert-FileContains -Path $shellViewModel -Pattern "DeleteCommand" -Description "shell exposes delete command"
 Assert-FileContains -Path $shellViewModel -Pattern "RenameCommand" -Description "shell exposes rename command"
 Assert-FileContains -Path $shellViewModel -Pattern "UploadDroppedFilesAsync" -Description "shell handles local file drop upload"
-Assert-FileContains -Path $shellViewModel -Pattern "ConfirmOverwrite" -Description "upload flow confirms same-name replacement"
 Assert-FileContains -Path $shellViewModel -Pattern "StartFileDragAsync" -Description "shell starts drag-out workflow"
+Assert-FileContains -Path $shellViewModel -Pattern "FileDragDropCoordinator" -Description "shell delegates file drag/drop workflow"
+Assert-FileContains -Path $fileDragDropCoordinator -Pattern "StartFileDragAsync" -Description "file drag/drop coordinator owns drag-out workflow"
+Assert-FileContains -Path $fileDragDropCoordinator -Pattern "UploadDroppedFilesAsync" -Description "file drag/drop coordinator owns drop upload workflow"
+Assert-FileContains -Path $fileDragDropCoordinator -Pattern "ConfirmOverwrite" -Description "drop upload flow confirms same-name replacement"
+Assert-FileContains -Path $fileDragDropCoordinator -Pattern "CreateDragDownloadPayloadAsync" -Description "drag-out flow creates virtual-file payload"
+Assert-FileContains -Path $fileDragDropCoordinator -Pattern "UploadFilesAsync" -Description "drop upload flow calls upload service"
+Assert-FileContains -Path $shellViewModel -Pattern "PreviewCoordinator" -Description "shell delegates preview workflow"
 Assert-FileContains -Path $shellViewModel -Pattern "ActivateExternalArgumentsAsync" -Description "shell accepts external activation"
+Assert-FileContains -Path $shellViewModel -Pattern "LinkActivationCoordinator" -Description "shell delegates link activation workflow"
 Assert-FileContains -Path $shellViewModel -Pattern "OpenLinkRequestAsync" -Description "shell opens activated links"
+Assert-FileContains -Path $linkActivationCoordinator -Pattern "ActivateStartupArgumentsAsync" -Description "link activation coordinator parses startup arguments"
+Assert-FileContains -Path $linkActivationCoordinator -Pattern "ConsumePendingIfPossibleAsync" -Description "link activation coordinator owns pending activation"
+Assert-FileContains -Path $linkActivationCoordinator -Pattern "CanOpenWithSession" -Description "link activation coordinator checks active session"
+Assert-FileContains -Path $previewCoordinator -Pattern "SelectFileAsync" -Description "preview coordinator owns selection preview flow"
+Assert-FileContains -Path $previewCoordinator -Pattern "ShowPreviewLoading" -Description "preview coordinator shows loading state"
+Assert-FileContains -Path $previewCoordinator -Pattern "ShowPreviewInfo" -Description "preview coordinator shows preview info"
+Assert-FileContains -Path $previewCoordinator -Pattern "ShowPreviewUnavailable" -Description "preview coordinator handles preview failures"
 
 Assert-FileContains -Path $fileListView -Pattern "PreviewMouseMove" -Description "file list starts drag from pointer movement"
 Assert-FileContains -Path $fileListView -Pattern "DataFormats\.FileDrop" -Description "file list accepts local file drops"
@@ -199,6 +229,7 @@ Assert-FileContains -Path $fileOperationService -Pattern "replaceExisting" -Desc
 
 Assert-FileContains -Path $fileTransferService -Pattern "LazyRemoteDownloadStream" -Description "drag-out uses lazy virtual-file download stream"
 Assert-FileContains -Path $fileTransferService -Pattern "DragCache" -Description "drag-out has local drag cache path"
+Assert-FileContains -Path $fileTransferService -Pattern "CleanupDirectory" -Description "drag cache cleanup is triggered"
 Assert-FileContains -Path $fileTransferService -Pattern "\.part" -Description "drag-out downloads to partial file before completion"
 Assert-FileContains -Path $shellDragDropService -Pattern "FileGroupDescriptorW" -Description "drag-out publishes virtual file descriptor"
 Assert-FileContains -Path $shellDragDropService -Pattern "FileContents" -Description "drag-out publishes virtual file contents"
@@ -206,11 +237,14 @@ Assert-FileContains -Path $shellDragDropService -Pattern "FileContents" -Descrip
 Assert-FileContains -Path $previewService -Pattern "PreviewCache" -Description "preview service uses preview cache"
 Assert-FileContains -Path $previewService -Pattern "SmbCacheFile" -Description "preview service caches remote files through core"
 Assert-FileContains -Path $previewService -Pattern "maxBytes" -Description "preview service limits preview cache bytes"
+Assert-FileContains -Path $previewService -Pattern "CleanupDirectory" -Description "preview cache cleanup is triggered"
+Assert-FileContains -Path $cacheCleanupService -Pattern "PartialFileMaxAge" -Description "cache cleanup removes stale partial files"
+Assert-FileContains -Path $cacheCleanupService -Pattern "DeleteEmptyDirectories" -Description "cache cleanup prunes empty directories"
 
 Assert-FileContains -Path $linkActivationService -Pattern "rynat://" -Description "link activation accepts rynat protocol"
-Assert-FileContains -Path $linkActivationService -Pattern "127\.0\.0\.1" -Description "link activation accepts local HTTP links"
+Assert-FileContains -Path $linkActivationService -Pattern "http://" -Description "link activation accepts local HTTP links"
 Assert-FileContains -Path $localRedirectService -Pattern "TcpListener" -Description "local redirect owns local HTTP listener"
-Assert-FileContains -Path $localRedirectService -Pattern "AlreadyActivated = true" -Description "local redirect returns already-activated close page"
+Assert-FileContains -Path $localRedirectService -Pattern "AlreadyActivated:\s*true" -Description "local redirect returns already-activated close page"
 Assert-FileContains -Path $singleInstanceService -Pattern "NamedPipe" -Description "single-instance forwarding uses named pipes"
 
 if ($Build) {

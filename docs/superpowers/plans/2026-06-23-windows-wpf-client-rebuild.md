@@ -36,6 +36,11 @@
 - Current macOS-side validation also covers `scripts/check-bridge-surface.sh` and `scripts/ffi-smoke-test.sh`.
 - Windows WPF has single-item remote copy / move / paste plumbing with same-name confirmation, pending Windows SMB validation.
 - Remote copy/move implementation is isolated in `RemoteCopyMoveService`; paste state and conflict flow are isolated in `RemoteClipboardCoordinator`.
+- Link startup parsing, pending activation, and active-session matching are isolated in `LinkActivationCoordinator`.
+- Directory loading, current path/share state, and navigation-tree synchronization are isolated in `DirectoryNavigationCoordinator`.
+- File selection preview loading and stale-preview protection are isolated in `PreviewCoordinator`.
+- File drag-out and local drop upload coordination are isolated in `FileDragDropCoordinator`.
+- Preview and drag caches have age/size cleanup with stale `.part` removal.
 
 ## Remaining Product Work
 
@@ -44,13 +49,13 @@
 - [ ] In-app drag/drop for remote move/copy: dragging without a valid cross-directory target should be visual only.
 - [ ] Further refine Explorer/Desktop drag-out visuals and same-name overwrite behavior on real Windows.
 - [ ] Improve preview performance: avoid caching large videos when a lightweight thumbnail/first-frame path is available.
-- [ ] Add preview/drag cache cleanup policy.
+- [ ] Observe preview/drag cache cleanup behavior during Windows real-use testing.
 - [ ] Add favorites/quick-link library UI if Windows needs parity with macOS favorites.
 - [ ] Add broader keyboard shortcuts and selection polish after real-user testing.
 
 ## Remaining Architecture Work
 
-- [ ] Continue splitting `UI/Shell/ShellViewModel.cs`; next candidates are link activation, directory navigation, preview loading, and file drag/drop.
+- [ ] Keep `UI/Shell/ShellViewModel.cs` focused on composition and command routing; split login/server-setting coordination later only if those areas grow.
 - [ ] Keep heavier recursive/long-running file workflows out of `FileOperationService`; put them behind dedicated use-case services like `RemoteCopyMoveService`.
 - [ ] Keep `MainWindow.xaml.cs` thin and prevent Shell/platform logic from leaking into UI code.
 - [ ] Add Windows-side automated smoke checks for bridge surface, startup parsing, and link activation helpers.

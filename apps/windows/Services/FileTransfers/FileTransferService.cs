@@ -4,11 +4,14 @@ using System.Text;
 using Rynat.Client;
 using Rynat.WindowsClient.Domain;
 using Rynat.WindowsClient.Infrastructure;
+using Rynat.WindowsClient.Services.Cache;
 
 namespace Rynat.WindowsClient.Services.FileTransfers;
 
 public sealed class FileTransferService : IFileTransferService
 {
+    private const long DragCacheMaxBytes = 4L * 1024 * 1024 * 1024;
+    private static readonly TimeSpan DragCacheMaxAge = TimeSpan.FromDays(3);
     private readonly RynatCoreBridge _bridge;
 
     public FileTransferService(RynatCoreBridge bridge)
@@ -178,12 +181,15 @@ public sealed class FileTransferService : IFileTransferService
 
     private static string DragCachePath(ServerSession session, RemoteFileItem item)
     {
-        var cacheDirectory = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "Rynat",
+        var cacheDirectory = WindowsCacheCleanupService.AppCacheDirectory(
             "DragCache",
             SafeFileName(session.ConnectionId),
             StableKey(session.Host, item.Share, item.Path, item.Size.ToString(), item.ModifiedAt?.ToUnixTimeSeconds().ToString() ?? "")
+        );
+        WindowsCacheCleanupService.CleanupDirectory(
+            WindowsCacheCleanupService.AppCacheDirectory("DragCache", SafeFileName(session.ConnectionId)),
+            DragCacheMaxBytes,
+            DragCacheMaxAge
         );
 
         return Path.Combine(cacheDirectory, SafeFileName(item.Name));

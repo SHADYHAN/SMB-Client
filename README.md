@@ -130,6 +130,7 @@ scripts/ffi-smoke-test-windows.ps1
 - macOS AppKit 客户端作为当前 macOS 主线继续演进，后续重点是拆薄 `WorkspaceController` 和 `RynatCore.swift`。
 - Windows 主线已切换为 WPF 客户端，旧 WinUI 3 版本只保留在 `apps/windows-winui-legacy` 作为历史参考。
 - Windows WPF 已接入单项远端复制 / 移动 / 粘贴和同名确认基础流程，仍需 Windows 实机验证构建、交互和 SMB 真实行为。
+- Windows WPF 的远端剪贴板、链接激活、目录导航、预览加载和拖拽协调已从 `ShellViewModel` 拆到独立 coordinator，避免主壳继续膨胀。
 - 快速链接已切换为紧凑 `/s/<短码>` 格式；本地短链接命中客户端后，浏览器页只负责尝试关闭，不再重复唤醒协议。
 
 ## 后续重点

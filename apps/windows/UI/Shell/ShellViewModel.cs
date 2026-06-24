@@ -1,4 +1,3 @@
-using System.Threading;
 using Rynat.WindowsClient.Domain;
 using Rynat.WindowsClient.Platform.Clipboard;
 using Rynat.WindowsClient.Platform.Dialogs;
@@ -25,26 +24,19 @@ public sealed class ShellViewModel : ObservableObject
 {
     private readonly IBootstrapService _bootstrapService;
     private readonly ISmbSessionService _sessionService;
-    private readonly IDirectoryService _directoryService;
     private readonly IFileOperationService _fileOperationService;
     private readonly IRemoteCopyMoveService _remoteCopyMoveService;
-    private readonly IFileTransferService _fileTransferService;
     private readonly IQuickLinkService _quickLinkService;
-    private readonly ILinkActivationService _linkActivationService;
-    private readonly IPreviewService _previewService;
     private readonly IServerProfileService _serverProfileService;
     private readonly IClipboardService _clipboardService;
     private readonly IUserDialogService _userDialogService;
     private readonly IServerSettingsDialogService _serverSettingsDialogService;
-    private readonly IWindowsShellDragDropService _shellDragDropService;
-    private readonly SemaphoreSlim _directoryLoadLock = new(1, 1);
     private ServerSession? _session;
-    private string? _currentShare;
-    private string _currentPath = "/";
-    private string? _loadingDirectoryKey;
-    private LinkOpenRequest? _pendingLinkOpenRequest;
+    private readonly DirectoryNavigationCoordinator _directoryNavigationCoordinator;
+    private readonly FileDragDropCoordinator _fileDragDropCoordinator;
+    private readonly LinkActivationCoordinator _linkActivationCoordinator;
+    private readonly PreviewCoordinator _previewCoordinator;
     private readonly RemoteClipboardCoordinator _remoteClipboardCoordinator;
-    private int _previewLoadVersion;
     private bool _isLoggedIn;
 
     public ShellViewModel(
@@ -66,18 +58,32 @@ public sealed class ShellViewModel : ObservableObject
     {
         _bootstrapService = bootstrapService;
         _sessionService = sessionService;
-        _directoryService = directoryService;
         _fileOperationService = fileOperationService;
         _remoteCopyMoveService = remoteCopyMoveService;
-        _fileTransferService = fileTransferService;
         _quickLinkService = quickLinkService;
-        _linkActivationService = linkActivationService;
-        _previewService = previewService;
         _serverProfileService = serverProfileService;
         _clipboardService = clipboardService;
         _userDialogService = userDialogService;
         _serverSettingsDialogService = serverSettingsDialogService;
-        _shellDragDropService = shellDragDropService;
+        _directoryNavigationCoordinator = new DirectoryNavigationCoordinator(
+            directoryService,
+            FileList,
+            Navigation,
+            Preview,
+            Status,
+            UserFacingError
+        );
+        _fileDragDropCoordinator = new FileDragDropCoordinator(
+            fileTransferService,
+            _fileOperationService,
+            shellDragDropService,
+            _userDialogService,
+            FileList,
+            Status,
+            UserFacingError
+        );
+        _linkActivationCoordinator = new LinkActivationCoordinator(linkActivationService);
+        _previewCoordinator = new PreviewCoordinator(previewService, FileList, Preview);
         _remoteClipboardCoordinator = new RemoteClipboardCoordinator(
             _remoteCopyMoveService,
             names => _userDialogService.ConfirmOverwrite(names)
@@ -168,115 +174,32 @@ public sealed class ShellViewModel : ObservableObject
         }
 
         var shouldExpand = !node.IsExpanded;
-        await LoadDirectoryAsync(node.Share, node.Path, node, expandNavigationNode: shouldExpand);
-        node.IsExpanded = shouldExpand;
+        var loaded = await LoadDirectoryAsync(node.Share, node.Path, node, expandNavigationNode: shouldExpand);
+        if (!loaded)
+        {
+            node.IsExpanded = shouldExpand;
+        }
     }
 
     public async Task SelectFileAsync(FileItemViewModel? item)
     {
-        FileList.SelectedItem = item;
-        Preview.ShowSelection(item?.Item);
-        RefreshFileCommands();
-
-        var previewVersion = Interlocked.Increment(ref _previewLoadVersion);
-        if (_session is not null && item?.Item is { IsDirectory: false } selected)
-        {
-            try
-            {
-                Preview.ShowPreviewLoading();
-                var info = await _previewService.PlanAsync(_session, selected);
-                if (previewVersion == _previewLoadVersion && ReferenceEquals(FileList.SelectedItem, item))
-                {
-                    Preview.ShowPreviewInfo(info);
-                }
-            }
-            catch
-            {
-                if (previewVersion == _previewLoadVersion && ReferenceEquals(FileList.SelectedItem, item))
-                {
-                    Preview.ShowPreviewUnavailable();
-                }
-            }
-        }
+        await _previewCoordinator.SelectFileAsync(_session, item, RefreshFileCommands);
     }
 
     public async Task StartFileDragAsync(object dragSource, FileItemViewModel? item)
     {
-        if (_session is null || item is null)
-        {
-            return;
-        }
-
-        var selectedItems = new[] { item.Item };
-
-        if (!_shellDragDropService.CanStartDrag(selectedItems))
-        {
-            Status.Message = item.Item.IsDirectory ? "暂不支持拖出文件夹。" : "无法拖出。";
-            return;
-        }
-
-        try
-        {
-            Status.Message = "拖到本地位置后开始复制。";
-            var result = await _fileTransferService.CreateDragDownloadPayloadAsync(_session, selectedItems);
-            if (!result.Succeeded)
-            {
-                Status.Message = result.Summary;
-                return;
-            }
-
-            var completed = _shellDragDropService.StartDrag(dragSource, result.Files);
-            Status.Message = completed ? "拖出完成。" : "已取消拖出。";
-        }
-        catch (Exception ex)
-        {
-            Status.Message = UserFacingError(ex, "拖出失败");
-        }
+        await _fileDragDropCoordinator.StartFileDragAsync(_session, dragSource, item);
     }
 
     public async Task UploadDroppedFilesAsync(IReadOnlyList<string> localPaths)
     {
-        if (_session is null || _currentShare is null)
-        {
-            return;
-        }
-
-        var existingNames = new HashSet<string>(
-            FileList.AllNames,
-            StringComparer.CurrentCultureIgnoreCase
+        await _fileDragDropCoordinator.UploadDroppedFilesAsync(
+            _session,
+            _directoryNavigationCoordinator.CurrentShare,
+            _directoryNavigationCoordinator.CurrentPath,
+            localPaths,
+            RefreshCurrentDirectoryAsync
         );
-        var conflicts = localPaths
-            .Select(System.IO.Path.GetFileName)
-            .Where(name => !string.IsNullOrWhiteSpace(name) && existingNames.Contains(name))
-            .Cast<string>()
-            .Distinct(StringComparer.CurrentCultureIgnoreCase)
-            .ToArray();
-        if (conflicts.Length > 0 && !_userDialogService.ConfirmOverwrite(conflicts))
-        {
-            Status.Message = "已取消上传。";
-            return;
-        }
-
-        try
-        {
-            Status.Message = "正在上传...";
-            var result = await _fileOperationService.UploadFilesAsync(
-                _session,
-                _currentShare,
-                _currentPath,
-                localPaths,
-                replaceExisting: conflicts.Length > 0
-            );
-            Status.Message = result.Summary;
-            if (result.Succeeded)
-            {
-                await RefreshCurrentDirectoryAsync();
-            }
-        }
-        catch (Exception ex)
-        {
-            Status.Message = UserFacingError(ex, "上传失败");
-        }
     }
 
     private async Task LoginAsync()
@@ -366,6 +289,7 @@ public sealed class ShellViewModel : ObservableObject
     {
         _session = session;
         _remoteClipboardCoordinator.Clear();
+        _directoryNavigationCoordinator.Clear();
         Navigation.LoadShares(_session.Shares);
         IsLoggedIn = true;
         Login.Password = "";
@@ -473,72 +397,43 @@ public sealed class ShellViewModel : ObservableObject
 
     private async Task ActivateStartupLinkAsync(IReadOnlyList<string>? rawArguments)
     {
-        if (rawArguments is null || rawArguments.Count == 0)
+        var statusMessage = await _linkActivationCoordinator.ActivateStartupArgumentsAsync(
+            rawArguments,
+            _session,
+            OpenLinkRequestAsync
+        );
+        if (statusMessage is not null)
         {
-            return;
+            Status.Message = statusMessage;
         }
-
-        var rawLink = _linkActivationService.TryExtractStartupLink(rawArguments);
-        if (string.IsNullOrWhiteSpace(rawLink))
-        {
-            return;
-        }
-
-        await ActivateLinkAsync(rawLink);
-    }
-
-    private async Task ActivateLinkAsync(string rawLink)
-    {
-        var result = await _linkActivationService.ActivateAsync(rawLink);
-        if (!result.Succeeded || result.Request is null)
-        {
-            Status.Message = result.Summary;
-            return;
-        }
-
-        if (_session is null)
-        {
-            _pendingLinkOpenRequest = result.Request;
-            Status.Message = "请先登录对应服务器。";
-            return;
-        }
-
-        if (!_linkActivationService.CanOpenWithSession(_session, result.Request))
-        {
-            _pendingLinkOpenRequest = result.Request;
-            Status.Message = "请切换到对应服务器。";
-            return;
-        }
-
-        await OpenLinkRequestAsync(result.Request);
     }
 
     private async Task ConsumePendingLinkIfPossibleAsync()
     {
-        if (_pendingLinkOpenRequest is null || _session is null || !_linkActivationService.CanOpenWithSession(_session, _pendingLinkOpenRequest))
+        var statusMessage = await _linkActivationCoordinator.ConsumePendingIfPossibleAsync(
+            _session,
+            OpenLinkRequestAsync
+        );
+        if (statusMessage is not null)
         {
-            return;
+            Status.Message = statusMessage;
         }
-
-        var request = _pendingLinkOpenRequest;
-        _pendingLinkOpenRequest = null;
-        await OpenLinkRequestAsync(request);
     }
 
-    private async Task OpenLinkRequestAsync(LinkOpenRequest request)
+    private async Task<bool> OpenLinkRequestAsync(LinkOpenRequest request)
     {
         var opened = await LoadDirectoryAsync(request.Share, request.DirectoryPath, null, expandNavigationNode: false);
         if (!opened)
         {
-            return;
+            return false;
         }
 
         if (!string.IsNullOrWhiteSpace(request.SelectedPath))
         {
             var item = FileList.Items.FirstOrDefault(candidate =>
                 string.Equals(
-                    NormalizeDirectoryPath(candidate.Item.Path),
-                    NormalizeDirectoryPath(request.SelectedPath),
+                    DirectoryNavigationCoordinator.NormalizeDirectoryPath(candidate.Item.Path),
+                    DirectoryNavigationCoordinator.NormalizeDirectoryPath(request.SelectedPath),
                     StringComparison.OrdinalIgnoreCase
                 )
             );
@@ -549,7 +444,7 @@ public sealed class ShellViewModel : ObservableObject
             }
         }
 
-        Status.Message = "已打开链接。";
+        return true;
     }
 
     private async Task CopyLinkAsync(RemoteFileItem? item)
@@ -574,17 +469,13 @@ public sealed class ShellViewModel : ObservableObject
 
     private async Task RefreshCurrentDirectoryAsync()
     {
-        if (_currentShare is null)
-        {
-            return;
-        }
-
-        await LoadDirectoryAsync(_currentShare, _currentPath, CurrentNavigationNode(), expandNavigationNode: null);
+        await _directoryNavigationCoordinator.RefreshAsync(_session, RefreshFileCommands);
     }
 
     private async Task CreateFolderAsync()
     {
-        if (_session is null || _currentShare is null)
+        var currentShare = _directoryNavigationCoordinator.CurrentShare;
+        if (_session is null || currentShare is null)
         {
             return;
         }
@@ -595,7 +486,12 @@ public sealed class ShellViewModel : ObservableObject
             return;
         }
 
-        var result = await _fileOperationService.CreateDirectoryAsync(_session, _currentShare, _currentPath, name);
+        var result = await _fileOperationService.CreateDirectoryAsync(
+            _session,
+            currentShare,
+            _directoryNavigationCoordinator.CurrentPath,
+            name
+        );
         Status.Message = result.Summary;
         if (result.Succeeded)
         {
@@ -668,7 +564,8 @@ public sealed class ShellViewModel : ObservableObject
 
     private async Task PasteRemoteClipboardAsync()
     {
-        if (_session is null || _currentShare is null)
+        var currentShare = _directoryNavigationCoordinator.CurrentShare;
+        if (_session is null || currentShare is null)
         {
             return;
         }
@@ -678,8 +575,8 @@ public sealed class ShellViewModel : ObservableObject
             Status.Message = "正在粘贴...";
             var pasteResult = await _remoteClipboardCoordinator.PasteAsync(
                 _session,
-                _currentShare,
-                _currentPath,
+                currentShare,
+                _directoryNavigationCoordinator.CurrentPath,
                 FileList.ContainsName
             );
             if (pasteResult is null)
@@ -756,20 +653,9 @@ public sealed class ShellViewModel : ObservableObject
         }
     }
 
-    private bool CanUseCurrentDirectory() => _session is not null && _currentShare is not null;
+    private bool CanUseCurrentDirectory() => _session is not null && _directoryNavigationCoordinator.HasCurrentDirectory;
 
     private bool CanPasteRemoteClipboard() => CanUseCurrentDirectory() && _remoteClipboardCoordinator.CanPaste;
-
-    private NavigationNodeViewModel? CurrentNavigationNode()
-    {
-        var selected = Navigation.SelectedNode;
-        return selected is not null
-            && _currentShare is not null
-            && selected.Share.Equals(_currentShare, StringComparison.OrdinalIgnoreCase)
-            && NormalizeDirectoryPath(selected.Path) == NormalizeDirectoryPath(_currentPath)
-                ? selected
-                : null;
-    }
 
     private async Task OpenSelectedItemAsync()
     {
@@ -789,91 +675,14 @@ public sealed class ShellViewModel : ObservableObject
         bool? expandNavigationNode
     )
     {
-        if (_session is null)
-        {
-            return false;
-        }
-
-        var normalizedKey = $"{share}:{NormalizeDirectoryPath(path)}";
-        await _directoryLoadLock.WaitAsync();
-        try
-        {
-            if (_session is null)
-            {
-                return false;
-            }
-
-            if (_loadingDirectoryKey == normalizedKey)
-            {
-                if (navigationNode is not null && expandNavigationNode is bool requestedExpansion)
-                {
-                    navigationNode.IsExpanded = requestedExpansion;
-                }
-
-                return false;
-            }
-
-            _loadingDirectoryKey = normalizedKey;
-            FileList.IsLoading = true;
-            Status.Message = "正在加载目录...";
-
-            try
-            {
-                var directory = await _directoryService.ListAsync(_session, share, path);
-                _currentShare = directory.Share;
-                _currentPath = directory.Path;
-                FileList.ShowDirectory(directory);
-                Preview.ShowSelection(null);
-                RefreshFileCommands();
-
-                if (navigationNode is not null)
-                {
-                    Navigation.ReplaceChildren(
-                        navigationNode,
-                        directory.Items.Where(item => item.IsDirectory).ToArray()
-                    );
-                    if (expandNavigationNode is bool requestedExpansion)
-                    {
-                        navigationNode.IsExpanded = requestedExpansion;
-                    }
-
-                    navigationNode.IsSelected = true;
-                    Navigation.SelectedNode = navigationNode;
-                }
-
-                Status.Message = $"{directory.Items.Count} 个项目";
-                return true;
-            }
-            catch (Exception ex)
-            {
-                Status.Message = UserFacingError(ex, "目录加载失败");
-                return false;
-            }
-            finally
-            {
-                if (_loadingDirectoryKey == normalizedKey)
-                {
-                    _loadingDirectoryKey = null;
-                }
-
-                FileList.IsLoading = false;
-            }
-        }
-        finally
-        {
-            _directoryLoadLock.Release();
-        }
-    }
-
-    private static string NormalizeDirectoryPath(string path)
-    {
-        if (string.IsNullOrWhiteSpace(path) || path == "/")
-        {
-            return "/";
-        }
-
-        var normalized = path.Replace('\\', '/').Trim();
-        return normalized.StartsWith('/') ? normalized : "/" + normalized;
+        return await _directoryNavigationCoordinator.LoadAsync(
+            _session,
+            share,
+            path,
+            navigationNode,
+            expandNavigationNode,
+            RefreshFileCommands
+        );
     }
 
     private static string UserFacingError(Exception ex, string fallback)
