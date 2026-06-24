@@ -6,6 +6,7 @@ using Rynat.WindowsClient.Platform.Shell;
 using Rynat.WindowsClient.Services.Bootstrap;
 using Rynat.WindowsClient.Services.Directory;
 using Rynat.WindowsClient.Services.FileOperations;
+using Rynat.WindowsClient.Services.FileTransfers;
 using Rynat.WindowsClient.Services.Links;
 using Rynat.WindowsClient.Services.Preview;
 using Rynat.WindowsClient.Services.Profiles;
@@ -25,6 +26,7 @@ public partial class App : Application
         var sessionService = new SmbSessionService(bridge);
         var directoryService = new DirectoryService(bridge);
         var fileOperationService = new FileOperationService(bridge);
+        var fileTransferService = new FileTransferService(bridge);
         var quickLinkService = new QuickLinkService(bridge);
         var previewService = new PreviewService(bridge);
         var serverProfileService = new ServerProfileService(bridge);
@@ -37,6 +39,7 @@ public partial class App : Application
             sessionService,
             directoryService,
             fileOperationService,
+            fileTransferService,
             quickLinkService,
             previewService,
             serverProfileService,

@@ -6,6 +6,7 @@ using Rynat.WindowsClient.Platform.Shell;
 using Rynat.WindowsClient.Services.Bootstrap;
 using Rynat.WindowsClient.Services.Directory;
 using Rynat.WindowsClient.Services.FileOperations;
+using Rynat.WindowsClient.Services.FileTransfers;
 using Rynat.WindowsClient.Services.Links;
 using Rynat.WindowsClient.Services.Preview;
 using Rynat.WindowsClient.Services.Profiles;
@@ -25,6 +26,7 @@ public sealed class ShellViewModel : ObservableObject
     private readonly ISmbSessionService _sessionService;
     private readonly IDirectoryService _directoryService;
     private readonly IFileOperationService _fileOperationService;
+    private readonly IFileTransferService _fileTransferService;
     private readonly IQuickLinkService _quickLinkService;
     private readonly IPreviewService _previewService;
     private readonly IServerProfileService _serverProfileService;
@@ -43,6 +45,7 @@ public sealed class ShellViewModel : ObservableObject
         ISmbSessionService sessionService,
         IDirectoryService directoryService,
         IFileOperationService fileOperationService,
+        IFileTransferService fileTransferService,
         IQuickLinkService quickLinkService,
         IPreviewService previewService,
         IServerProfileService serverProfileService,
@@ -55,6 +58,7 @@ public sealed class ShellViewModel : ObservableObject
         _sessionService = sessionService;
         _directoryService = directoryService;
         _fileOperationService = fileOperationService;
+        _fileTransferService = fileTransferService;
         _quickLinkService = quickLinkService;
         _previewService = previewService;
         _serverProfileService = serverProfileService;
@@ -160,6 +164,40 @@ public sealed class ShellViewModel : ObservableObject
                     Preview.ShowPreviewUnavailable();
                 }
             }
+        }
+    }
+
+    public async Task StartFileDragAsync(object dragSource, FileItemViewModel? item)
+    {
+        if (_session is null || item is null)
+        {
+            return;
+        }
+
+        var selectedItems = new[] { item.Item };
+
+        if (!_shellDragDropService.CanStartDrag(selectedItems))
+        {
+            Status.Message = item.Item.IsDirectory ? "暂不支持拖出文件夹。" : "无法拖出。";
+            return;
+        }
+
+        try
+        {
+            Status.Message = "拖到本地位置后开始复制。";
+            var result = await _fileTransferService.CreateDragDownloadPayloadAsync(_session, selectedItems);
+            if (!result.Succeeded)
+            {
+                Status.Message = result.Summary;
+                return;
+            }
+
+            var completed = _shellDragDropService.StartDrag(dragSource, result.Files);
+            Status.Message = completed ? "拖出完成。" : "已取消拖出。";
+        }
+        catch (Exception ex)
+        {
+            Status.Message = UserFacingError(ex, "拖出失败");
         }
     }
 

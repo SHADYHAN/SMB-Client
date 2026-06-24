@@ -53,6 +53,8 @@
 
             <ListView ItemsSource="{Binding Items}"
                       SelectedItem="{Binding SelectedItem, Mode=TwoWay}"
+                      PreviewMouseLeftButtonDown="ListView_OnPreviewMouseLeftButtonDown"
+                      PreviewMouseMove="ListView_OnPreviewMouseMove"
                       MouseDoubleClick="ListView_OnMouseDoubleClick"
                       PreviewMouseRightButtonDown="ListView_OnPreviewMouseRightButtonDown"
                       SelectionChanged="ListView_OnSelectionChanged"
