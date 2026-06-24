@@ -44,9 +44,11 @@
                         </Style>
                     </TextBlock.Style>
                 </TextBlock>
-                <TextBox Grid.Column="4"
+                <TextBox x:Name="SearchBox"
+                         Grid.Column="4"
                          MinHeight="30"
                          Padding="8,4"
+                         Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
                          VerticalContentAlignment="Center"
                          ToolTip="搜索当前目录" />
             </Grid>

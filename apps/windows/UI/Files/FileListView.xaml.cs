@@ -84,8 +84,28 @@ public partial class FileListView : UserControl
             return;
         }
 
+        if (Keyboard.Modifiers == ModifierKeys.Control)
+        {
+            switch (e.Key)
+            {
+                case Key.C when viewModel.CopyLinkCommand.CanExecute(null):
+                    viewModel.CopyLinkCommand.Execute(null);
+                    e.Handled = true;
+                    return;
+                case Key.F:
+                    SearchBox.Focus();
+                    SearchBox.SelectAll();
+                    e.Handled = true;
+                    return;
+            }
+        }
+
         switch (e.Key)
         {
+            case Key.Enter when viewModel.OpenItemCommand.CanExecute(null):
+                viewModel.OpenItemCommand.Execute(null);
+                e.Handled = true;
+                break;
             case Key.F5 when viewModel.RefreshCommand.CanExecute(null):
                 viewModel.RefreshCommand.Execute(null);
                 e.Handled = true;

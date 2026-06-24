@@ -8,6 +8,7 @@ using Rynat.WindowsClient.Services.Directory;
 using Rynat.WindowsClient.Services.FileOperations;
 using Rynat.WindowsClient.Services.FileTransfers;
 using Rynat.WindowsClient.Services.Links;
+using Rynat.WindowsClient.Services.LinkActivation;
 using Rynat.WindowsClient.Services.Preview;
 using Rynat.WindowsClient.Services.Profiles;
 using Rynat.WindowsClient.Services.Smb;
@@ -28,6 +29,7 @@ public partial class App : Application
         var fileOperationService = new FileOperationService(bridge);
         var fileTransferService = new FileTransferService(bridge);
         var quickLinkService = new QuickLinkService(bridge);
+        var linkActivationService = new LinkActivationService(bridge);
         var previewService = new PreviewService(bridge);
         var serverProfileService = new ServerProfileService(bridge);
         var clipboardService = new WindowsClipboardService();
@@ -41,6 +43,7 @@ public partial class App : Application
             fileOperationService,
             fileTransferService,
             quickLinkService,
+            linkActivationService,
             previewService,
             serverProfileService,
             clipboardService,
@@ -55,6 +58,6 @@ public partial class App : Application
 
         MainWindow = window;
         window.Show();
-        _ = viewModel.InitializeAsync();
+        _ = viewModel.InitializeAsync(e.Args);
     }
 }

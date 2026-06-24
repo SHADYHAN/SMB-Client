@@ -8,6 +8,7 @@ using Rynat.WindowsClient.Services.Directory;
 using Rynat.WindowsClient.Services.FileOperations;
 using Rynat.WindowsClient.Services.FileTransfers;
 using Rynat.WindowsClient.Services.Links;
+using Rynat.WindowsClient.Services.LinkActivation;
 using Rynat.WindowsClient.Services.Preview;
 using Rynat.WindowsClient.Services.Profiles;
 using Rynat.WindowsClient.Services.Smb;
@@ -28,6 +29,7 @@ public sealed class ShellViewModel : ObservableObject
     private readonly IFileOperationService _fileOperationService;
     private readonly IFileTransferService _fileTransferService;
     private readonly IQuickLinkService _quickLinkService;
+    private readonly ILinkActivationService _linkActivationService;
     private readonly IPreviewService _previewService;
     private readonly IServerProfileService _serverProfileService;
     private readonly IClipboardService _clipboardService;
@@ -38,6 +40,7 @@ public sealed class ShellViewModel : ObservableObject
     private string? _currentShare;
     private string _currentPath = "/";
     private string? _loadingDirectoryKey;
+    private LinkOpenRequest? _pendingLinkOpenRequest;
     private int _previewLoadVersion;
     private bool _isLoggedIn;
 
@@ -48,6 +51,7 @@ public sealed class ShellViewModel : ObservableObject
         IFileOperationService fileOperationService,
         IFileTransferService fileTransferService,
         IQuickLinkService quickLinkService,
+        ILinkActivationService linkActivationService,
         IPreviewService previewService,
         IServerProfileService serverProfileService,
         IClipboardService clipboardService,
@@ -61,6 +65,7 @@ public sealed class ShellViewModel : ObservableObject
         _fileOperationService = fileOperationService;
         _fileTransferService = fileTransferService;
         _quickLinkService = quickLinkService;
+        _linkActivationService = linkActivationService;
         _previewService = previewService;
         _serverProfileService = serverProfileService;
         _clipboardService = clipboardService;
@@ -94,7 +99,7 @@ public sealed class ShellViewModel : ObservableObject
         private set => SetProperty(ref _isLoggedIn, value);
     }
 
-    public async Task InitializeAsync()
+    public async Task InitializeAsync(IReadOnlyList<string>? startupArguments = null)
     {
         try
         {
@@ -112,6 +117,7 @@ public sealed class ShellViewModel : ObservableObject
                 : $"已加载 {state.ServerProfiles.Count} 个服务器配置。";
 
             await TryAutoLoginAsync();
+            await ActivateStartupLinkAsync(startupArguments);
         }
         catch (Exception ex)
         {
@@ -346,6 +352,7 @@ public sealed class ShellViewModel : ObservableObject
         FileList.Clear("");
         Preview.ShowSelection(null);
         Status.Message = $"已连接 {_session.Host}。";
+        await ConsumePendingLinkIfPossibleAsync();
     }
 
     private async Task SaveLoginProfileAsync()
@@ -428,6 +435,87 @@ public sealed class ShellViewModel : ObservableObject
     private async Task CopyPreviewLinkAsync()
     {
         await CopyLinkAsync(Preview.SelectedItem);
+    }
+
+    private async Task ActivateStartupLinkAsync(IReadOnlyList<string>? rawArguments)
+    {
+        if (rawArguments is null || rawArguments.Count == 0)
+        {
+            return;
+        }
+
+        var rawLink = _linkActivationService.TryExtractStartupLink(rawArguments);
+        if (string.IsNullOrWhiteSpace(rawLink))
+        {
+            return;
+        }
+
+        await ActivateLinkAsync(rawLink);
+    }
+
+    private async Task ActivateLinkAsync(string rawLink)
+    {
+        var result = await _linkActivationService.ActivateAsync(rawLink);
+        if (!result.Succeeded || result.Request is null)
+        {
+            Status.Message = result.Summary;
+            return;
+        }
+
+        if (_session is null)
+        {
+            _pendingLinkOpenRequest = result.Request;
+            Status.Message = "请先登录对应服务器。";
+            return;
+        }
+
+        if (!_linkActivationService.CanOpenWithSession(_session, result.Request))
+        {
+            _pendingLinkOpenRequest = result.Request;
+            Status.Message = "请切换到对应服务器。";
+            return;
+        }
+
+        await OpenLinkRequestAsync(result.Request);
+    }
+
+    private async Task ConsumePendingLinkIfPossibleAsync()
+    {
+        if (_pendingLinkOpenRequest is null || _session is null || !_linkActivationService.CanOpenWithSession(_session, _pendingLinkOpenRequest))
+        {
+            return;
+        }
+
+        var request = _pendingLinkOpenRequest;
+        _pendingLinkOpenRequest = null;
+        await OpenLinkRequestAsync(request);
+    }
+
+    private async Task OpenLinkRequestAsync(LinkOpenRequest request)
+    {
+        var opened = await LoadDirectoryAsync(request.Share, request.DirectoryPath, null, expandNavigationNode: false);
+        if (!opened)
+        {
+            return;
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.SelectedPath))
+        {
+            var item = FileList.Items.FirstOrDefault(candidate =>
+                string.Equals(
+                    NormalizeDirectoryPath(candidate.Item.Path),
+                    NormalizeDirectoryPath(request.SelectedPath),
+                    StringComparison.OrdinalIgnoreCase
+                )
+            );
+            if (item is not null)
+            {
+                FileList.SelectedItem = item;
+                await SelectFileAsync(item);
+            }
+        }
+
+        Status.Message = "已打开链接。";
     }
 
     private async Task CopyLinkAsync(RemoteFileItem? item)
@@ -579,7 +667,7 @@ public sealed class ShellViewModel : ObservableObject
         await LoadDirectoryAsync(selected.Share, selected.Path, null, expandNavigationNode: false);
     }
 
-    private async Task LoadDirectoryAsync(
+    private async Task<bool> LoadDirectoryAsync(
         string share,
         string path,
         NavigationNodeViewModel? navigationNode,
@@ -588,7 +676,7 @@ public sealed class ShellViewModel : ObservableObject
     {
         if (_session is null)
         {
-            return;
+            return false;
         }
 
         var normalizedKey = $"{share}:{NormalizeDirectoryPath(path)}";
@@ -597,7 +685,7 @@ public sealed class ShellViewModel : ObservableObject
         {
             if (_session is null)
             {
-                return;
+                return false;
             }
 
             if (_loadingDirectoryKey == normalizedKey)
@@ -607,7 +695,7 @@ public sealed class ShellViewModel : ObservableObject
                     navigationNode.IsExpanded = requestedExpansion;
                 }
 
-                return;
+                return false;
             }
 
             _loadingDirectoryKey = normalizedKey;
@@ -639,10 +727,12 @@ public sealed class ShellViewModel : ObservableObject
                 }
 
                 Status.Message = $"{directory.Items.Count} 个项目";
+                return true;
             }
             catch (Exception ex)
             {
                 Status.Message = UserFacingError(ex, "目录加载失败");
+                return false;
             }
             finally
             {

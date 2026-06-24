@@ -7,8 +7,10 @@ namespace Rynat.WindowsClient.UI.Files;
 
 public sealed class FileListViewModel : ObservableObject
 {
+    private readonly List<FileItemViewModel> _allItems = new();
     private FileItemViewModel? _selectedItem;
     private string _pathTitle = "未连接";
+    private string _searchText = string.Empty;
     private bool _isLoading;
 
     public ObservableCollection<FileItemViewModel> Items { get; } = new();
@@ -17,6 +19,18 @@ public sealed class FileListViewModel : ObservableObject
     {
         get => _pathTitle;
         set => SetProperty(ref _pathTitle, value);
+    }
+
+    public string SearchText
+    {
+        get => _searchText;
+        set
+        {
+            if (SetProperty(ref _searchText, value))
+            {
+                ApplyFilter();
+            }
+        }
     }
 
     public FileItemViewModel? SelectedItem
@@ -66,21 +80,46 @@ public sealed class FileListViewModel : ObservableObject
         PathTitle = directory.Path == "/"
             ? directory.Share
             : $"{directory.Share}{directory.Path}";
-        Items.Clear();
+        SearchText = string.Empty;
+        _allItems.Clear();
 
         foreach (var item in directory.Items
             .OrderByDescending(item => item.IsDirectory)
             .ThenBy(item => item.Name, StringComparer.CurrentCultureIgnoreCase))
         {
-            Items.Add(new FileItemViewModel(item));
+            _allItems.Add(new FileItemViewModel(item));
         }
+
+        ApplyFilter();
     }
 
     public void Clear(string title)
     {
         PathTitle = title;
+        SearchText = string.Empty;
+        _allItems.Clear();
         Items.Clear();
         SelectedItem = null;
         IsLoading = false;
+    }
+
+    private void ApplyFilter()
+    {
+        var selected = SelectedItem;
+        var query = SearchText.Trim();
+        var filtered = string.IsNullOrWhiteSpace(query)
+            ? _allItems
+            : _allItems.Where(item => item.Name.Contains(query, StringComparison.CurrentCultureIgnoreCase));
+
+        Items.Clear();
+        foreach (var item in filtered)
+        {
+            Items.Add(item);
+        }
+
+        if (selected is null || !Items.Contains(selected))
+        {
+            SelectedItem = null;
+        }
     }
 }
