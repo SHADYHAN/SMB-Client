@@ -87,7 +87,7 @@ public sealed class PreviewService : IPreviewService
             "PreviewCache",
             SafeFileName(session.ConnectionId)
         );
-        Directory.CreateDirectory(previewDirectory);
+        System.IO.Directory.CreateDirectory(previewDirectory);
 
         var extension = Path.GetExtension(item.Name);
         if (string.IsNullOrWhiteSpace(extension))

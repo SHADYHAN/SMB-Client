@@ -153,7 +153,7 @@ public sealed class FileTransferService : IFileTransferService
         string localPath
     )
     {
-        Directory.CreateDirectory(Path.GetDirectoryName(localPath)!);
+        System.IO.Directory.CreateDirectory(Path.GetDirectoryName(localPath)!);
         var partialPath = localPath + ".part";
         DeleteIfExists(partialPath);
 

@@ -136,7 +136,7 @@ public sealed class FileOperationService : IFileOperationService
                     return Failure("请选择文件。", "upload.no_files");
                 }
 
-                if (localPaths.Any(Directory.Exists))
+                if (localPaths.Any(System.IO.Directory.Exists))
                 {
                     return Failure("暂不支持上传文件夹。", "upload.directory_not_supported");
                 }
