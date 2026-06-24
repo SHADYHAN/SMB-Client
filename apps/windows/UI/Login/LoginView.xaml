@@ -22,9 +22,18 @@
                            HorizontalAlignment="Center"
                            Margin="0,0,0,24" />
 
-                <TextBlock Text="服务器"
-                           Foreground="{StaticResource TextSecondaryBrush}"
-                           Margin="0,0,0,6" />
+                <Grid Margin="0,0,0,6">
+                    <TextBlock Text="服务器"
+                               Foreground="{StaticResource TextSecondaryBrush}"
+                               VerticalAlignment="Center" />
+                    <Button Content="设置"
+                            HorizontalAlignment="Right"
+                            MinHeight="24"
+                            Padding="8,2"
+                            Background="{StaticResource SubtleBackgroundBrush}"
+                            Foreground="{StaticResource TextPrimaryBrush}"
+                            Command="{Binding ServerSettingsCommand}" />
+                </Grid>
                 <ComboBox ItemsSource="{Binding ServerProfiles}"
                           SelectedItem="{Binding SelectedProfile, Mode=TwoWay}"
                           DisplayMemberPath="DisplayName"

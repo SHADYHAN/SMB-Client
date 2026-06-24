@@ -34,6 +34,7 @@ public sealed class ShellViewModel : ObservableObject
     private readonly IServerProfileService _serverProfileService;
     private readonly IClipboardService _clipboardService;
     private readonly IUserDialogService _userDialogService;
+    private readonly IServerSettingsDialogService _serverSettingsDialogService;
     private readonly IWindowsShellDragDropService _shellDragDropService;
     private readonly SemaphoreSlim _directoryLoadLock = new(1, 1);
     private ServerSession? _session;
@@ -56,6 +57,7 @@ public sealed class ShellViewModel : ObservableObject
         IServerProfileService serverProfileService,
         IClipboardService clipboardService,
         IUserDialogService userDialogService,
+        IServerSettingsDialogService serverSettingsDialogService,
         IWindowsShellDragDropService shellDragDropService
     )
     {
@@ -70,9 +72,11 @@ public sealed class ShellViewModel : ObservableObject
         _serverProfileService = serverProfileService;
         _clipboardService = clipboardService;
         _userDialogService = userDialogService;
+        _serverSettingsDialogService = serverSettingsDialogService;
         _shellDragDropService = shellDragDropService;
 
         Login.LoginCommand = new AsyncRelayCommand(LoginAsync, CanLogin);
+        Login.ServerSettingsCommand = new AsyncRelayCommand(OpenServerSettingsAsync, () => !Login.IsBusy);
         FileList.OpenItemCommand = new AsyncRelayCommand(OpenSelectedItemAsync, () => FileList.SelectedItem is not null);
         FileList.CopyLinkCommand = new AsyncRelayCommand(CopySelectedFileLinkAsync, () => FileList.SelectedItem is not null && _session is not null);
         FileList.RefreshCommand = new AsyncRelayCommand(RefreshCurrentDirectoryAsync, CanUseCurrentDirectory);
@@ -353,6 +357,19 @@ public sealed class ShellViewModel : ObservableObject
         Preview.ShowSelection(null);
         Status.Message = $"已连接 {_session.Host}。";
         await ConsumePendingLinkIfPossibleAsync();
+    }
+
+    private async Task OpenServerSettingsAsync()
+    {
+        var activeProfile = Login.SelectedProfile;
+        var result = await _serverSettingsDialogService.ShowAsync(Login.ServerProfiles.ToArray(), activeProfile);
+        if (result is null)
+        {
+            return;
+        }
+
+        Login.ReplaceServerProfiles(result.Profiles, result.ActiveProfile);
+        Status.Message = "服务器设置已更新。";
     }
 
     private async Task SaveLoginProfileAsync()

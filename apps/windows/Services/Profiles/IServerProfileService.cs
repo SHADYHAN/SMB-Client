@@ -20,4 +20,22 @@ public interface IServerProfileService
         bool autoLogin,
         CancellationToken cancellationToken = default
     );
+
+    Task<ServerProfileListResult> SaveServerAsync(
+        ServerProfile? existingProfile,
+        string displayName,
+        string host,
+        bool setActive,
+        CancellationToken cancellationToken = default
+    );
+
+    Task<ServerProfileListResult> DeleteServerAsync(
+        ServerProfile profile,
+        CancellationToken cancellationToken = default
+    );
+
+    Task<ServerProfileListResult> SetActiveAsync(
+        ServerProfile profile,
+        CancellationToken cancellationToken = default
+    );
 }

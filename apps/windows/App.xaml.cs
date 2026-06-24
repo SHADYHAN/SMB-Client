@@ -34,6 +34,7 @@ public partial class App : Application
         var serverProfileService = new ServerProfileService(bridge);
         var clipboardService = new WindowsClipboardService();
         var userDialogService = new WindowsUserDialogService();
+        var serverSettingsDialogService = new WindowsServerSettingsDialogService(serverProfileService);
         var shellDragDropService = new WindowsShellDragDropService();
 
         var viewModel = new ShellViewModel(
@@ -48,6 +49,7 @@ public partial class App : Application
             serverProfileService,
             clipboardService,
             userDialogService,
+            serverSettingsDialogService,
             shellDragDropService
         );
 

@@ -125,8 +125,122 @@ public sealed class ServerProfileService : IServerProfileService
         }, cancellationToken);
     }
 
+    public Task<ServerProfileListResult> SaveServerAsync(
+        ServerProfile? existingProfile,
+        string displayName,
+        string host,
+        bool setActive,
+        CancellationToken cancellationToken = default
+    )
+    {
+        return Task.Run(() =>
+        {
+            try
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var normalizedHost = host.Trim();
+                if (string.IsNullOrWhiteSpace(normalizedHost))
+                {
+                    return ListFailure("地址不能为空。", "server_profile.invalid");
+                }
+
+                var normalizedName = string.IsNullOrWhiteSpace(displayName)
+                    ? DisplayNameFor(existingProfile, normalizedHost)
+                    : displayName.Trim();
+
+                var saved = _bridge.SaveServerProfile(new SaveServerProfileRequest(
+                    string.IsNullOrWhiteSpace(existingProfile?.Id) ? null : existingProfile.Id,
+                    normalizedName,
+                    normalizedHost,
+                    existingProfile?.Username,
+                    "username_password",
+                    "smb3_preferred",
+                    setActive
+                ));
+                cancellationToken.ThrowIfCancellationRequested();
+
+                var state = _bridge.AppBootstrap();
+                var savedProfile = MapProfile(saved, CredentialFor(state, saved.Id));
+                return ListSuccess(state, savedProfile, "服务器已保存。");
+            }
+            catch (Exception ex) when (BridgeExceptionClassifier.IsBridgeFailure(ex))
+            {
+                return ListFailure("服务器保存失败。", BridgeExceptionClassifier.ErrorCodeFor(ex));
+            }
+        }, cancellationToken);
+    }
+
+    public Task<ServerProfileListResult> DeleteServerAsync(
+        ServerProfile profile,
+        CancellationToken cancellationToken = default
+    )
+    {
+        return Task.Run(() =>
+        {
+            try
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var state = _bridge.DeleteServerProfile(new DeleteServerProfileRequest(profile.Id));
+                return ListSuccess(state, null, "服务器已删除。");
+            }
+            catch (Exception ex) when (BridgeExceptionClassifier.IsBridgeFailure(ex))
+            {
+                return ListFailure("服务器删除失败。", BridgeExceptionClassifier.ErrorCodeFor(ex));
+            }
+        }, cancellationToken);
+    }
+
+    public Task<ServerProfileListResult> SetActiveAsync(
+        ServerProfile profile,
+        CancellationToken cancellationToken = default
+    )
+    {
+        return Task.Run(() =>
+        {
+            try
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var state = _bridge.SetActiveServerProfile(new SetActiveServerProfileRequest(profile.Id));
+                return ListSuccess(state, MapProfile(profile), "默认服务器已更新。");
+            }
+            catch (Exception ex) when (BridgeExceptionClassifier.IsBridgeFailure(ex))
+            {
+                return ListFailure("默认服务器设置失败。", BridgeExceptionClassifier.ErrorCodeFor(ex));
+            }
+        }, cancellationToken);
+    }
+
     private static ServerProfileSaveResult Failure(string summary, string errorCode) =>
         new(false, null, summary, errorCode);
+
+    private static ServerProfileListResult ListSuccess(
+        AppBootstrapState state,
+        ServerProfile? savedProfile,
+        string summary
+    )
+    {
+        var profiles = state.ServerProfiles
+            .Select(profile => MapProfile(profile, CredentialFor(state, profile.Id)))
+            .ToArray();
+        return new ServerProfileListResult(
+            true,
+            profiles,
+            state.ActiveServer is null ? null : MapProfile(state.ActiveServer, state.ActiveCredential),
+            savedProfile,
+            summary,
+            null
+        );
+    }
+
+    private static ServerProfileListResult ListFailure(string summary, string errorCode) =>
+        new(false, Array.Empty<ServerProfile>(), null, null, summary, errorCode);
+
+    private static StoredServerCredential? CredentialFor(AppBootstrapState state, string profileId)
+    {
+        return state.ActiveCredential?.ServerProfileId == profileId
+            ? state.ActiveCredential
+            : null;
+    }
 
     private static string DisplayNameFor(ServerProfile? existingProfile, string host)
     {
@@ -153,4 +267,6 @@ public sealed class ServerProfileService : IServerProfileService
             credential?.AutoLogin ?? false
         );
     }
+
+    private static ServerProfile MapProfile(ServerProfile profile) => profile;
 }

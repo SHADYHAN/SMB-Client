@@ -8,6 +8,7 @@ namespace Rynat.WindowsClient.UI.Login;
 public sealed class LoginViewModel : ObservableObject
 {
     private ICommand _loginCommand = new RelayCommand(() => { });
+    private ICommand _serverSettingsCommand = new RelayCommand(() => { });
     private ServerProfile? _selectedProfile;
     private string _serverHost = "192.168.102.136";
     private string _username = string.Empty;
@@ -125,6 +126,12 @@ public sealed class LoginViewModel : ObservableObject
         }
     }
 
+    public ICommand ServerSettingsCommand
+    {
+        get => _serverSettingsCommand;
+        set => SetProperty(ref _serverSettingsCommand, value);
+    }
+
     public void LoadServerProfiles(
         IReadOnlyList<ServerProfile> profiles,
         ServerProfile? activeProfile,
@@ -167,6 +174,19 @@ public sealed class LoginViewModel : ObservableObject
         }
 
         SelectedProfile = profile;
+    }
+
+    public void ReplaceServerProfiles(IReadOnlyList<ServerProfile> profiles, ServerProfile? activeProfile)
+    {
+        ServerProfiles.Clear();
+        foreach (var profile in profiles)
+        {
+            ServerProfiles.Add(profile);
+        }
+
+        SelectedProfile = activeProfile is null
+            ? ServerProfiles.FirstOrDefault()
+            : ServerProfiles.FirstOrDefault(profile => profile.Id == activeProfile.Id) ?? ServerProfiles.FirstOrDefault();
     }
 
     private void RefreshLoginCommand()
