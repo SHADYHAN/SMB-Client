@@ -24,6 +24,20 @@ public partial class App : Application
 
     protected override void OnStartup(StartupEventArgs e)
     {
+        try
+        {
+            StartApplication(e);
+        }
+        catch (Exception ex)
+        {
+            LogStartupException(ex);
+            MessageBox.Show("启动失败，请重新打开。", "RYNAT 共享网盘", MessageBoxButton.OK, MessageBoxImage.Error);
+            Shutdown(1);
+        }
+    }
+
+    private void StartApplication(StartupEventArgs e)
+    {
         _singleInstanceService = new WindowsSingleInstanceService();
         var isPrimary = _singleInstanceService.StartAsync(e.Args).GetAwaiter().GetResult();
         if (!isPrimary)
@@ -88,6 +102,22 @@ public partial class App : Application
         MainWindow = window;
         window.Show();
         _ = viewModel.InitializeAsync(e.Args);
+    }
+
+    private static void LogStartupException(Exception exception)
+    {
+        try
+        {
+            var appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            var directory = System.IO.Path.Combine(appData, "Rynat", "logs");
+            System.IO.Directory.CreateDirectory(directory);
+            var logPath = System.IO.Path.Combine(directory, "startup.log");
+            System.IO.File.AppendAllText(logPath, $"[{DateTimeOffset.Now:O}] {exception}{Environment.NewLine}{Environment.NewLine}");
+        }
+        catch
+        {
+            // Logging must never block application startup or shutdown.
+        }
     }
 
     private void ActivateArguments(

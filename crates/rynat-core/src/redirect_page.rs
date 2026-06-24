@@ -150,7 +150,8 @@ mod tests {
         assert!(html.contains("document.body.style.display = \"flex\""));
         assert!(html.contains("rynat://s?"));
         assert!(html.contains("var url = \"rynat://s?"));
-        assert!(html.contains("href=\"rynat://s?h=nas&amp;s=Share"));
+        assert!(html.contains("href=\"rynat://s?d="));
+        assert!(!html.contains("h=nas&amp;s=Share"));
     }
 
     #[test]

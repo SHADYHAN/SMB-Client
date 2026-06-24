@@ -23,7 +23,7 @@ public sealed class WindowsSingleInstanceService : IAppSingleInstanceService
         CancellationToken cancellationToken = default
     )
     {
-        IsPrimaryInstance = _mutex.WaitOne(0);
+        IsPrimaryInstance = TryAcquirePrimaryMutex();
         if (!IsPrimaryInstance)
         {
             await ForwardAsync(startupArguments, cancellationToken);
@@ -33,6 +33,20 @@ public sealed class WindowsSingleInstanceService : IAppSingleInstanceService
         _listenerCancellation = new CancellationTokenSource();
         _listenerTask = Task.Run(() => ListenAsync(_listenerCancellation.Token), CancellationToken.None);
         return true;
+    }
+
+    private bool TryAcquirePrimaryMutex()
+    {
+        try
+        {
+            return _mutex.WaitOne(0);
+        }
+        catch (AbandonedMutexException)
+        {
+            // The previous process died without releasing the mutex. Windows grants
+            // ownership to this process, so continue as the primary instance.
+            return true;
+        }
     }
 
     public void Stop()

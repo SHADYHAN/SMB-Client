@@ -190,6 +190,15 @@ pub struct LinkOpenIntent {
     pub preview_path: Option<String>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+struct QuickLinkPayload {
+    h: String,
+    s: String,
+    p: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    t: Option<String>,
+}
+
 pub fn normalize_remote_path(raw: &str) -> String {
     let mut path = raw.trim().replace('\\', "/");
     if path.is_empty() {
@@ -210,7 +219,7 @@ pub fn normalize_remote_path(raw: &str) -> String {
 pub fn build_deep_link(protocol: &str, target: &QuickLinkTarget) -> CoreResult<String> {
     target.validate()?;
     let mut url = Url::parse(&format!("{protocol}://s"))?;
-    append_target_params(&mut url, target);
+    append_target_payload(&mut url, target)?;
     Ok(url.to_string())
 }
 
@@ -229,7 +238,7 @@ pub fn build_web_redirect_link(
             "redirect endpoint must use http or https".to_string(),
         ));
     }
-    append_target_params(&mut url, target);
+    append_target_payload(&mut url, target)?;
     Ok(url.to_string())
 }
 
@@ -245,40 +254,95 @@ pub fn parse_quick_link(input: &str) -> CoreResult<QuickLinkTarget> {
         }
     };
 
-    if action != "s" && action != "open" {
+    if action != "s" {
         return Err(CoreError::InvalidLink(format!(
             "unsupported action '{action}'"
         )));
     }
 
-    let params: Vec<(String, String)> = url.query_pairs().into_owned().collect();
-    let value = |short: &str, long: &str| -> Option<String> {
-        params
-            .iter()
-            .find(|(key, _)| key == short)
-            .or_else(|| params.iter().find(|(key, _)| key == long))
-            .map(|(_, value)| value.clone())
-    };
-
-    let server_host = value("h", "server").ok_or(CoreError::MissingField("server_host"))?;
-    let share = value("s", "share").ok_or(CoreError::MissingField("share"))?;
-    let path = value("p", "path").unwrap_or_else(|| "/".to_string());
-    let name = value("n", "name");
-    let kind = LinkKind::from_param(value("t", "type").as_deref());
-
-    let target = QuickLinkTarget::new(server_host, share, path, name, kind);
+    let payload = url
+        .query_pairs()
+        .find(|(key, _)| key == "d")
+        .map(|(_, value)| value.into_owned())
+        .ok_or(CoreError::MissingField("payload"))?;
+    let payload_bytes = base64url_decode(&payload)?;
+    let payload: QuickLinkPayload = serde_json::from_slice(&payload_bytes)?;
+    let target = QuickLinkTarget::new(
+        payload.h,
+        payload.s,
+        payload.p,
+        None,
+        LinkKind::from_param(payload.t.as_deref()),
+    );
     target.validate()?;
     Ok(target)
 }
 
-fn append_target_params(url: &mut Url, target: &QuickLinkTarget) {
-    let mut pairs = url.query_pairs_mut();
-    pairs
-        .append_pair("h", &target.server_host)
-        .append_pair("s", &target.share)
-        .append_pair("p", &target.path);
-    if let Some(kind) = target.kind.as_param() {
-        pairs.append_pair("t", kind);
+fn append_target_payload(url: &mut Url, target: &QuickLinkTarget) -> CoreResult<()> {
+    let payload = QuickLinkPayload {
+        h: target.server_host.clone(),
+        s: target.share.clone(),
+        p: target.path.clone(),
+        t: target.kind.as_param().map(str::to_string),
+    };
+    let payload = serde_json::to_vec(&payload)?;
+    url.query_pairs_mut()
+        .append_pair("d", &base64url_encode(&payload));
+    Ok(())
+}
+
+const BASE64URL: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+
+fn base64url_encode(bytes: &[u8]) -> String {
+    let mut out = String::with_capacity(bytes.len().div_ceil(3) * 4);
+    for chunk in bytes.chunks(3) {
+        let b0 = chunk[0];
+        let b1 = *chunk.get(1).unwrap_or(&0);
+        let b2 = *chunk.get(2).unwrap_or(&0);
+        let n = ((b0 as u32) << 16) | ((b1 as u32) << 8) | b2 as u32;
+        out.push(BASE64URL[((n >> 18) & 0x3f) as usize] as char);
+        out.push(BASE64URL[((n >> 12) & 0x3f) as usize] as char);
+        if chunk.len() > 1 {
+            out.push(BASE64URL[((n >> 6) & 0x3f) as usize] as char);
+        }
+        if chunk.len() > 2 {
+            out.push(BASE64URL[(n & 0x3f) as usize] as char);
+        }
+    }
+    out
+}
+
+fn base64url_decode(value: &str) -> CoreResult<Vec<u8>> {
+    if value.len() % 4 == 1 {
+        return Err(CoreError::InvalidLink(
+            "invalid payload encoding".to_string(),
+        ));
+    }
+
+    let mut output = Vec::with_capacity((value.len() * 3) / 4);
+    let mut buffer = 0_u32;
+    let mut bits = 0_u8;
+    for byte in value.bytes() {
+        let value = decode_base64url_byte(byte)
+            .ok_or_else(|| CoreError::InvalidLink("invalid payload encoding".to_string()))?;
+        buffer = (buffer << 6) | value as u32;
+        bits += 6;
+        while bits >= 8 {
+            bits -= 8;
+            output.push(((buffer >> bits) & 0xff) as u8);
+        }
+    }
+    Ok(output)
+}
+
+fn decode_base64url_byte(byte: u8) -> Option<u8> {
+    match byte {
+        b'A'..=b'Z' => Some(byte - b'A'),
+        b'a'..=b'z' => Some(byte - b'a' + 26),
+        b'0'..=b'9' => Some(byte - b'0' + 52),
+        b'-' => Some(62),
+        b'_' => Some(63),
+        _ => None,
     }
 }
 
@@ -299,7 +363,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn builds_http_link_with_encoded_params() {
+    fn builds_http_link_with_compact_payload() {
         let target = QuickLinkTarget::new(
             "nas.local:445",
             "共享资料",
@@ -310,12 +374,18 @@ mod tests {
 
         let url = build_http_link(19527, &target).unwrap();
 
-        assert!(url.starts_with("http://127.0.0.1:19527/s?"));
-        assert!(url.contains("h=nas.local%3A445"));
-        assert!(url.contains("s=%E5%85%B1%E4%BA%AB%E8%B5%84%E6%96%99"));
-        assert!(url.contains("p=%2F%E5%90%88%E5%90%8C%2F2026+Q2%2F%E6%8A%A5%E4%BB%B7.pdf"));
-        assert!(url.contains("t=file"));
-        assert!(!url.contains("&n="));
+        assert!(url.starts_with("http://127.0.0.1:19527/s?d="));
+        assert!(!url.contains("%E5"));
+        assert!(!url.contains("共享资料"));
+        assert!(!url.contains("&s="));
+        assert!(!url.contains("&p="));
+
+        let parsed = parse_quick_link(&url).unwrap();
+        assert_eq!(parsed.server_host, "nas.local:445");
+        assert_eq!(parsed.share, "共享资料");
+        assert_eq!(parsed.path, "/合同/2026 Q2/报价.pdf");
+        assert_eq!(parsed.name, None);
+        assert_eq!(parsed.kind, LinkKind::File);
     }
 
     #[test]
@@ -330,12 +400,16 @@ mod tests {
 
         let url = build_web_redirect_link("https://links.example.com/s", &target).unwrap();
 
-        assert!(url.starts_with("https://links.example.com/s?"));
-        assert!(url.contains("h=nas.local"));
-        assert!(url.contains("s=Media"));
-        assert!(url.contains("p=%2FMovies%2Fdemo.mp4"));
-        assert!(url.contains("t=file"));
-        assert!(!url.contains("&n="));
+        assert!(url.starts_with("https://links.example.com/s?d="));
+        assert!(!url.contains("h=nas.local"));
+        assert!(!url.contains("s=Media"));
+        assert!(!url.contains("p=%2FMovies%2Fdemo.mp4"));
+
+        let parsed = parse_quick_link(&url).unwrap();
+        assert_eq!(parsed.server_host, "nas.local");
+        assert_eq!(parsed.share, "Media");
+        assert_eq!(parsed.path, "/Movies/demo.mp4");
+        assert_eq!(parsed.kind, LinkKind::File);
     }
 
     #[test]
@@ -386,33 +460,36 @@ mod tests {
     }
 
     #[test]
-    fn parses_old_short_deep_link() {
-        let target =
-            parse_quick_link("rynat://s?h=192.168.102.136&s=Backoffice&p=/Contracts/2024").unwrap();
+    fn parses_compact_deep_link() {
+        let source = QuickLinkTarget::new(
+            "192.168.102.136",
+            "Backoffice",
+            "/Contracts/2024",
+            None,
+            LinkKind::Directory,
+        );
+        let link = build_deep_link(DEFAULT_PROTOCOL, &source).unwrap();
+        let target = parse_quick_link(&link).unwrap();
 
         assert_eq!(target.server_host, "192.168.102.136");
         assert_eq!(target.share, "Backoffice");
         assert_eq!(target.path, "/Contracts/2024");
-        assert_eq!(target.kind, LinkKind::Unknown);
+        assert_eq!(target.kind, LinkKind::Directory);
     }
 
     #[test]
-    fn parses_legacy_open_link() {
-        let target = parse_quick_link(
-            "rynat://open?server=nas&share=Media&path=/Movies/demo.mp4&name=demo.mp4&type=file",
-        )
-        .unwrap();
+    fn rejects_links_without_payload() {
+        let error =
+            parse_quick_link("rynat://s?h=nas&s=Media&p=/Movies/demo.mp4&t=file").unwrap_err();
 
-        assert_eq!(target.server_host, "nas");
-        assert_eq!(target.share, "Media");
-        assert_eq!(target.path, "/Movies/demo.mp4");
-        assert_eq!(target.name.as_deref(), Some("demo.mp4"));
-        assert_eq!(target.kind, LinkKind::File);
+        assert!(error.to_string().contains("payload"));
     }
 
     #[test]
     fn parses_web_link_with_trailing_slash_action() {
-        let target = parse_quick_link("http://127.0.0.1:19527/s/?h=nas&s=Docs&p=/Reports").unwrap();
+        let source = QuickLinkTarget::new("nas", "Docs", "/Reports", None, LinkKind::Directory);
+        let link = build_web_redirect_link("http://127.0.0.1:19527/s/", &source).unwrap();
+        let target = parse_quick_link(&link).unwrap();
 
         assert_eq!(target.server_host, "nas");
         assert_eq!(target.share, "Docs");

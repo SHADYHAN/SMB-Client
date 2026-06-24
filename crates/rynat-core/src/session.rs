@@ -87,7 +87,7 @@ impl CoreSession {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::link::{LinkKind, QuickLinkTarget};
+    use crate::link::{DEFAULT_PROTOCOL, LinkKind, QuickLinkTarget, build_deep_link};
     use crate::preview::{PreviewContentType, PreviewKind};
     use crate::server::{AuthMode, ServerProfile};
 
@@ -104,9 +104,18 @@ mod tests {
         store.save_server_profile(&profile).unwrap();
         let session = CoreSession::new(store);
 
-        let activation = session
-            .activate_link("rynat://s?h=NAS.local&s=Media&p=/Movies/demo.mp4&t=file")
-            .unwrap();
+        let link = build_deep_link(
+            DEFAULT_PROTOCOL,
+            &QuickLinkTarget::new(
+                "NAS.local",
+                "Media",
+                "/Movies/demo.mp4",
+                None,
+                LinkKind::File,
+            ),
+        )
+        .unwrap();
+        let activation = session.activate_link(&link).unwrap();
 
         assert_eq!(activation.matched_server.as_ref().unwrap().id, profile.id);
         assert_eq!(activation.browse_location.remote_path, "/Movies");

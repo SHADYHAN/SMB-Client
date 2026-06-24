@@ -1451,8 +1451,11 @@ mod tests {
         let link = response.data.unwrap();
 
         assert!(response.ok);
-        assert!(link.http_url.starts_with("http://127.0.0.1:19527/s?"));
-        assert!(link.http_url.contains("t=file"));
+        assert!(link.http_url.starts_with("http://127.0.0.1:19527/s?d="));
+        assert_eq!(
+            crate::link::parse_quick_link(&link.http_url).unwrap().kind,
+            crate::link::LinkKind::File
+        );
         assert!(!link.http_url.contains("&n="));
     }
 
@@ -1491,10 +1494,19 @@ mod tests {
         store.save_server_profile(&profile).unwrap();
         set_app_store(store).unwrap();
 
-        let json = activate_link_json(
-            r#"{"raw_link":"rynat://s?h=nas.local&s=Media&p=/Movies/demo.mp4&t=file"}"#,
+        let raw_link = crate::link::build_deep_link(
+            crate::link::DEFAULT_PROTOCOL,
+            &crate::link::QuickLinkTarget::new(
+                "nas.local",
+                "Media",
+                "/Movies/demo.mp4",
+                None,
+                crate::link::LinkKind::File,
+            ),
         )
         .unwrap();
+        let json =
+            activate_link_json(&serde_json::json!({ "raw_link": raw_link }).to_string()).unwrap();
         let response: BridgeResponse<LinkActivation> = serde_json::from_str(&json).unwrap();
         let activation = response.data.unwrap();
 
