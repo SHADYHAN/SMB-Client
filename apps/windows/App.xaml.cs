@@ -1,5 +1,6 @@
 using System.Windows;
 using Rynat.Client;
+using Rynat.WindowsClient.Platform.Activation;
 using Rynat.WindowsClient.Platform.Clipboard;
 using Rynat.WindowsClient.Platform.Dialogs;
 using Rynat.WindowsClient.Platform.Shell;
@@ -18,11 +19,27 @@ namespace Rynat.WindowsClient;
 
 public partial class App : Application
 {
+    private IAppSingleInstanceService? _singleInstanceService;
+    private ILocalLinkRedirectService? _localLinkRedirectService;
+
     protected override void OnStartup(StartupEventArgs e)
     {
+        _singleInstanceService = new WindowsSingleInstanceService();
+        var isPrimary = _singleInstanceService.StartAsync(e.Args).GetAwaiter().GetResult();
+        if (!isPrimary)
+        {
+            Shutdown();
+            return;
+        }
+
         base.OnStartup(e);
 
         var bridge = new RynatCoreBridge();
+        var protocolRegistrationService = new WindowsProtocolRegistrationService();
+        protocolRegistrationService.EnsureRegistered();
+        _localLinkRedirectService = new LocalLinkRedirectService(bridge);
+        _ = _localLinkRedirectService.StartAsync();
+
         var bootstrapService = new BootstrapService(bridge);
         var sessionService = new SmbSessionService(bridge);
         var directoryService = new DirectoryService(bridge);
@@ -53,6 +70,24 @@ public partial class App : Application
             shellDragDropService
         );
 
+        _singleInstanceService.Activated += (_, args) =>
+        {
+            _ = Dispatcher.InvokeAsync(async () =>
+            {
+                if (MainWindow is { } activeWindow)
+                {
+                    activeWindow.Show();
+                    if (activeWindow.WindowState == WindowState.Minimized)
+                    {
+                        activeWindow.WindowState = WindowState.Normal;
+                    }
+                    activeWindow.Activate();
+                }
+
+                await viewModel.ActivateExternalArgumentsAsync(args.Arguments);
+            });
+        };
+
         var window = new MainWindow
         {
             DataContext = viewModel
@@ -61,5 +96,12 @@ public partial class App : Application
         MainWindow = window;
         window.Show();
         _ = viewModel.InitializeAsync(e.Args);
+    }
+
+    protected override void OnExit(ExitEventArgs e)
+    {
+        _localLinkRedirectService?.Dispose();
+        _singleInstanceService?.Dispose();
+        base.OnExit(e);
     }
 }

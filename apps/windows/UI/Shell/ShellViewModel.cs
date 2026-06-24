@@ -144,6 +144,11 @@ public sealed class ShellViewModel : ObservableObject
         Status.Message = UserFacingError(exception, fallback);
     }
 
+    public async Task ActivateExternalArgumentsAsync(IReadOnlyList<string> rawArguments)
+    {
+        await ActivateStartupLinkAsync(rawArguments);
+    }
+
     public async Task ToggleNavigationNodeAsync(NavigationNodeViewModel node)
     {
         if (_session is null)
