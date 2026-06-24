@@ -124,9 +124,24 @@ scripts/check-bridge-surface.ps1
 scripts/ffi-smoke-test-windows.ps1
 ```
 
+## 当前状态
+
+- Rust Core 是共享业务底座，链接、SMB、存储、凭据、任务、错误码、预览计划等能力已形成双平台共用边界。
+- macOS AppKit 客户端作为当前 macOS 主线继续演进，后续重点是拆薄 `WorkspaceController` 和 `RynatCore.swift`。
+- Windows 主线已切换为 WPF 客户端，旧 WinUI 3 版本只保留在 `apps/windows-winui-legacy` 作为历史参考。
+- 快速链接已切换为紧凑 `/s/<短码>` 格式；本地短链接命中客户端后，浏览器页只负责尝试关闭，不再重复唤醒协议。
+
+## 后续重点
+
+- Windows：补齐远端复制 / 移动 / 粘贴，以及复制 / 移动同名确认。
+- Windows：继续实机打磨软件内拖拽、拖出桌面视觉影子和 Explorer 同名行为。
+- Windows：优化预览性能和缓存清理。
+- macOS：按 `docs/macos-architecture-evolution-plan.md` 渐进拆分桥接、服务和状态。
+- 双平台：保持 `include/rynat_core.h`、Swift bridge、C# bridge 与 Rust ABI 同步。
+
 ## 目录约定
 
 - `crates/rynat-core` — 共享业务协议与执行能力：SMB、链接、配置、凭据、任务、错误码、预览计划。
 - `apps/macos` / `apps/windows` — 各自原生 UI 与平台集成，不把页面状态塞进 Core。
 - `include/rynat_core.h` — 跨平台 C ABI 头文件，是两端 FFI 的唯一契约源。
-- `docs/` — 代码审查记录。
+- `docs/` — 架构方向、实施状态和后续计划。

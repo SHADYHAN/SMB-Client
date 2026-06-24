@@ -39,19 +39,26 @@ This is the active WPF client for the rebuilt Windows line. It currently include
 
 Remaining feature migration should be added module by module rather than porting the old WinUI main window wholesale.
 
+## Completed Highlights
+
+- Windows build and runtime flow has been validated through the one-click script.
+- Link activation works through `rynat://`, local HTTP redirect, single-instance forwarding, and foreground activation.
+- Compact `/s/<code>` quick links are supported.
+- Local short-link pages now close through an already-activated page instead of reopening the protocol.
+
 ## Remaining Work
 
-Near-term items before broader testing:
+Near-term product work:
 
-- Verify the Windows build and runtime flow on a Windows machine.
-- Test link activation from browser and document apps when the client is both running and closed.
-- Add in-app copy, move, and paste for remote files.
-- Add same-name conflict confirmation to copy/move flows.
+- Add in-app remote copy, move, and paste.
+- Add same-name conflict confirmation to remote copy/move flows.
 - Refine internal drag visuals so dragging without a valid cross-directory target is visual only.
 - Validate and refine shell drag-out visuals and same-name behavior on the Desktop.
+- Decide whether Windows needs the same favorites/quick-link library UI as macOS.
 
 Follow-up quality work:
 
 - Improve preview performance with thumbnails/video first frames instead of caching large media when possible.
 - Add cache cleanup policy for preview and drag cache files.
 - Continue splitting `ShellViewModel` into smaller coordinators as file operations grow.
+- Add smoke checks around bridge surface, startup argument parsing, and local redirect handling.
