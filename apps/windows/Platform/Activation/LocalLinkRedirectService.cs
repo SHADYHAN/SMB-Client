@@ -22,6 +22,8 @@ public sealed class LocalLinkRedirectService : ILocalLinkRedirectService
         _bridge = bridge;
     }
 
+    public event EventHandler<ExternalActivationEventArgs>? Activated;
+
     public Task StartAsync(CancellationToken cancellationToken = default)
     {
         if (_serverTask is not null)
@@ -108,6 +110,7 @@ public sealed class LocalLinkRedirectService : ILocalLinkRedirectService
                     return;
                 }
 
+                Activated?.Invoke(this, new ExternalActivationEventArgs(new[] { deepLink }));
                 var html = _bridge.RedirectPage(new RedirectPageRequest(deepLink));
                 await WriteResponseAsync(stream, "200 OK", "text/html; charset=utf-8", html, timeout.Token);
             }

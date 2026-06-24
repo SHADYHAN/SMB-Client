@@ -38,7 +38,6 @@ public partial class App : Application
         var protocolRegistrationService = new WindowsProtocolRegistrationService();
         protocolRegistrationService.EnsureRegistered();
         _localLinkRedirectService = new LocalLinkRedirectService(bridge);
-        _ = _localLinkRedirectService.StartAsync();
 
         var bootstrapService = new BootstrapService(bridge);
         var sessionService = new SmbSessionService(bridge);
@@ -72,21 +71,13 @@ public partial class App : Application
 
         _singleInstanceService.Activated += (_, args) =>
         {
-            _ = Dispatcher.InvokeAsync(async () =>
-            {
-                if (MainWindow is { } activeWindow)
-                {
-                    activeWindow.Show();
-                    if (activeWindow.WindowState == WindowState.Minimized)
-                    {
-                        activeWindow.WindowState = WindowState.Normal;
-                    }
-                    activeWindow.Activate();
-                }
-
-                await viewModel.ActivateExternalArgumentsAsync(args.Arguments);
-            });
+            ActivateArguments(viewModel, args.Arguments);
         };
+        _localLinkRedirectService.Activated += (_, args) =>
+        {
+            ActivateArguments(viewModel, args.Arguments);
+        };
+        _ = _localLinkRedirectService.StartAsync();
 
         var window = new MainWindow
         {
@@ -96,6 +87,27 @@ public partial class App : Application
         MainWindow = window;
         window.Show();
         _ = viewModel.InitializeAsync(e.Args);
+    }
+
+    private void ActivateArguments(
+        ShellViewModel viewModel,
+        IReadOnlyList<string> arguments
+    )
+    {
+        _ = Dispatcher.InvokeAsync(() =>
+        {
+            if (MainWindow is { } activeWindow)
+            {
+                activeWindow.Show();
+                if (activeWindow.WindowState == WindowState.Minimized)
+                {
+                    activeWindow.WindowState = WindowState.Normal;
+                }
+                activeWindow.Activate();
+            }
+
+            _ = viewModel.ActivateExternalArgumentsAsync(arguments);
+        });
     }
 
     protected override void OnExit(ExitEventArgs e)
