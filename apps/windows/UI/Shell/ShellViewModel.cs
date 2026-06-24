@@ -343,9 +343,9 @@ public sealed class ShellViewModel : ObservableObject
         IsLoggedIn = true;
         RefreshFileCommands();
         Login.Password = "";
-        FileList.Clear("请选择左侧共享目录");
+        FileList.Clear("");
         Preview.ShowSelection(null);
-        Status.Message = $"已连接 {_session.Host}，请选择共享目录。";
+        Status.Message = $"已连接 {_session.Host}。";
     }
 
     private async Task SaveLoginProfileAsync()
