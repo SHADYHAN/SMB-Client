@@ -41,7 +41,14 @@ try {
     }
 
     Write-Host "Building Windows client ($Configuration)..." -ForegroundColor Cyan
-    Invoke-NativeCommand dotnet build $project --configuration $Configuration -v minimal -nr:false
+    Invoke-NativeCommand -FilePath dotnet -Arguments @(
+        "build",
+        $project,
+        "--configuration",
+        $Configuration,
+        "--verbosity:minimal",
+        "/nr:false"
+    )
 
     $targetFramework = "net8.0-windows"
     $runtimeIdentifier = "win-x64"
