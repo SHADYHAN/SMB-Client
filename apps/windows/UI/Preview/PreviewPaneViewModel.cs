@@ -9,6 +9,9 @@ public sealed class PreviewPaneViewModel : ObservableObject
     private string _title = "预览";
     private string _subtitle = "选择一个文件查看信息";
     private string _contentType = "";
+    private string? _localImagePath;
+    private string? _localVideoPath;
+    private bool _isLoading;
     private RemoteFileItem? _selectedItem;
     private bool _isVisible = true;
 
@@ -28,6 +31,81 @@ public sealed class PreviewPaneViewModel : ObservableObject
     {
         get => _contentType;
         set => SetProperty(ref _contentType, value);
+    }
+
+    public string? LocalImagePath
+    {
+        get => _localImagePath;
+        set
+        {
+            if (SetProperty(ref _localImagePath, value))
+            {
+                OnPropertyChanged(nameof(LocalImageUri));
+                OnPropertyChanged(nameof(HasImagePreview));
+                OnPropertyChanged(nameof(HasPreviewMedia));
+                OnPropertyChanged(nameof(PreviewText));
+            }
+        }
+    }
+
+    public string? LocalVideoPath
+    {
+        get => _localVideoPath;
+        set
+        {
+            if (SetProperty(ref _localVideoPath, value))
+            {
+                OnPropertyChanged(nameof(LocalVideoUri));
+                OnPropertyChanged(nameof(HasVideoPreview));
+                OnPropertyChanged(nameof(HasPreviewMedia));
+                OnPropertyChanged(nameof(PreviewText));
+            }
+        }
+    }
+
+    public bool IsLoading
+    {
+        get => _isLoading;
+        set
+        {
+            if (SetProperty(ref _isLoading, value))
+            {
+                OnPropertyChanged(nameof(PreviewText));
+            }
+        }
+    }
+
+    public Uri? LocalImageUri => BuildLocalUri(LocalImagePath);
+
+    public Uri? LocalVideoUri => BuildLocalUri(LocalVideoPath);
+
+    public bool HasImagePreview => !string.IsNullOrWhiteSpace(LocalImagePath);
+
+    public bool HasVideoPreview => !string.IsNullOrWhiteSpace(LocalVideoPath);
+
+    public bool HasPreviewMedia => HasImagePreview || HasVideoPreview;
+
+    public string PreviewText
+    {
+        get
+        {
+            if (IsLoading)
+            {
+                return "正在加载预览...";
+            }
+
+            if (HasPreviewMedia)
+            {
+                return string.Empty;
+            }
+
+            if (SelectedItem is null)
+            {
+                return "暂无预览";
+            }
+
+            return string.IsNullOrWhiteSpace(ContentType) ? "暂无预览" : ContentType;
+        }
     }
 
     public RemoteFileItem? SelectedItem
@@ -55,22 +133,56 @@ public sealed class PreviewPaneViewModel : ObservableObject
     public void ShowSelection(RemoteFileItem? item)
     {
         SelectedItem = item;
+        LocalImagePath = null;
+        LocalVideoPath = null;
+        IsLoading = false;
         if (item is null)
         {
             Title = "预览";
             Subtitle = "选择一个文件查看信息";
             ContentType = "";
+            OnPropertyChanged(nameof(PreviewText));
             return;
         }
 
         Title = item.Name;
         Subtitle = item.IsDirectory ? "文件夹" : $"{FormatSize(item.Size)} · {item.ModifiedAt?.LocalDateTime:yyyy-MM-dd HH:mm}";
         ContentType = "";
+        OnPropertyChanged(nameof(PreviewText));
+    }
+
+    public void ShowPreviewLoading()
+    {
+        LocalImagePath = null;
+        LocalVideoPath = null;
+        IsLoading = true;
     }
 
     public void ShowPreviewInfo(PreviewInfo info)
     {
+        IsLoading = false;
         ContentType = info.ContentType;
+        LocalImagePath = info.LocalImagePath;
+        LocalVideoPath = info.LocalVideoPath;
+        OnPropertyChanged(nameof(PreviewText));
+    }
+
+    public void ShowPreviewUnavailable()
+    {
+        IsLoading = false;
+        LocalImagePath = null;
+        LocalVideoPath = null;
+        ContentType = "";
+        OnPropertyChanged(nameof(PreviewText));
+    }
+
+    private static Uri? BuildLocalUri(string? path)
+    {
+        return string.IsNullOrWhiteSpace(path)
+            ? null
+            : Uri.TryCreate(path, UriKind.Absolute, out var uri)
+                ? uri
+                : null;
     }
 
     private void RefreshCopyLinkCommand()

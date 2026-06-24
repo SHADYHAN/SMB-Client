@@ -36,14 +36,75 @@
                            Foreground="{StaticResource TextSecondaryBrush}"
                            TextWrapping="Wrap"
                            Margin="0,8,0,18" />
-                <Border Height="210"
-                        Background="{StaticResource SubtleBackgroundBrush}"
-                        CornerRadius="12">
-                    <TextBlock Text="{Binding ContentType, TargetNullValue=暂无预览}"
+                <Grid Height="240"
+                      ClipToBounds="True">
+                    <Border Background="{StaticResource SubtleBackgroundBrush}"
+                            CornerRadius="12" />
+                    <Image Source="{Binding LocalImageUri}"
+                           Stretch="Uniform"
+                           Margin="10">
+                        <Image.Style>
+                            <Style TargetType="Image">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding HasImagePreview}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Image.Style>
+                    </Image>
+                    <MediaElement x:Name="VideoPreview"
+                                  Source="{Binding LocalVideoUri}"
+                                  LoadedBehavior="Manual"
+                                  UnloadedBehavior="Stop"
+                                  Stretch="Uniform"
+                                  Margin="10">
+                        <MediaElement.Style>
+                            <Style TargetType="MediaElement">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding HasVideoPreview}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </MediaElement.Style>
+                    </MediaElement>
+                    <Button x:Name="VideoPlayButton"
+                            Content="播放"
+                            Width="64"
+                            Height="32"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            Click="VideoPlayButton_OnClick">
+                        <Button.Style>
+                            <Style TargetType="Button">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding HasVideoPreview}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+                    <TextBlock Text="{Binding PreviewText}"
                                Foreground="{StaticResource TextSecondaryBrush}"
                                HorizontalAlignment="Center"
-                               VerticalAlignment="Center" />
-                </Border>
+                               VerticalAlignment="Center">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Visibility" Value="Visible" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding HasPreviewMedia}" Value="True">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </Grid>
             </StackPanel>
         </DockPanel>
     </Border>

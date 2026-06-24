@@ -1,3 +1,4 @@
+using System.Threading;
 using Rynat.WindowsClient.Domain;
 using Rynat.WindowsClient.Platform.Clipboard;
 using Rynat.WindowsClient.Platform.Shell;
@@ -28,6 +29,7 @@ public sealed class ShellViewModel : ObservableObject
     private readonly IWindowsShellDragDropService _shellDragDropService;
     private ServerSession? _session;
     private string? _loadingDirectoryKey;
+    private int _previewLoadVersion;
     private bool _isLoggedIn;
 
     public ShellViewModel(
@@ -126,16 +128,24 @@ public sealed class ShellViewModel : ObservableObject
         Preview.ShowSelection(item?.Item);
         RefreshItemCommands();
 
-        if (item?.Item is { IsDirectory: false } selected)
+        var previewVersion = Interlocked.Increment(ref _previewLoadVersion);
+        if (_session is not null && item?.Item is { IsDirectory: false } selected)
         {
             try
             {
-                var info = await _previewService.PlanAsync(_session!, selected);
-                Preview.ShowPreviewInfo(info);
+                Preview.ShowPreviewLoading();
+                var info = await _previewService.PlanAsync(_session, selected);
+                if (previewVersion == _previewLoadVersion && ReferenceEquals(FileList.SelectedItem, item))
+                {
+                    Preview.ShowPreviewInfo(info);
+                }
             }
             catch
             {
-                Preview.ContentType = "";
+                if (previewVersion == _previewLoadVersion && ReferenceEquals(FileList.SelectedItem, item))
+                {
+                    Preview.ShowPreviewUnavailable();
+                }
             }
         }
     }
