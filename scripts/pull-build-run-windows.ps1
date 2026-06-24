@@ -6,6 +6,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+$scriptVersion = "2026-06-24.2"
 
 $root = Split-Path -Parent $PSScriptRoot
 $project = Join-Path $root "apps\windows\Rynat.WindowsClient.csproj"
@@ -34,6 +35,7 @@ function Stop-RunningClient {
 Push-Location $root
 try {
     Write-Host "Repository: $root" -ForegroundColor Cyan
+    Write-Host "Build script: $scriptVersion" -ForegroundColor DarkGray
 
     if (-not $SkipPull) {
         Write-Host "Pulling latest changes..." -ForegroundColor Cyan
@@ -41,14 +43,10 @@ try {
     }
 
     Write-Host "Building Windows client ($Configuration)..." -ForegroundColor Cyan
-    Invoke-NativeCommand -FilePath dotnet -Arguments @(
-        "build",
-        $project,
-        "--configuration",
-        $Configuration,
-        "--verbosity:minimal",
-        "/nr:false"
-    )
+    & dotnet build $project --configuration $Configuration
+    if ($LASTEXITCODE -ne 0) {
+        throw "dotnet failed with exit code $LASTEXITCODE"
+    }
 
     $targetFramework = "net8.0-windows"
     $runtimeIdentifier = "win-x64"
