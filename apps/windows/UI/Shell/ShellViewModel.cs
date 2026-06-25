@@ -103,6 +103,10 @@ public sealed class ShellViewModel : ObservableObject
         FileList.CreateFolderCommand = new AsyncRelayCommand(CreateFolderAsync, CanUseCurrentDirectory);
         FileList.DeleteCommand = new AsyncRelayCommand(DeleteSelectedItemAsync, () => FileList.HasSingleWritableSelection && _session is not null);
         FileList.RenameCommand = new AsyncRelayCommand(RenameSelectedItemAsync, () => FileList.HasSingleWritableSelection && _session is not null);
+        Navigation.ShowSharesCommand = new RelayCommand(Navigation.ShowShares);
+        Navigation.ShowFavoritesCommand = new RelayCommand(Navigation.ShowFavorites);
+        Navigation.AddFavoriteCommand = new AsyncRelayCommand(AddSelectedFavoriteAsync, () => FileList.HasSingleSelection && _session is not null);
+        Navigation.RemoveFavoriteCommand = new AsyncRelayCommand(RemoveFavoriteAsync, parameter => parameter is FavoriteLinkViewModel);
         Preview.ToggleCommand = new RelayCommand(() => Preview.IsVisible = !Preview.IsVisible);
         Preview.CopyLinkCommand = new AsyncRelayCommand(CopyPreviewLinkAsync, () => Preview.SelectedItem is not null && _session is not null);
     }
@@ -246,6 +250,35 @@ public sealed class ShellViewModel : ObservableObject
         );
     }
 
+    public async Task OpenFavoriteAsync(FavoriteLinkViewModel favorite)
+    {
+        if (_session is null)
+        {
+            return;
+        }
+
+        if (!FavoriteMatchesSession(favorite.Item, _session))
+        {
+            Status.Message = "收藏属于其他服务器。";
+            return;
+        }
+
+        var directoryPath = favorite.Item.IsDirectory
+            ? favorite.Item.Path
+            : ParentPath(favorite.Item.Path);
+        var request = new LinkOpenRequest(
+            favorite.Item.ServerHost,
+            favorite.Item.Share,
+            directoryPath,
+            favorite.Item.IsDirectory ? null : favorite.Item.Path,
+            !favorite.Item.IsDirectory
+        );
+
+        Status.Message = await OpenLinkRequestAsync(request)
+            ? "已打开收藏。"
+            : "收藏打开失败。";
+    }
+
     private async Task LoginAsync()
     {
         if (!CanLogin())
@@ -338,6 +371,7 @@ public sealed class ShellViewModel : ObservableObject
         IsLoggedIn = true;
         Login.Password = "";
         FileList.ShowShareRoot(_session);
+        await LoadFavoritesAsync();
         Preview.ShowSelection(null);
         RefreshFileCommands();
         Status.Message = $"已连接 {_session.Host}。";
@@ -437,6 +471,66 @@ public sealed class ShellViewModel : ObservableObject
     private async Task CopyPreviewLinkAsync()
     {
         await CopyLinkAsync(Preview.SelectedItem);
+    }
+
+    private async Task AddSelectedFavoriteAsync()
+    {
+        if (_session is null || FileList.SelectedItem?.Item is not { } item)
+        {
+            return;
+        }
+
+        try
+        {
+            Status.Message = "正在添加收藏...";
+            var favorite = await _quickLinkService.AddFavoriteAsync(_session, item);
+            Navigation.UpsertFavorite(favorite);
+            Navigation.ShowFavorites();
+            Status.Message = $"已收藏 {favorite.Name}。";
+        }
+        catch (Exception ex)
+        {
+            Status.Message = UserFacingError(ex, "收藏失败");
+        }
+    }
+
+    private async Task RemoveFavoriteAsync(object? parameter)
+    {
+        if (parameter is not FavoriteLinkViewModel favorite)
+        {
+            return;
+        }
+
+        try
+        {
+            await _quickLinkService.DeleteFavoriteAsync(favorite.Item.Id);
+            Navigation.RemoveFavorite(favorite.Item.Id);
+            Status.Message = "已移除收藏。";
+        }
+        catch (Exception ex)
+        {
+            Status.Message = UserFacingError(ex, "移除收藏失败");
+        }
+    }
+
+    private async Task LoadFavoritesAsync()
+    {
+        if (_session is null)
+        {
+            Navigation.LoadFavorites(Array.Empty<FavoriteLinkItem>());
+            return;
+        }
+
+        try
+        {
+            var favorites = await _quickLinkService.ListFavoritesAsync();
+            Navigation.LoadFavorites(favorites.Where(favorite => FavoriteMatchesSession(favorite, _session)));
+        }
+        catch (Exception ex)
+        {
+            Navigation.LoadFavorites(Array.Empty<FavoriteLinkItem>());
+            Status.Message = UserFacingError(ex, "收藏加载失败");
+        }
     }
 
     private async Task ActivateStartupLinkAsync(IReadOnlyList<string>? rawArguments)
@@ -705,6 +799,11 @@ public sealed class ShellViewModel : ObservableObject
         {
             previewCommand.RaiseCanExecuteChanged();
         }
+
+        if (Navigation.AddFavoriteCommand is AsyncRelayCommand addFavoriteCommand)
+        {
+            addFavoriteCommand.RaiseCanExecuteChanged();
+        }
     }
 
     private bool CanRefreshCurrentView() => _session is not null
@@ -756,5 +855,37 @@ public sealed class ShellViewModel : ObservableObject
             || ex.Message.Contains("logon", StringComparison.OrdinalIgnoreCase)
                 ? "账号或密码错误"
                 : fallback;
+    }
+
+    private static bool FavoriteMatchesSession(FavoriteLinkItem favorite, ServerSession session)
+    {
+        return NormalizeServerHost(favorite.ServerHost)
+            .Equals(NormalizeServerHost(session.Host), StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string NormalizeServerHost(string host)
+    {
+        var normalized = host.Trim();
+        if (normalized.StartsWith("smb://", StringComparison.OrdinalIgnoreCase))
+        {
+            normalized = normalized["smb://".Length..];
+        }
+
+        normalized = normalized.Trim().TrimEnd('/').TrimEnd('.');
+        return normalized.EndsWith(":445", StringComparison.OrdinalIgnoreCase)
+            ? normalized[..^":445".Length]
+            : normalized;
+    }
+
+    private static string ParentPath(string path)
+    {
+        var normalized = DirectoryNavigationCoordinator.NormalizeDirectoryPath(path);
+        if (normalized == "/")
+        {
+            return "/";
+        }
+
+        var lastSlash = normalized.LastIndexOf('/');
+        return lastSlash <= 0 ? "/" : normalized[..lastSlash];
     }
 }

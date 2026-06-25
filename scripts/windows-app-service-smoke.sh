@@ -60,6 +60,7 @@ file_transfer_service="$ROOT_DIR/apps/windows/Services/FileTransfers/FileTransfe
 cache_cleanup_service="$ROOT_DIR/apps/windows/Services/Cache/WindowsCacheCleanupService.cs"
 preview_service="$ROOT_DIR/apps/windows/Services/Preview/PreviewService.cs"
 thumbnail_service_interface="$ROOT_DIR/apps/windows/Services/Preview/IThumbnailService.cs"
+quick_link_service="$ROOT_DIR/apps/windows/Services/Links/QuickLinkService.cs"
 link_activation_service="$ROOT_DIR/apps/windows/Services/LinkActivation/LinkActivationService.cs"
 local_redirect_service="$ROOT_DIR/apps/windows/Platform/Activation/LocalLinkRedirectService.cs"
 single_instance_service="$ROOT_DIR/apps/windows/Platform/Activation/WindowsSingleInstanceService.cs"
@@ -83,6 +84,7 @@ required_files=(
     "apps/windows/CoreAdapter/RynatCoreRequests.cs"
     "apps/windows/CoreAdapter/RynatCoreModels.cs"
     "apps/windows/CoreAdapter/RynatJsonContext.cs"
+    "apps/windows/Domain/FavoriteLinkItem.cs"
     "apps/windows/Domain/RemoteFileItem.cs"
     "apps/windows/Domain/RemoteDragPayload.cs"
     "apps/windows/Domain/RemoteClipboardItem.cs"
@@ -119,6 +121,8 @@ required_files=(
     "apps/windows/UI/Files/FileItemViewModel.cs"
     "apps/windows/UI/Files/FileListView.xaml"
     "apps/windows/UI/Files/FileListView.xaml.cs"
+    "apps/windows/UI/Navigation/FavoriteLinkViewModel.cs"
+    "apps/windows/UI/Navigation/NavigationSidebarTab.cs"
     "apps/windows/UI/Navigation/NavigationTreeView.xaml"
     "apps/windows/UI/Preview/PreviewPaneView.xaml"
     "apps/windows/UI/Status/StatusBarView.xaml"
@@ -193,6 +197,14 @@ assert_file_contains "$shell_view_model" 'selected\.IsShareRoot' 'shell opens sh
 assert_file_contains "$shell_view_model" 'HasWritableSelection' 'shell excludes share roots from remote cut/copy commands'
 assert_file_contains "$shell_view_model" 'HasSingleWritableSelection' 'shell excludes share roots from rename/delete commands'
 assert_file_contains "$shell_view_model" 'CanRefreshCurrentView' 'shell can refresh the virtual share-root view'
+assert_file_contains "$shell_view_model" 'LoadFavoritesAsync' 'shell loads favorites after login'
+assert_file_contains "$shell_view_model" 'AddSelectedFavoriteAsync' 'shell can add current item to favorites'
+assert_file_contains "$shell_view_model" 'OpenFavoriteAsync' 'shell can open favorite links'
+assert_file_contains "$shell_view_model" 'RemoveFavoriteAsync' 'shell can remove favorites'
+assert_file_contains "$quick_link_service" 'GenerateLink' 'favorite creation persists generated quick links'
+assert_file_contains "$quick_link_service" 'ListQuickLinks' 'favorite service lists stored quick links'
+assert_file_contains "$quick_link_service" 'DeleteQuickLink' 'favorite service deletes stored quick links'
+assert_file_contains "$quick_link_service" 'BuildLink' 'copy-link still builds non-persisted share links'
 assert_file_contains "$file_drag_drop_coordinator" 'StartFileDragAsync' 'file drag/drop coordinator owns drag-out workflow'
 assert_file_contains "$file_drag_drop_coordinator" 'GetRemoteDropEffect' 'file drag/drop coordinator resolves internal remote drop effects'
 assert_file_contains "$file_drag_drop_coordinator" 'DropRemoteItemsAsync' 'file drag/drop coordinator owns internal remote drop workflow'
@@ -248,7 +260,12 @@ assert_file_contains "$navigation_node_view_model" 'enum NavigationDropState' 'n
 assert_file_contains "$navigation_node_view_model" 'RemoteDropState' 'navigation node exposes remote drop hover state'
 assert_file_contains "$navigation_tree_xaml" 'DragLeave="TreeView_OnDragLeave"' 'navigation tree clears drag hover on leave'
 assert_file_contains "$navigation_tree_xaml" 'NavigationDropState\.ValidTarget' 'navigation tree binds valid remote drop target styling'
+assert_file_contains "$navigation_tree_xaml" 'ShowFavoritesCommand' 'navigation sidebar exposes favorites tab'
+assert_file_contains "$navigation_tree_xaml" 'AddFavoriteCommand' 'navigation sidebar exposes add-favorite action'
+assert_file_contains "$navigation_tree_xaml" 'RemoveFavoriteCommand' 'navigation sidebar exposes remove-favorite action'
+assert_file_contains "$navigation_tree_xaml" 'ItemsSource="\{Binding Favorites\}"' 'navigation sidebar lists favorites'
 assert_file_contains "$navigation_tree_view" 'SetRemoteDropTarget' 'navigation tree updates remote drop hover state'
+assert_file_contains "$navigation_tree_view" 'OpenFavoriteAsync' 'navigation tree opens favorite rows'
 assert_file_contains "$navigation_tree_view" 'e\.Effects == DragDropEffects\.None \? null : target' 'navigation tree highlights only valid remote drop targets'
 
 assert_file_contains "$file_operation_interface" 'CreateDirectoryAsync' 'file operation interface supports create folder'

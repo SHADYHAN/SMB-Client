@@ -119,6 +119,45 @@ public partial class NavigationTreeView : UserControl
         );
     }
 
+    private async void FavoritesList_OnMouseDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        if ((sender as ListView)?.SelectedItem is not FavoriteLinkViewModel favorite)
+        {
+            return;
+        }
+
+        await OpenFavoriteAsync(favorite);
+    }
+
+    private async void FavoriteOpenMenuItem_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (FindAncestor<ContextMenu>((DependencyObject)e.OriginalSource)
+                is not { PlacementTarget: ListView { SelectedItem: FavoriteLinkViewModel favorite } })
+        {
+            return;
+        }
+
+        await OpenFavoriteAsync(favorite);
+    }
+
+    private async Task OpenFavoriteAsync(FavoriteLinkViewModel favorite)
+    {
+        var shell = FindShellViewModel();
+        if (shell is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await shell.OpenFavoriteAsync(favorite);
+        }
+        catch (Exception ex)
+        {
+            shell.ReportUiError(ex, "收藏打开失败");
+        }
+    }
+
     private void SetRemoteDropTarget(NavigationNodeViewModel? target)
     {
         if (ReferenceEquals(_remoteDropTarget, target))

@@ -22,6 +22,7 @@
 - [x] Add basic file operations: refresh, create folder, rename, delete, upload by local drag/drop.
 - [x] Add upload same-name confirmation before replacing.
 - [x] Add fixed quick-link generation and clipboard copy.
+- [x] Add favorites / quick-link library UI in the Windows navigation sidebar.
 - [x] Add link activation flow: `rynat://`, local HTTP redirect, single-instance forwarding, and foreground activation.
 - [x] Add compact `/s/<code>` link support and a local already-activated close page for browser-opened links.
 - [x] Add basic image/video preview cache and playback panel.
@@ -35,6 +36,7 @@
 - Link activation now brings the client to the foreground in the tested cases.
 - Windows copy-link keeps only the plain-text HTTP short link for DingTalk/chat/docs, avoiding DingTalk document rewrites of `rynat://` hrefs.
 - Windows login now lands on a virtual share-root directory in the content pane instead of an empty file area.
+- Windows favorites can be added from the current item, opened from the sidebar, and removed through stored quick links.
 - Local short-link browser requests now return an already-activated close page after activation instead of reopening `rynat://`.
 - Current macOS-side validation also covers `scripts/check-bridge-surface.sh`, `scripts/ffi-smoke-test.sh`, and `scripts/windows-app-service-smoke.sh`.
 - Windows WPF has multi-select remote copy / move / paste plumbing with same-name confirmation, pending Windows SMB validation.
@@ -59,7 +61,7 @@
 - [ ] Further refine Explorer/Desktop drag-out visuals and same-name overwrite behavior on real Windows.
 - [ ] Improve preview performance: image thumbnails and Shell video posters are in place; validate poster quality across codecs and consider fallback extraction only if needed.
 - [ ] Observe preview/drag cache cleanup behavior during Windows real-use testing.
-- [ ] Add favorites/quick-link library UI if Windows needs parity with macOS favorites.
+- [ ] Refine favorites sidebar details after Windows real-use testing.
 - [ ] Continue broader keyboard shortcuts and selection polish after real-user testing.
 
 ## Remaining Architecture Work

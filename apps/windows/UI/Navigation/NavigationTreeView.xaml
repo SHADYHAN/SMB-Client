@@ -5,10 +5,33 @@
     <Border Background="{StaticResource PanelBackgroundBrush}"
             Padding="12,14">
         <DockPanel>
-            <TextBlock DockPanel.Dock="Top"
-                       Text="共享"
-                       FontWeight="SemiBold"
-                       Margin="4,0,0,12" />
+            <Grid DockPanel.Dock="Top"
+                  Margin="0,0,0,12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <Button Grid.Column="0"
+                        Content="共享"
+                        MinHeight="30"
+                        Padding="8,4"
+                        Margin="0,0,4,0"
+                        Command="{Binding ShowSharesCommand}" />
+                <Button Grid.Column="1"
+                        Content="收藏"
+                        MinHeight="30"
+                        Padding="8,4"
+                        Margin="0,0,8,0"
+                        Command="{Binding ShowFavoritesCommand}" />
+                <Button Grid.Column="2"
+                        Content="+"
+                        MinWidth="30"
+                        MinHeight="30"
+                        Padding="0"
+                        ToolTip="添加当前项目到收藏"
+                        Command="{Binding AddFavoriteCommand}" />
+            </Grid>
             <TreeView ItemsSource="{Binding Roots}"
                       SelectedItemChanged="TreeView_OnSelectedItemChanged"
                       MouseDoubleClick="TreeView_OnMouseDoubleClick"
@@ -18,6 +41,16 @@
                       Drop="TreeView_OnDrop"
                       BorderThickness="0"
                       Background="Transparent">
+                <TreeView.Style>
+                    <Style TargetType="TreeView">
+                        <Setter Property="Visibility" Value="Visible" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsSharesTabActive}" Value="False">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TreeView.Style>
                 <TreeView.ItemContainerStyle>
                     <Style TargetType="TreeViewItem">
                         <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
@@ -42,6 +75,43 @@
                     </HierarchicalDataTemplate>
                 </TreeView.Resources>
             </TreeView>
+            <ListView ItemsSource="{Binding Favorites}"
+                      MouseDoubleClick="FavoritesList_OnMouseDoubleClick"
+                      BorderThickness="0"
+                      Background="Transparent">
+                <ListView.Style>
+                    <Style TargetType="ListView">
+                        <Setter Property="Visibility" Value="Collapsed" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsFavoritesTabActive}" Value="True">
+                                <Setter Property="Visibility" Value="Visible" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </ListView.Style>
+                <ListView.ContextMenu>
+                    <ContextMenu>
+                        <MenuItem Header="打开收藏"
+                                  Click="FavoriteOpenMenuItem_OnClick" />
+                        <MenuItem Header="取消收藏"
+                                  Command="{Binding PlacementTarget.DataContext.RemoveFavoriteCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                  CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                    </ContextMenu>
+                </ListView.ContextMenu>
+                <ListView.ItemTemplate>
+                    <DataTemplate DataType="{x:Type navigation:FavoriteLinkViewModel}">
+                        <StackPanel Margin="2,4">
+                            <TextBlock Text="{Binding Name}"
+                                       FontWeight="SemiBold"
+                                       TextTrimming="CharacterEllipsis" />
+                            <TextBlock Text="{Binding Location}"
+                                       Foreground="{StaticResource TextSecondaryBrush}"
+                                       FontSize="11"
+                                       TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+                    </DataTemplate>
+                </ListView.ItemTemplate>
+            </ListView>
         </DockPanel>
     </Border>
 </UserControl>

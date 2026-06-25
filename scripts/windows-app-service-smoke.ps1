@@ -34,6 +34,7 @@ $fileTransferService = Join-Path $root "apps\windows\Services\FileTransfers\File
 $cacheCleanupService = Join-Path $root "apps\windows\Services\Cache\WindowsCacheCleanupService.cs"
 $previewService = Join-Path $root "apps\windows\Services\Preview\PreviewService.cs"
 $thumbnailServiceInterface = Join-Path $root "apps\windows\Services\Preview\IThumbnailService.cs"
+$quickLinkService = Join-Path $root "apps\windows\Services\Links\QuickLinkService.cs"
 $linkActivationService = Join-Path $root "apps\windows\Services\LinkActivation\LinkActivationService.cs"
 $localRedirectService = Join-Path $root "apps\windows\Platform\Activation\LocalLinkRedirectService.cs"
 $singleInstanceService = Join-Path $root "apps\windows\Platform\Activation\WindowsSingleInstanceService.cs"
@@ -102,6 +103,7 @@ $requiredFiles = @(
     "apps\windows\CoreAdapter\RynatCoreRequests.cs",
     "apps\windows\CoreAdapter\RynatCoreModels.cs",
     "apps\windows\CoreAdapter\RynatJsonContext.cs",
+    "apps\windows\Domain\FavoriteLinkItem.cs",
     "apps\windows\Domain\RemoteFileItem.cs",
     "apps\windows\Domain\RemoteDragPayload.cs",
     "apps\windows\Domain\RemoteClipboardItem.cs",
@@ -137,6 +139,8 @@ $requiredFiles = @(
     "apps\windows\UI\Shell\RemoteClipboardPasteResult.cs",
     "apps\windows\UI\Files\FileListView.xaml",
     "apps\windows\UI\Files\FileListView.xaml.cs",
+    "apps\windows\UI\Navigation\FavoriteLinkViewModel.cs",
+    "apps\windows\UI\Navigation\NavigationSidebarTab.cs",
     "apps\windows\UI\Navigation\NavigationTreeView.xaml",
     "apps\windows\UI\Preview\PreviewPaneView.xaml",
     "apps\windows\UI\Status\StatusBarView.xaml"
@@ -211,6 +215,14 @@ Assert-FileContains -Path $shellViewModel -Pattern "selected\.IsShareRoot" -Desc
 Assert-FileContains -Path $shellViewModel -Pattern "HasWritableSelection" -Description "shell excludes share roots from remote cut/copy commands"
 Assert-FileContains -Path $shellViewModel -Pattern "HasSingleWritableSelection" -Description "shell excludes share roots from rename/delete commands"
 Assert-FileContains -Path $shellViewModel -Pattern "CanRefreshCurrentView" -Description "shell can refresh the virtual share-root view"
+Assert-FileContains -Path $shellViewModel -Pattern "LoadFavoritesAsync" -Description "shell loads favorites after login"
+Assert-FileContains -Path $shellViewModel -Pattern "AddSelectedFavoriteAsync" -Description "shell can add current item to favorites"
+Assert-FileContains -Path $shellViewModel -Pattern "OpenFavoriteAsync" -Description "shell can open favorite links"
+Assert-FileContains -Path $shellViewModel -Pattern "RemoveFavoriteAsync" -Description "shell can remove favorites"
+Assert-FileContains -Path $quickLinkService -Pattern "GenerateLink" -Description "favorite creation persists generated quick links"
+Assert-FileContains -Path $quickLinkService -Pattern "ListQuickLinks" -Description "favorite service lists stored quick links"
+Assert-FileContains -Path $quickLinkService -Pattern "DeleteQuickLink" -Description "favorite service deletes stored quick links"
+Assert-FileContains -Path $quickLinkService -Pattern "BuildLink" -Description "copy-link still builds non-persisted share links"
 Assert-FileContains -Path $fileDragDropCoordinator -Pattern "StartFileDragAsync" -Description "file drag/drop coordinator owns drag-out workflow"
 Assert-FileContains -Path $fileDragDropCoordinator -Pattern "GetRemoteDropEffect" -Description "file drag/drop coordinator resolves internal remote drop effects"
 Assert-FileContains -Path $fileDragDropCoordinator -Pattern "DropRemoteItemsAsync" -Description "file drag/drop coordinator owns internal remote drop workflow"
@@ -260,7 +272,12 @@ Assert-FileContains -Path $navigationNodeViewModel -Pattern "enum NavigationDrop
 Assert-FileContains -Path $navigationNodeViewModel -Pattern "RemoteDropState" -Description "navigation node exposes remote drop hover state"
 Assert-FileContains -Path $navigationTreeXaml -Pattern "DragLeave=`"TreeView_OnDragLeave`"" -Description "navigation tree clears drag hover on leave"
 Assert-FileContains -Path $navigationTreeXaml -Pattern "NavigationDropState\.ValidTarget" -Description "navigation tree binds valid remote drop target styling"
+Assert-FileContains -Path $navigationTreeXaml -Pattern "ShowFavoritesCommand" -Description "navigation sidebar exposes favorites tab"
+Assert-FileContains -Path $navigationTreeXaml -Pattern "AddFavoriteCommand" -Description "navigation sidebar exposes add-favorite action"
+Assert-FileContains -Path $navigationTreeXaml -Pattern "RemoveFavoriteCommand" -Description "navigation sidebar exposes remove-favorite action"
+Assert-FileContains -Path $navigationTreeXaml -Pattern "ItemsSource=`"{Binding Favorites}`"" -Description "navigation sidebar lists favorites"
 Assert-FileContains -Path $navigationTreeView -Pattern "SetRemoteDropTarget" -Description "navigation tree updates remote drop hover state"
+Assert-FileContains -Path $navigationTreeView -Pattern "OpenFavoriteAsync" -Description "navigation tree opens favorite rows"
 Assert-FileContains -Path $navigationTreeView -Pattern "e\.Effects == DragDropEffects\.None \? null : target" -Description "navigation tree highlights only valid remote drop targets"
 
 Assert-FileContains -Path $fileOperationInterface -Pattern "CreateDirectoryAsync" -Description "file operation interface supports create folder"
