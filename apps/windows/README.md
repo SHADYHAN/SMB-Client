@@ -46,7 +46,7 @@ Remaining feature migration should be added module by module rather than porting
 - Windows build and runtime flow has been validated through the one-click script.
 - Link activation works through `rynat://`, local HTTP redirect, single-instance forwarding, and foreground activation.
 - Compact `/s/<code>` quick links are supported.
-- Windows copy-link keeps the document-friendly HTTP share link so DingTalk/chat/docs can recognize it as clickable.
+- Windows copy-link keeps the plain-text HTTP share link for DingTalk/chat/docs, and also publishes rich clipboard HTML whose href points to the `rynat://` direct app link when the paste target preserves it.
 - Local short-link requests now return `204 No Content` after activation instead of rendering a script-close page or reopening the protocol.
 - WPF smoke checks now target the current `CoreAdapter` / `Services` / `Platform` / `UI` layout instead of the old WinUI app-services tree.
 - Cross-platform WPF static smoke checks cover startup arguments, local redirect, protocol registration, and single-instance forwarding.

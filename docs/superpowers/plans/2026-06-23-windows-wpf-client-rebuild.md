@@ -32,7 +32,7 @@
 - `cargo test -p rynat-core` passes locally: 79 tests.
 - Windows build was confirmed by the user after the build script was simplified.
 - Link activation now brings the client to the foreground in the tested cases.
-- Windows copy-link keeps the HTTP short link so DingTalk/chat/docs can recognize it as clickable.
+- Windows copy-link keeps the plain-text HTTP short link for DingTalk/chat/docs, and also publishes rich clipboard HTML whose href points to the `rynat://` direct app link when the paste target preserves it.
 - Local short-link browser requests now return `204 No Content` after activation instead of rendering a script-close page or reopening `rynat://`.
 - Current macOS-side validation also covers `scripts/check-bridge-surface.sh`, `scripts/ffi-smoke-test.sh`, and `scripts/windows-app-service-smoke.sh`.
 - Windows WPF has multi-select remote copy / move / paste plumbing with same-name confirmation, pending Windows SMB validation.

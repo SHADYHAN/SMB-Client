@@ -58,6 +58,7 @@ local_redirect_service="$ROOT_DIR/apps/windows/Platform/Activation/LocalLinkRedi
 single_instance_service="$ROOT_DIR/apps/windows/Platform/Activation/WindowsSingleInstanceService.cs"
 protocol_registration_service="$ROOT_DIR/apps/windows/Platform/Activation/WindowsProtocolRegistrationService.cs"
 shell_drag_drop_service="$ROOT_DIR/apps/windows/Platform/Shell/WindowsShellDragDropService.cs"
+windows_clipboard_service="$ROOT_DIR/apps/windows/Platform/Clipboard/WindowsClipboardService.cs"
 
 printf 'Checking bridge/header/Swift/C# ABI surface...\n'
 "$ROOT_DIR/scripts/check-bridge-surface.sh"
@@ -190,7 +191,10 @@ assert_file_contains "$shell_view_model" 'PreviewCoordinator' 'shell delegates p
 assert_file_contains "$shell_view_model" 'ActivateExternalArgumentsAsync' 'shell accepts external activation'
 assert_file_contains "$shell_view_model" 'LinkActivationCoordinator' 'shell delegates link activation workflow'
 assert_file_contains "$shell_view_model" 'OpenLinkRequestAsync' 'shell opens activated links'
-assert_file_contains "$shell_view_model" 'SetText\(link\.HttpUrl\)' 'Windows copy-link uses document-friendly HTTP share links'
+assert_file_contains "$shell_view_model" 'SetShareLink\(link\.HttpUrl, link\.DeepLinkUrl\)' 'Windows copy-link keeps HTTP text with direct activation metadata'
+assert_file_contains "$windows_clipboard_service" 'TextDataFormat\.Html' 'Windows clipboard publishes rich share-link HTML'
+assert_file_contains "$windows_clipboard_service" 'TextDataFormat\.UnicodeText' 'Windows clipboard keeps a Unicode plain-text share link fallback'
+assert_file_contains "$windows_clipboard_service" 'StartFragment' 'Windows clipboard builds CF_HTML fragments'
 assert_file_contains "$link_activation_coordinator" 'ActivateStartupArgumentsAsync' 'link activation coordinator parses startup arguments'
 assert_file_contains "$link_activation_coordinator" 'ConsumePendingIfPossibleAsync' 'link activation coordinator owns pending activation'
 assert_file_contains "$link_activation_coordinator" 'CanOpenWithSession' 'link activation coordinator checks active session'

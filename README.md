@@ -133,7 +133,7 @@ scripts/ffi-smoke-test-windows.ps1
 - Windows 主线已切换为 WPF 客户端，旧 WinUI 3 版本只保留在 `apps/windows-winui-legacy` 作为历史参考。
 - Windows WPF 已接入多选远端复制 / 移动 / 粘贴、软件内远端拖拽和同名确认基础流程，仍需 Windows 实机验证构建、交互和 SMB 真实行为。
 - Windows WPF 的远端剪贴板、链接激活、目录导航、预览加载和拖拽协调已从 `ShellViewModel` 拆到独立 coordinator，避免主壳继续膨胀。
-- 快速链接已切换为紧凑 `/s/<短码>` 格式；Windows UI 默认复制文档 / 聊天工具友好的 HTTP 短链接，命中已运行客户端后由本地中转返回 `204 No Content`，不再依赖浏览器脚本自动关闭标签页。
+- 快速链接已切换为紧凑 `/s/<短码>` 格式；Windows UI 默认复制文档 / 聊天工具友好的 HTTP 短链接，同时在富文本剪贴板里附带 `rynat://` 直达 href。支持该富文本链接的目标可直接唤醒客户端；不支持时仍回退到 HTTP，本地中转命中已运行客户端后返回 `204 No Content`，不再依赖浏览器脚本自动关闭标签页。
 
 ## 后续重点
 

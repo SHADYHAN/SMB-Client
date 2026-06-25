@@ -32,6 +32,7 @@ $localRedirectService = Join-Path $root "apps\windows\Platform\Activation\LocalL
 $singleInstanceService = Join-Path $root "apps\windows\Platform\Activation\WindowsSingleInstanceService.cs"
 $protocolRegistrationService = Join-Path $root "apps\windows\Platform\Activation\WindowsProtocolRegistrationService.cs"
 $shellDragDropService = Join-Path $root "apps\windows\Platform\Shell\WindowsShellDragDropService.cs"
+$windowsClipboardService = Join-Path $root "apps\windows\Platform\Clipboard\WindowsClipboardService.cs"
 
 if ([string]::IsNullOrWhiteSpace($BuildOutputDir)) {
     $BuildOutputDir = Join-Path $root "apps\windows\bin\AppServiceSmoke"
@@ -208,7 +209,10 @@ Assert-FileContains -Path $shellViewModel -Pattern "PreviewCoordinator" -Descrip
 Assert-FileContains -Path $shellViewModel -Pattern "ActivateExternalArgumentsAsync" -Description "shell accepts external activation"
 Assert-FileContains -Path $shellViewModel -Pattern "LinkActivationCoordinator" -Description "shell delegates link activation workflow"
 Assert-FileContains -Path $shellViewModel -Pattern "OpenLinkRequestAsync" -Description "shell opens activated links"
-Assert-FileContains -Path $shellViewModel -Pattern "SetText\(link\.HttpUrl\)" -Description "Windows copy-link uses document-friendly HTTP share links"
+Assert-FileContains -Path $shellViewModel -Pattern "SetShareLink\(link\.HttpUrl, link\.DeepLinkUrl\)" -Description "Windows copy-link keeps HTTP text with direct activation metadata"
+Assert-FileContains -Path $windowsClipboardService -Pattern "TextDataFormat\.Html" -Description "Windows clipboard publishes rich share-link HTML"
+Assert-FileContains -Path $windowsClipboardService -Pattern "TextDataFormat\.UnicodeText" -Description "Windows clipboard keeps a Unicode plain-text share link fallback"
+Assert-FileContains -Path $windowsClipboardService -Pattern "StartFragment" -Description "Windows clipboard builds CF_HTML fragments"
 Assert-FileContains -Path $linkActivationCoordinator -Pattern "ActivateStartupArgumentsAsync" -Description "link activation coordinator parses startup arguments"
 Assert-FileContains -Path $linkActivationCoordinator -Pattern "ConsumePendingIfPossibleAsync" -Description "link activation coordinator owns pending activation"
 Assert-FileContains -Path $linkActivationCoordinator -Pattern "CanOpenWithSession" -Description "link activation coordinator checks active session"
