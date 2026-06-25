@@ -11,7 +11,7 @@ public sealed class PreviewService : IPreviewService
 {
     private const uint DefaultPreviewEdgePx = 640;
     private const ulong ImagePreviewMaxBytes = 32UL * 1024 * 1024;
-    private const ulong VideoPreviewMaxBytes = 512UL * 1024 * 1024;
+    private const ulong InlineVideoPreviewMaxBytes = 128UL * 1024 * 1024;
     private const long PreviewCacheMaxBytes = 2L * 1024 * 1024 * 1024;
     private static readonly TimeSpan PreviewCacheMaxAge = TimeSpan.FromDays(14);
     private readonly RynatCoreBridge _bridge;
@@ -42,6 +42,7 @@ public sealed class PreviewService : IPreviewService
 
             string? localImagePath = null;
             string? localVideoPath = null;
+            string? message = null;
             if (IsImage(plan.ContentType))
             {
                 localImagePath = CachePreviewFile(
@@ -55,14 +56,21 @@ public sealed class PreviewService : IPreviewService
             }
             else if (IsVideo(plan.ContentType))
             {
-                localVideoPath = CachePreviewFile(
-                    session,
-                    item,
-                    plan.CacheKey,
-                    operationId,
-                    VideoPreviewMaxBytes,
-                    cancellationToken
-                );
+                if (item.Size <= InlineVideoPreviewMaxBytes)
+                {
+                    localVideoPath = CachePreviewFile(
+                        session,
+                        item,
+                        plan.CacheKey,
+                        operationId,
+                        InlineVideoPreviewMaxBytes,
+                        cancellationToken
+                    );
+                }
+                else
+                {
+                    message = "视频较大，暂不自动缓存预览。";
+                }
             }
 
             return new PreviewInfo(
@@ -70,7 +78,8 @@ public sealed class PreviewService : IPreviewService
                 plan.Thumbnail?.Url,
                 plan.Playback?.Url,
                 localImagePath,
-                localVideoPath
+                localVideoPath,
+                message
             );
         }, cancellationToken);
     }

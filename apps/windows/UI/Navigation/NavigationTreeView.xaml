@@ -12,6 +12,9 @@
             <TreeView ItemsSource="{Binding Roots}"
                       SelectedItemChanged="TreeView_OnSelectedItemChanged"
                       MouseDoubleClick="TreeView_OnMouseDoubleClick"
+                      AllowDrop="True"
+                      DragOver="TreeView_OnDragOver"
+                      Drop="TreeView_OnDrop"
                       BorderThickness="0"
                       Background="Transparent">
                 <TreeView.ItemContainerStyle>

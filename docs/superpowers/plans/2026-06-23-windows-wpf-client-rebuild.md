@@ -33,22 +33,24 @@
 - Windows build was confirmed by the user after the build script was simplified.
 - Link activation now brings the client to the foreground in the tested cases.
 - Local short-link browser tabs now return an already-activated close page instead of reopening `rynat://`.
-- Current macOS-side validation also covers `scripts/check-bridge-surface.sh` and `scripts/ffi-smoke-test.sh`.
-- Windows WPF has single-item remote copy / move / paste plumbing with same-name confirmation, pending Windows SMB validation.
+- Current macOS-side validation also covers `scripts/check-bridge-surface.sh`, `scripts/ffi-smoke-test.sh`, and `scripts/windows-app-service-smoke.sh`.
+- Windows WPF has multi-select remote copy / move / paste plumbing with same-name confirmation, pending Windows SMB validation.
 - Remote copy/move implementation is isolated in `RemoteCopyMoveService`; paste state and conflict flow are isolated in `RemoteClipboardCoordinator`.
 - Link startup parsing, pending activation, and active-session matching are isolated in `LinkActivationCoordinator`.
 - Directory loading, current path/share state, and navigation-tree synchronization are isolated in `DirectoryNavigationCoordinator`.
 - File selection preview loading and stale-preview protection are isolated in `PreviewCoordinator`.
 - File drag-out and local drop upload coordination are isolated in `FileDragDropCoordinator`.
+- In-app remote drag/drop now uses a Windows-local payload and reuses `RemoteCopyMoveService` for directory-target copy/move.
 - Preview and drag caches have age/size cleanup with stale `.part` removal.
+- Large videos no longer auto-cache for inline preview; they show a lightweight message until a thumbnail/first-frame path is added.
+- Cross-platform WPF static smoke checks cover startup arguments, local redirect, protocol registration, and single-instance forwarding.
 
 ## Remaining Product Work
 
-- [ ] Validate and refine remote copy / move / paste on real Windows SMB shares.
-- [ ] Expand remote copy / move / paste to multi-select if Windows parity requires it.
-- [ ] In-app drag/drop for remote move/copy: dragging without a valid cross-directory target should be visual only.
+- [ ] Validate and refine remote copy / move / paste / drag/drop on real Windows SMB shares.
+- [ ] Refine in-app drag/drop hover visuals: dragging without a valid cross-directory target should remain visual only.
 - [ ] Further refine Explorer/Desktop drag-out visuals and same-name overwrite behavior on real Windows.
-- [ ] Improve preview performance: avoid caching large videos when a lightweight thumbnail/first-frame path is available.
+- [ ] Improve preview performance: add lightweight thumbnail/video first-frame generation instead of relying on full media cache.
 - [ ] Observe preview/drag cache cleanup behavior during Windows real-use testing.
 - [ ] Add favorites/quick-link library UI if Windows needs parity with macOS favorites.
 - [ ] Add broader keyboard shortcuts and selection polish after real-user testing.
@@ -58,7 +60,7 @@
 - [ ] Keep `UI/Shell/ShellViewModel.cs` focused on composition and command routing; split login/server-setting coordination later only if those areas grow.
 - [ ] Keep heavier recursive/long-running file workflows out of `FileOperationService`; put them behind dedicated use-case services like `RemoteCopyMoveService`.
 - [ ] Keep `MainWindow.xaml.cs` thin and prevent Shell/platform logic from leaking into UI code.
-- [ ] Add Windows-side automated smoke checks for bridge surface, startup parsing, and link activation helpers.
+- [ ] Keep Windows-side smoke checks current as new activation or Shell integration paths are added.
 - [ ] Revisit Cloud Files API only if the product later needs Explorer-level virtual drive / placeholder-file behavior.
 
 ## Reference Boundaries

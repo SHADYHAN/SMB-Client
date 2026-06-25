@@ -20,16 +20,23 @@ public sealed class WindowsShellDragDropService : IWindowsShellDragDropService
         return selection.Count == 1 && selection.All(item => !item.IsDirectory);
     }
 
-    public bool StartDrag(object dragSource, IReadOnlyList<DragFilePayload> files)
+    public DragDropEffects StartDrag(
+        object dragSource,
+        RemoteDragPayload remotePayload,
+        IReadOnlyList<DragFilePayload> files
+    )
     {
-        if (dragSource is not DependencyObject dependencyObject || files.Count == 0)
+        if (dragSource is not DependencyObject dependencyObject || remotePayload.Items.Count == 0)
         {
-            return false;
+            return DragDropEffects.None;
         }
 
-        using var payload = VirtualFileDragPayload.Create(files[0]);
-        var effect = DragDrop.DoDragDrop(dependencyObject, payload.DataObject, DragDropEffects.Copy);
-        return effect == DragDropEffects.Copy;
+        using var payload = VirtualFileDragPayload.Create(remotePayload, files.FirstOrDefault());
+        return DragDrop.DoDragDrop(
+            dependencyObject,
+            payload.DataObject,
+            DragDropEffects.Copy | DragDropEffects.Move
+        );
     }
 
     private sealed class VirtualFileDragPayload : IDisposable
@@ -43,18 +50,36 @@ public sealed class WindowsShellDragDropService : IWindowsShellDragDropService
 
         public DataObject DataObject { get; }
 
-        public static VirtualFileDragPayload Create(DragFilePayload file)
+        public static VirtualFileDragPayload Create(
+            RemoteDragPayload remotePayload,
+            DragFilePayload? file
+        )
         {
             var dataObject = new DataObject();
-            var descriptor = BuildFileGroupDescriptor(file);
-            var content = file.OpenReadStream();
+            dataObject.SetData(RemoteDragPayload.DataFormat, remotePayload, false);
 
-            dataObject.SetData(FileGroupDescriptorW, descriptor, false);
-            dataObject.SetData(FileContents, content, false);
+            MemoryStream? descriptor = null;
+            Stream? content = null;
+            if (file is not null)
+            {
+                descriptor = BuildFileGroupDescriptor(file);
+                content = file.OpenReadStream();
+
+                dataObject.SetData(FileGroupDescriptorW, descriptor, false);
+                dataObject.SetData(FileContents, content, false);
+            }
 
             var payload = new VirtualFileDragPayload(dataObject);
-            payload._disposables.Add(descriptor);
-            payload._disposables.Add(content);
+            if (descriptor is not null)
+            {
+                payload._disposables.Add(descriptor);
+            }
+
+            if (content is not null)
+            {
+                payload._disposables.Add(content);
+            }
+
             return payload;
         }
 

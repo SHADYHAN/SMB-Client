@@ -31,8 +31,9 @@ This is the active WPF client for the rebuilt Windows line. It currently include
 - SMB session connection and share navigation
 - Explorer-style navigation tree basics
 - File list with refresh, search, rename, delete, create folder, and copy link
-- Single-item remote cut/copy/paste with same-name overwrite confirmation
+- Multi-select remote cut/copy/paste with same-name overwrite confirmation
 - Local file drop upload
+- In-app remote drag/drop to directory targets for move, or copy when Ctrl is held / crossing shares
 - Shell drag-out download foundation using virtual file data
 - Preview pane for image/video cache playback basics
 - Fixed HTTP share link generation through Rust core
@@ -47,26 +48,28 @@ Remaining feature migration should be added module by module rather than porting
 - Compact `/s/<code>` quick links are supported.
 - Local short-link pages now close through an already-activated page instead of reopening the protocol.
 - WPF smoke checks now target the current `CoreAdapter` / `Services` / `Platform` / `UI` layout instead of the old WinUI app-services tree.
+- Cross-platform WPF static smoke checks cover startup arguments, local redirect, protocol registration, and single-instance forwarding.
 - Remote copy/move logic is isolated in `RemoteCopyMoveService`, and shell paste state is isolated in `RemoteClipboardCoordinator`.
+- Remote cut/copy/paste supports extended multi-selection in the file list.
+- Internal remote drag/drop publishes a Windows-local payload and commits through `FileDragDropCoordinator`.
 - Link startup parsing, pending activation, and session matching are isolated in `LinkActivationCoordinator`.
 - Directory loading, current path/share state, and navigation-tree selection are isolated in `DirectoryNavigationCoordinator`.
 - File selection preview loading is isolated in `PreviewCoordinator`.
 - File drag-out and local drop upload coordination are isolated in `FileDragDropCoordinator`.
-- Preview and drag caches now have age/size cleanup with stale `.part` removal.
+- Preview and drag caches now have age/size cleanup with stale `.part` removal; large videos no longer auto-cache for inline preview.
 
 ## Remaining Work
 
 Near-term product work:
 
-- Validate and refine in-app remote copy, move, and paste on real Windows SMB shares.
-- Expand remote copy/move beyond the current single-item flow if multi-select parity is needed.
-- Refine internal drag visuals so dragging without a valid cross-directory target is visual only.
+- Validate and refine in-app remote copy, move, paste, and drag/drop on real Windows SMB shares.
+- Refine internal drag visuals and hover feedback so dragging without a valid cross-directory target remains visual only.
 - Validate and refine shell drag-out visuals and same-name behavior on the Desktop.
 - Decide whether Windows needs the same favorites/quick-link library UI as macOS.
 
 Follow-up quality work:
 
-- Improve preview performance with thumbnails/video first frames instead of caching large media when possible.
+- Improve preview performance with thumbnails/video first frames; large videos already avoid automatic inline caching.
 - Observe preview/drag cache cleanup behavior during Windows real-use testing.
 - Keep `ShellViewModel` focused on composition and command routing; continue extracting login/server-setting coordination only if it starts to grow.
-- Broaden smoke checks around startup argument parsing and local redirect handling.
+- Keep broadening smoke checks when new Windows activation or Shell integration paths are added.

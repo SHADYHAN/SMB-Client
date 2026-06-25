@@ -8,6 +8,8 @@ namespace Rynat.WindowsClient.UI.Files;
 public sealed class FileListViewModel : ObservableObject
 {
     private readonly List<FileItemViewModel> _allItems = new();
+    private readonly List<FileItemViewModel> _selectedItems = new();
+    private IReadOnlyList<RemoteFileItem> _selectedRemoteItems = Array.Empty<RemoteFileItem>();
     private FileItemViewModel? _selectedItem;
     private string _pathTitle = "未连接";
     private string _searchText = string.Empty;
@@ -16,6 +18,14 @@ public sealed class FileListViewModel : ObservableObject
     public ObservableCollection<FileItemViewModel> Items { get; } = new();
 
     public IEnumerable<string> AllNames => _allItems.Select(item => item.Name);
+
+    public IReadOnlyList<FileItemViewModel> SelectedItems => _selectedItems;
+
+    public IReadOnlyList<RemoteFileItem> SelectedRemoteItems => _selectedRemoteItems;
+
+    public bool HasSelection => _selectedRemoteItems.Count > 0;
+
+    public bool HasSingleSelection => _selectedRemoteItems.Count == 1;
 
     public string PathTitle
     {
@@ -42,6 +52,11 @@ public sealed class FileListViewModel : ObservableObject
         {
             if (SetProperty(ref _selectedItem, value))
             {
+                if (_selectedItems.Count == 0)
+                {
+                    RefreshSelectedRemoteItems();
+                }
+
                 RefreshOpenItemCommand();
             }
         }
@@ -71,7 +86,29 @@ public sealed class FileListViewModel : ObservableObject
 
     public ICommand RenameCommand { get; set; } = new RelayCommand(_ => { });
 
+    public void ReplaceSelectedItems(IEnumerable<FileItemViewModel> selectedItems)
+    {
+        _selectedItems.Clear();
+        _selectedItems.AddRange(selectedItems);
+        RefreshSelectedRemoteItems();
+        RefreshSelectionCommands();
+    }
+
+    private void RefreshSelectedRemoteItems()
+    {
+        _selectedRemoteItems = _selectedItems.Count > 0
+            ? _selectedItems.Select(item => item.Item).ToArray()
+            : SelectedItem is null
+                ? Array.Empty<RemoteFileItem>()
+                : new[] { SelectedItem.Item };
+    }
+
     private void RefreshOpenItemCommand()
+    {
+        RefreshSelectionCommands();
+    }
+
+    private void RefreshSelectionCommands()
     {
         if (OpenItemCommand is AsyncRelayCommand asyncCommand)
         {
@@ -80,6 +117,31 @@ public sealed class FileListViewModel : ObservableObject
         else if (OpenItemCommand is RelayCommand relayCommand)
         {
             relayCommand.RaiseCanExecuteChanged();
+        }
+
+        if (CopyLinkCommand is AsyncRelayCommand copyLinkCommand)
+        {
+            copyLinkCommand.RaiseCanExecuteChanged();
+        }
+
+        if (CutCommand is RelayCommand cutCommand)
+        {
+            cutCommand.RaiseCanExecuteChanged();
+        }
+
+        if (CopyFileCommand is RelayCommand copyFileCommand)
+        {
+            copyFileCommand.RaiseCanExecuteChanged();
+        }
+
+        if (DeleteCommand is AsyncRelayCommand deleteCommand)
+        {
+            deleteCommand.RaiseCanExecuteChanged();
+        }
+
+        if (RenameCommand is AsyncRelayCommand renameCommand)
+        {
+            renameCommand.RaiseCanExecuteChanged();
         }
     }
 
@@ -108,6 +170,7 @@ public sealed class FileListViewModel : ObservableObject
         _allItems.Clear();
         Items.Clear();
         SelectedItem = null;
+        ReplaceSelectedItems(Array.Empty<FileItemViewModel>());
         IsLoading = false;
     }
 
@@ -134,5 +197,7 @@ public sealed class FileListViewModel : ObservableObject
         {
             SelectedItem = null;
         }
+
+        ReplaceSelectedItems(_selectedItems.Where(Items.Contains).ToArray());
     }
 }

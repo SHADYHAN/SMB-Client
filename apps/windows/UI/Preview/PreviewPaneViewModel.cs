@@ -9,6 +9,7 @@ public sealed class PreviewPaneViewModel : ObservableObject
     private string _title = "预览";
     private string _subtitle = "选择一个文件查看信息";
     private string _contentType = "";
+    private string? _message;
     private string? _localImagePath;
     private string? _localVideoPath;
     private bool _isLoading;
@@ -31,6 +32,18 @@ public sealed class PreviewPaneViewModel : ObservableObject
     {
         get => _contentType;
         set => SetProperty(ref _contentType, value);
+    }
+
+    public string? Message
+    {
+        get => _message;
+        set
+        {
+            if (SetProperty(ref _message, value))
+            {
+                OnPropertyChanged(nameof(PreviewText));
+            }
+        }
     }
 
     public string? LocalImagePath
@@ -99,6 +112,11 @@ public sealed class PreviewPaneViewModel : ObservableObject
                 return string.Empty;
             }
 
+            if (!string.IsNullOrWhiteSpace(Message))
+            {
+                return Message;
+            }
+
             if (SelectedItem is null)
             {
                 return "暂无预览";
@@ -135,6 +153,7 @@ public sealed class PreviewPaneViewModel : ObservableObject
         SelectedItem = item;
         LocalImagePath = null;
         LocalVideoPath = null;
+        Message = null;
         IsLoading = false;
         if (item is null)
         {
@@ -148,6 +167,7 @@ public sealed class PreviewPaneViewModel : ObservableObject
         Title = item.Name;
         Subtitle = item.IsDirectory ? "文件夹" : $"{FormatSize(item.Size)} · {item.ModifiedAt?.LocalDateTime:yyyy-MM-dd HH:mm}";
         ContentType = "";
+        Message = null;
         OnPropertyChanged(nameof(PreviewText));
     }
 
@@ -155,6 +175,7 @@ public sealed class PreviewPaneViewModel : ObservableObject
     {
         LocalImagePath = null;
         LocalVideoPath = null;
+        Message = null;
         IsLoading = true;
     }
 
@@ -162,6 +183,7 @@ public sealed class PreviewPaneViewModel : ObservableObject
     {
         IsLoading = false;
         ContentType = info.ContentType;
+        Message = info.Message;
         LocalImagePath = info.LocalImagePath;
         LocalVideoPath = info.LocalVideoPath;
         OnPropertyChanged(nameof(PreviewText));
@@ -173,6 +195,7 @@ public sealed class PreviewPaneViewModel : ObservableObject
         LocalImagePath = null;
         LocalVideoPath = null;
         ContentType = "";
+        Message = null;
         OnPropertyChanged(nameof(PreviewText));
     }
 

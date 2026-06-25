@@ -5,5 +5,6 @@ public sealed record PreviewInfo(
     string? ThumbnailUrl,
     string? PlaybackUrl,
     string? LocalImagePath = null,
-    string? LocalVideoPath = null
+    string? LocalVideoPath = null,
+    string? Message = null
 );

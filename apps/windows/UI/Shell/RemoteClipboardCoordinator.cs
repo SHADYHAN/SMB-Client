@@ -23,14 +23,36 @@ public sealed class RemoteClipboardCoordinator
 
     public string Cut(RemoteFileItem item)
     {
-        Clipboard = new RemoteClipboardItem(RemoteClipboardMode.Cut, item);
-        return $"已剪切 {item.Name}。";
+        return Cut(new[] { item });
+    }
+
+    public string Cut(IReadOnlyList<RemoteFileItem> items)
+    {
+        if (items.Count == 0)
+        {
+            Clear();
+            return "没有可剪切的项目。";
+        }
+
+        Clipboard = new RemoteClipboardItem(RemoteClipboardMode.Cut, items);
+        return ClipboardSummary("已剪切", items);
     }
 
     public string Copy(RemoteFileItem item)
     {
-        Clipboard = new RemoteClipboardItem(RemoteClipboardMode.Copy, item);
-        return $"已复制 {item.Name}。";
+        return Copy(new[] { item });
+    }
+
+    public string Copy(IReadOnlyList<RemoteFileItem> items)
+    {
+        if (items.Count == 0)
+        {
+            Clear();
+            return "没有可复制的项目。";
+        }
+
+        Clipboard = new RemoteClipboardItem(RemoteClipboardMode.Copy, items);
+        return ClipboardSummary("已复制", items);
     }
 
     public void Clear()
@@ -51,50 +73,110 @@ public sealed class RemoteClipboardCoordinator
             return null;
         }
 
-        var targetPath = JoinRemotePath(targetDirectory, clipboard.Item.Name);
-        if (IsSameRemoteTarget(clipboard.Item.Share, clipboard.Item.Path, targetShare, targetPath))
+        if (clipboard.Items.Count == 0)
+        {
+            return null;
+        }
+
+        var sameTarget = clipboard.Items.FirstOrDefault(item =>
+            IsSameRemoteTarget(item.Share, item.Path, targetShare, JoinRemotePath(targetDirectory, item.Name))
+        );
+        if (sameTarget is not null)
         {
             var summary = clipboard.Mode == RemoteClipboardMode.Cut
-                ? "项目已在当前位置。"
-                : "不能复制到原位置。";
+                ? SameTargetSummary("项目已在当前位置。", "部分项目已在当前位置", sameTarget, clipboard.Items)
+                : SameTargetSummary("不能复制到原位置。", "部分项目不能复制到原位置", sameTarget, clipboard.Items);
             return StatusOnly(summary, "file.same_target");
         }
-        if (clipboard.Item.IsDirectory && IsNestedDirectoryTarget(clipboard.Item.Share, clipboard.Item.Path, targetShare, targetPath))
+
+        var nestedTarget = clipboard.Items.FirstOrDefault(item =>
+            item.IsDirectory && IsNestedDirectoryTarget(item.Share, item.Path, targetShare, JoinRemotePath(targetDirectory, item.Name))
+        );
+        if (nestedTarget is not null)
         {
             var summary = clipboard.Mode == RemoteClipboardMode.Cut
-                ? "不能移动到自身内部。"
-                : "不能复制到自身内部。";
+                ? $"不能移动到自身内部：{nestedTarget.Name}。"
+                : $"不能复制到自身内部：{nestedTarget.Name}。";
             return StatusOnly(summary, "file.nested_target");
         }
 
-        var replaceExisting = targetContainsName(clipboard.Item.Name);
-        if (replaceExisting && !_confirmOverwrite(new[] { clipboard.Item.Name }))
+        var conflictNames = clipboard.Items
+            .Select(item => item.Name)
+            .Where(targetContainsName)
+            .Distinct(StringComparer.CurrentCultureIgnoreCase)
+            .ToArray();
+        if (conflictNames.Length > 0 && !_confirmOverwrite(conflictNames))
         {
             return StatusOnly("已取消粘贴。", "file.cancelled");
         }
 
-        var result = clipboard.Mode == RemoteClipboardMode.Cut
-            ? await _remoteCopyMoveService.MoveAsync(
-                session,
-                clipboard.Item,
-                targetShare,
-                targetDirectory,
-                replaceExisting,
-                cancellationToken
-            )
-            : await _remoteCopyMoveService.CopyAsync(
-                session,
-                clipboard.Item,
-                targetShare,
-                targetDirectory,
-                replaceExisting,
-                cancellationToken
-            );
+        var completed = 0;
+        foreach (var item in clipboard.Items)
+        {
+            var replaceExisting = conflictNames.Contains(item.Name, StringComparer.CurrentCultureIgnoreCase);
+            var result = clipboard.Mode == RemoteClipboardMode.Cut
+                ? await _remoteCopyMoveService.MoveAsync(
+                    session,
+                    item,
+                    targetShare,
+                    targetDirectory,
+                    replaceExisting,
+                    cancellationToken
+                )
+                : await _remoteCopyMoveService.CopyAsync(
+                    session,
+                    item,
+                    targetShare,
+                    targetDirectory,
+                    replaceExisting,
+                    cancellationToken
+                );
+
+            if (!result.Succeeded)
+            {
+                return new RemoteClipboardPasteResult(
+                    new FileOperationResult(false, $"{result.Summary}（已完成 {completed}/{clipboard.Items.Count} 项）", result.ErrorCode),
+                    ClearClipboard: false
+                );
+            }
+
+            completed++;
+        }
+
+        var summary = clipboard.Mode == RemoteClipboardMode.Cut
+            ? PasteSummary("已移动", clipboard.Items)
+            : PasteSummary("已复制", clipboard.Items);
 
         return new RemoteClipboardPasteResult(
-            result,
-            ClearClipboard: result.Succeeded && clipboard.Mode == RemoteClipboardMode.Cut
+            new FileOperationResult(true, summary),
+            ClearClipboard: clipboard.Mode == RemoteClipboardMode.Cut
         );
+    }
+
+    private static string ClipboardSummary(string prefix, IReadOnlyList<RemoteFileItem> items)
+    {
+        return items.Count == 1
+            ? $"{prefix} {items[0].Name}。"
+            : $"{prefix} {items.Count} 个项目。";
+    }
+
+    private static string PasteSummary(string prefix, IReadOnlyList<RemoteFileItem> items)
+    {
+        return items.Count == 1
+            ? $"{prefix} {items[0].Name}。"
+            : $"{prefix} {items.Count} 个项目。";
+    }
+
+    private static string SameTargetSummary(
+        string singleItemSummary,
+        string multipleItemPrefix,
+        RemoteFileItem item,
+        IReadOnlyList<RemoteFileItem> items
+    )
+    {
+        return items.Count == 1
+            ? singleItemSummary
+            : $"{multipleItemPrefix}：{item.Name}。";
     }
 
     private static RemoteClipboardPasteResult StatusOnly(string summary, string errorCode)

@@ -1,3 +1,4 @@
+using System.Windows;
 using Rynat.WindowsClient.Domain;
 using Rynat.WindowsClient.Platform.Clipboard;
 using Rynat.WindowsClient.Platform.Dialogs;
@@ -76,6 +77,8 @@ public sealed class ShellViewModel : ObservableObject
         _fileDragDropCoordinator = new FileDragDropCoordinator(
             fileTransferService,
             _fileOperationService,
+            _remoteCopyMoveService,
+            directoryService,
             shellDragDropService,
             _userDialogService,
             FileList,
@@ -91,15 +94,15 @@ public sealed class ShellViewModel : ObservableObject
 
         Login.LoginCommand = new AsyncRelayCommand(LoginAsync, CanLogin);
         Login.ServerSettingsCommand = new AsyncRelayCommand(OpenServerSettingsAsync, () => !Login.IsBusy);
-        FileList.OpenItemCommand = new AsyncRelayCommand(OpenSelectedItemAsync, () => FileList.SelectedItem is not null);
-        FileList.CopyLinkCommand = new AsyncRelayCommand(CopySelectedFileLinkAsync, () => FileList.SelectedItem is not null && _session is not null);
-        FileList.CutCommand = new RelayCommand(CutSelectedItem, () => FileList.SelectedItem is not null && _session is not null);
-        FileList.CopyFileCommand = new RelayCommand(CopySelectedItem, () => FileList.SelectedItem is not null && _session is not null);
+        FileList.OpenItemCommand = new AsyncRelayCommand(OpenSelectedItemAsync, () => FileList.HasSingleSelection);
+        FileList.CopyLinkCommand = new AsyncRelayCommand(CopySelectedFileLinkAsync, () => FileList.HasSingleSelection && _session is not null);
+        FileList.CutCommand = new RelayCommand(CutSelectedItems, () => FileList.HasSelection && _session is not null);
+        FileList.CopyFileCommand = new RelayCommand(CopySelectedItems, () => FileList.HasSelection && _session is not null);
         FileList.PasteCommand = new AsyncRelayCommand(PasteRemoteClipboardAsync, CanPasteRemoteClipboard);
         FileList.RefreshCommand = new AsyncRelayCommand(RefreshCurrentDirectoryAsync, CanUseCurrentDirectory);
         FileList.CreateFolderCommand = new AsyncRelayCommand(CreateFolderAsync, CanUseCurrentDirectory);
-        FileList.DeleteCommand = new AsyncRelayCommand(DeleteSelectedItemAsync, () => FileList.SelectedItem is not null && _session is not null);
-        FileList.RenameCommand = new AsyncRelayCommand(RenameSelectedItemAsync, () => FileList.SelectedItem is not null && _session is not null);
+        FileList.DeleteCommand = new AsyncRelayCommand(DeleteSelectedItemAsync, () => FileList.HasSingleSelection && _session is not null);
+        FileList.RenameCommand = new AsyncRelayCommand(RenameSelectedItemAsync, () => FileList.HasSingleSelection && _session is not null);
         Preview.ToggleCommand = new RelayCommand(() => Preview.IsVisible = !Preview.IsVisible);
         Preview.CopyLinkCommand = new AsyncRelayCommand(CopyPreviewLinkAsync, () => Preview.SelectedItem is not null && _session is not null);
     }
@@ -186,9 +189,18 @@ public sealed class ShellViewModel : ObservableObject
         await _previewCoordinator.SelectFileAsync(_session, item, RefreshFileCommands);
     }
 
-    public async Task StartFileDragAsync(object dragSource, FileItemViewModel? item)
+    public async Task StartFileDragAsync(
+        object dragSource,
+        FileItemViewModel? item,
+        IReadOnlyList<RemoteFileItem>? preservedSelection = null
+    )
     {
-        await _fileDragDropCoordinator.StartFileDragAsync(_session, dragSource, item);
+        await _fileDragDropCoordinator.StartFileDragAsync(
+            _session,
+            dragSource,
+            item,
+            preservedSelection
+        );
     }
 
     public async Task UploadDroppedFilesAsync(IReadOnlyList<string> localPaths)
@@ -198,6 +210,38 @@ public sealed class ShellViewModel : ObservableObject
             _directoryNavigationCoordinator.CurrentShare,
             _directoryNavigationCoordinator.CurrentPath,
             localPaths,
+            RefreshCurrentDirectoryAsync
+        );
+    }
+
+    public DragDropEffects GetRemoteDropEffect(
+        RemoteDragPayload? payload,
+        string targetShare,
+        string targetDirectory,
+        bool copyRequested
+    )
+    {
+        return _fileDragDropCoordinator.GetRemoteDropEffect(
+            payload,
+            targetShare,
+            targetDirectory,
+            copyRequested
+        );
+    }
+
+    public async Task DropRemoteItemsAsync(
+        RemoteDragPayload payload,
+        string targetShare,
+        string targetDirectory,
+        bool copyRequested
+    )
+    {
+        await _fileDragDropCoordinator.DropRemoteItemsAsync(
+            _session,
+            payload,
+            targetShare,
+            targetDirectory,
+            copyRequested,
             RefreshCurrentDirectoryAsync
         );
     }
@@ -540,25 +584,27 @@ public sealed class ShellViewModel : ObservableObject
         }
     }
 
-    private void CutSelectedItem()
+    private void CutSelectedItems()
     {
-        if (FileList.SelectedItem?.Item is not { } item)
+        var items = FileList.SelectedRemoteItems;
+        if (items.Count == 0)
         {
             return;
         }
 
-        Status.Message = _remoteClipboardCoordinator.Cut(item);
+        Status.Message = _remoteClipboardCoordinator.Cut(items);
         RefreshFileCommands();
     }
 
-    private void CopySelectedItem()
+    private void CopySelectedItems()
     {
-        if (FileList.SelectedItem?.Item is not { } item)
+        var items = FileList.SelectedRemoteItems;
+        if (items.Count == 0)
         {
             return;
         }
 
-        Status.Message = _remoteClipboardCoordinator.Copy(item);
+        Status.Message = _remoteClipboardCoordinator.Copy(items);
         RefreshFileCommands();
     }
 

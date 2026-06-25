@@ -55,6 +55,7 @@
 
             <ListView ItemsSource="{Binding Items}"
                       SelectedItem="{Binding SelectedItem, Mode=TwoWay}"
+                      SelectionMode="Extended"
                       AllowDrop="True"
                       PreviewMouseLeftButtonDown="ListView_OnPreviewMouseLeftButtonDown"
                       PreviewMouseMove="ListView_OnPreviewMouseMove"

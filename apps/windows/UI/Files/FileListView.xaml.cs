@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using Rynat.WindowsClient.Domain;
 using Rynat.WindowsClient.UI.Shell;
 
 namespace Rynat.WindowsClient.UI.Files;
@@ -10,6 +11,7 @@ public partial class FileListView : UserControl
 {
     private Point? _dragStartPoint;
     private FileItemViewModel? _dragStartItem;
+    private IReadOnlyList<RemoteFileItem>? _dragStartSelection;
 
     public FileListView()
     {
@@ -23,11 +25,19 @@ public partial class FileListView : UserControl
         {
             _dragStartPoint = null;
             _dragStartItem = null;
+            _dragStartSelection = null;
             return;
         }
 
         _dragStartPoint = e.GetPosition(this);
         _dragStartItem = fileItem;
+        _dragStartSelection = DataContext is FileListViewModel viewModel
+            && item.IsSelected
+            && viewModel.SelectedRemoteItems.Any(selected =>
+                selected.Share.Equals(fileItem.Item.Share, StringComparison.OrdinalIgnoreCase)
+                && NormalizeDirectoryPath(selected.Path).Equals(NormalizeDirectoryPath(fileItem.Item.Path), StringComparison.OrdinalIgnoreCase))
+                ? viewModel.SelectedRemoteItems.ToArray()
+                : null;
     }
 
     private async void ListView_OnPreviewMouseMove(object sender, MouseEventArgs e)
@@ -47,15 +57,31 @@ public partial class FileListView : UserControl
         }
 
         _dragStartPoint = null;
+        var preservedSelection = _dragStartSelection;
         _dragStartItem = null;
+        _dragStartSelection = null;
         if (FindShellViewModel() is { } shell)
         {
-            await shell.StartFileDragAsync(this, dragItem);
+            await shell.StartFileDragAsync(this, dragItem, preservedSelection);
         }
     }
 
     private void ListView_OnDragOver(object sender, DragEventArgs e)
     {
+        if (TryGetRemotePayload(e, out var payload)
+            && TryGetDirectoryDropTarget(e, out var target)
+            && FindShellViewModel() is { } shell)
+        {
+            e.Effects = shell.GetRemoteDropEffect(
+                payload,
+                target.Share,
+                target.Path,
+                IsCopyRequested(e)
+            );
+            e.Handled = true;
+            return;
+        }
+
         e.Effects = HasFileDrop(e) ? DragDropEffects.Copy : DragDropEffects.None;
         e.Handled = true;
     }
@@ -63,6 +89,19 @@ public partial class FileListView : UserControl
     private async void ListView_OnDrop(object sender, DragEventArgs e)
     {
         e.Handled = true;
+        if (TryGetRemotePayload(e, out var payload)
+            && TryGetDirectoryDropTarget(e, out var target)
+            && FindShellViewModel() is { } remoteShell)
+        {
+            await remoteShell.DropRemoteItemsAsync(
+                payload,
+                target.Share,
+                target.Path,
+                IsCopyRequested(e)
+            );
+            return;
+        }
+
         if (!HasFileDrop(e) || e.Data.GetData(DataFormats.FileDrop) is not string[] paths)
         {
             return;
@@ -76,6 +115,51 @@ public partial class FileListView : UserControl
 
     private static bool HasFileDrop(DragEventArgs e) =>
         e.Data.GetDataPresent(DataFormats.FileDrop);
+
+    private static bool TryGetRemotePayload(DragEventArgs e, out RemoteDragPayload payload)
+    {
+        payload = null!;
+        if (!e.Data.GetDataPresent(RemoteDragPayload.DataFormat)
+            || e.Data.GetData(RemoteDragPayload.DataFormat) is not RemoteDragPayload remotePayload)
+        {
+            return false;
+        }
+
+        payload = remotePayload;
+        return true;
+    }
+
+    private static bool TryGetDirectoryDropTarget(
+        DragEventArgs e,
+        out RemoteFileItem target
+    )
+    {
+        target = null!;
+        var item = FindAncestor<ListViewItem>((DependencyObject)e.OriginalSource);
+        if (item?.DataContext is not FileItemViewModel { Item.IsDirectory: true } fileItem)
+        {
+            return false;
+        }
+
+        target = fileItem.Item;
+        return true;
+    }
+
+    private static bool IsCopyRequested(DragEventArgs e)
+    {
+        return e.KeyStates.HasFlag(DragDropKeyStates.ControlKey);
+    }
+
+    private static string NormalizeDirectoryPath(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path) || path == "/")
+        {
+            return "/";
+        }
+
+        var normalized = path.Replace('\\', '/').Trim().TrimEnd('/');
+        return normalized.StartsWith('/') ? normalized : "/" + normalized;
+    }
 
     private void ListView_OnKeyDown(object sender, KeyEventArgs e)
     {
@@ -154,7 +238,16 @@ public partial class FileListView : UserControl
             return;
         }
 
-        item.IsSelected = true;
+        if (!item.IsSelected)
+        {
+            if (sender is ListView listView)
+            {
+                listView.SelectedItems.Clear();
+            }
+
+            item.IsSelected = true;
+        }
+
         item.Focus();
     }
 
@@ -163,6 +256,11 @@ public partial class FileListView : UserControl
         if (DataContext is not FileListViewModel viewModel)
         {
             return;
+        }
+
+        if (sender is ListView listView)
+        {
+            viewModel.ReplaceSelectedItems(listView.SelectedItems.OfType<FileItemViewModel>());
         }
 
         if (FindShellViewModel() is { } shell)
