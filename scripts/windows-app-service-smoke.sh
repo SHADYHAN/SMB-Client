@@ -262,6 +262,7 @@ assert_file_contains "$thumbnail_service_interface" 'TryCreateThumbnail' 'thumbn
 assert_file_contains "$windows_thumbnail_service" 'IShellItemImageFactory' 'Windows thumbnail service uses shell thumbnail extraction'
 assert_file_contains "$windows_thumbnail_service" 'SHCreateItemFromParsingName' 'Windows thumbnail service creates shell items from local paths'
 assert_file_contains "$windows_thumbnail_service" 'DeleteObject' 'Windows thumbnail service releases shell HBITMAP handles'
+assert_file_contains "$windows_thumbnail_service" 'using System\.IO;' 'Windows thumbnail service imports file-system helpers'
 assert_file_contains "$preview_pane_view" 'ShouldShowImagePreview' 'preview pane shows video poster before playback'
 assert_file_contains "$preview_pane_view" 'ShouldShowVideoPreview' 'preview pane shows video control only during playback'
 assert_file_contains "$preview_pane_view_model" 'IsVideoPlaying' 'preview state tracks video playback display mode'

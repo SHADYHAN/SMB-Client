@@ -274,6 +274,7 @@ Assert-FileContains -Path $thumbnailServiceInterface -Pattern "TryCreateThumbnai
 Assert-FileContains -Path $windowsThumbnailService -Pattern "IShellItemImageFactory" -Description "Windows thumbnail service uses shell thumbnail extraction"
 Assert-FileContains -Path $windowsThumbnailService -Pattern "SHCreateItemFromParsingName" -Description "Windows thumbnail service creates shell items from local paths"
 Assert-FileContains -Path $windowsThumbnailService -Pattern "DeleteObject" -Description "Windows thumbnail service releases shell HBITMAP handles"
+Assert-FileContains -Path $windowsThumbnailService -Pattern "using System\.IO;" -Description "Windows thumbnail service imports file-system helpers"
 Assert-FileContains -Path $previewPaneView -Pattern "ShouldShowImagePreview" -Description "preview pane shows video poster before playback"
 Assert-FileContains -Path $previewPaneView -Pattern "ShouldShowVideoPreview" -Description "preview pane shows video control only during playback"
 Assert-FileContains -Path $previewPaneViewModel -Pattern "IsVideoPlaying" -Description "preview state tracks video playback display mode"
