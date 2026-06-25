@@ -214,6 +214,10 @@ public partial class FileListView : UserControl
         {
             switch (e.Key)
             {
+                case Key.A when sender is ListView listView:
+                    listView.SelectAll();
+                    e.Handled = true;
+                    return;
                 case Key.X when viewModel.CutCommand.CanExecute(null):
                     viewModel.CutCommand.Execute(null);
                     e.Handled = true;
@@ -244,6 +248,10 @@ public partial class FileListView : UserControl
 
         switch (e.Key)
         {
+            case Key.Escape:
+                ClearSearchOrSelection(viewModel, sender as ListView);
+                e.Handled = true;
+                break;
             case Key.Enter when viewModel.OpenItemCommand.CanExecute(null):
                 viewModel.OpenItemCommand.Execute(null);
                 e.Handled = true;
@@ -261,6 +269,30 @@ public partial class FileListView : UserControl
                 e.Handled = true;
                 break;
         }
+    }
+
+    private void SearchBox_OnKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Escape || DataContext is not FileListViewModel viewModel)
+        {
+            return;
+        }
+
+        ClearSearchOrSelection(viewModel, FilesListView);
+        e.Handled = true;
+    }
+
+    private void ClearSearchOrSelection(FileListViewModel viewModel, ListView? listView)
+    {
+        if (!string.IsNullOrEmpty(viewModel.SearchText))
+        {
+            viewModel.SearchText = string.Empty;
+            listView?.Focus();
+            return;
+        }
+
+        listView?.SelectedItems.Clear();
+        viewModel.SelectedItem = null;
     }
 
     private void ListView_OnMouseDoubleClick(object sender, MouseButtonEventArgs e)

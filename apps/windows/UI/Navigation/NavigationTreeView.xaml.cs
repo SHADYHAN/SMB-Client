@@ -9,6 +9,8 @@ namespace Rynat.WindowsClient.UI.Navigation;
 
 public partial class NavigationTreeView : UserControl
 {
+    private NavigationNodeViewModel? _remoteDropTarget;
+
     public NavigationTreeView()
     {
         InitializeComponent();
@@ -79,12 +81,22 @@ public partial class NavigationTreeView : UserControl
                 target.Path,
                 IsCopyRequested(e)
             );
+            SetRemoteDropTarget(e.Effects == DragDropEffects.None ? null : target);
             e.Handled = true;
             return;
         }
 
+        SetRemoteDropTarget(null);
         e.Effects = DragDropEffects.None;
         e.Handled = true;
+    }
+
+    private void TreeView_OnDragLeave(object sender, DragEventArgs e)
+    {
+        if (!IsMouseWithin((FrameworkElement)sender, e))
+        {
+            SetRemoteDropTarget(null);
+        }
     }
 
     private async void TreeView_OnDrop(object sender, DragEventArgs e)
@@ -94,15 +106,46 @@ public partial class NavigationTreeView : UserControl
             || !TryGetNavigationDropTarget(e, out var target)
             || FindShellViewModel() is not { } shell)
         {
+            SetRemoteDropTarget(null);
             return;
         }
 
+        SetRemoteDropTarget(null);
         await shell.DropRemoteItemsAsync(
             payload,
             target.Share,
             target.Path,
             IsCopyRequested(e)
         );
+    }
+
+    private void SetRemoteDropTarget(NavigationNodeViewModel? target)
+    {
+        if (ReferenceEquals(_remoteDropTarget, target))
+        {
+            return;
+        }
+
+        if (_remoteDropTarget is not null)
+        {
+            _remoteDropTarget.RemoteDropState = NavigationDropState.None;
+        }
+
+        _remoteDropTarget = target;
+
+        if (_remoteDropTarget is not null)
+        {
+            _remoteDropTarget.RemoteDropState = NavigationDropState.ValidTarget;
+        }
+    }
+
+    private static bool IsMouseWithin(FrameworkElement element, DragEventArgs e)
+    {
+        var point = e.GetPosition(element);
+        return point.X >= 0
+            && point.Y >= 0
+            && point.X <= element.ActualWidth
+            && point.Y <= element.ActualHeight;
     }
 
     private static T? FindAncestor<T>(DependencyObject? current) where T : DependencyObject

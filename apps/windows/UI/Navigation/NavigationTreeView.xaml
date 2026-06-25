@@ -14,6 +14,7 @@
                       MouseDoubleClick="TreeView_OnMouseDoubleClick"
                       AllowDrop="True"
                       DragOver="TreeView_OnDragOver"
+                      DragLeave="TreeView_OnDragLeave"
                       Drop="TreeView_OnDrop"
                       BorderThickness="0"
                       Background="Transparent">
@@ -21,6 +22,16 @@
                     <Style TargetType="TreeViewItem">
                         <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
                         <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}" />
+                        <Setter Property="Margin" Value="0,1" />
+                        <Setter Property="BorderThickness" Value="1" />
+                        <Setter Property="BorderBrush" Value="Transparent" />
+                        <Setter Property="Background" Value="Transparent" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding RemoteDropState}" Value="{x:Static navigation:NavigationDropState.ValidTarget}">
+                                <Setter Property="Background" Value="{StaticResource AccentSoftBrush}" />
+                                <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+                            </DataTrigger>
+                        </Style.Triggers>
                     </Style>
                 </TreeView.ItemContainerStyle>
                 <TreeView.Resources>

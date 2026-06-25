@@ -51,10 +51,12 @@
                          Padding="8,4"
                          Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
                          VerticalContentAlignment="Center"
+                         KeyDown="SearchBox_OnKeyDown"
                          ToolTip="搜索当前目录" />
             </Grid>
 
-            <ListView ItemsSource="{Binding Items}"
+            <ListView x:Name="FilesListView"
+                      ItemsSource="{Binding Items}"
                       SelectedItem="{Binding SelectedItem, Mode=TwoWay}"
                       SelectionMode="Extended"
                       AllowDrop="True"

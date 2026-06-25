@@ -96,13 +96,13 @@ public sealed class ShellViewModel : ObservableObject
         Login.ServerSettingsCommand = new AsyncRelayCommand(OpenServerSettingsAsync, () => !Login.IsBusy);
         FileList.OpenItemCommand = new AsyncRelayCommand(OpenSelectedItemAsync, () => FileList.HasSingleSelection);
         FileList.CopyLinkCommand = new AsyncRelayCommand(CopySelectedFileLinkAsync, () => FileList.HasSingleSelection && _session is not null);
-        FileList.CutCommand = new RelayCommand(CutSelectedItems, () => FileList.HasSelection && _session is not null);
-        FileList.CopyFileCommand = new RelayCommand(CopySelectedItems, () => FileList.HasSelection && _session is not null);
+        FileList.CutCommand = new RelayCommand(CutSelectedItems, () => FileList.HasWritableSelection && _session is not null);
+        FileList.CopyFileCommand = new RelayCommand(CopySelectedItems, () => FileList.HasWritableSelection && _session is not null);
         FileList.PasteCommand = new AsyncRelayCommand(PasteRemoteClipboardAsync, CanPasteRemoteClipboard);
-        FileList.RefreshCommand = new AsyncRelayCommand(RefreshCurrentDirectoryAsync, CanUseCurrentDirectory);
+        FileList.RefreshCommand = new AsyncRelayCommand(RefreshCurrentDirectoryAsync, CanRefreshCurrentView);
         FileList.CreateFolderCommand = new AsyncRelayCommand(CreateFolderAsync, CanUseCurrentDirectory);
-        FileList.DeleteCommand = new AsyncRelayCommand(DeleteSelectedItemAsync, () => FileList.HasSingleSelection && _session is not null);
-        FileList.RenameCommand = new AsyncRelayCommand(RenameSelectedItemAsync, () => FileList.HasSingleSelection && _session is not null);
+        FileList.DeleteCommand = new AsyncRelayCommand(DeleteSelectedItemAsync, () => FileList.HasSingleWritableSelection && _session is not null);
+        FileList.RenameCommand = new AsyncRelayCommand(RenameSelectedItemAsync, () => FileList.HasSingleWritableSelection && _session is not null);
         Preview.ToggleCommand = new RelayCommand(() => Preview.IsVisible = !Preview.IsVisible);
         Preview.CopyLinkCommand = new AsyncRelayCommand(CopyPreviewLinkAsync, () => Preview.SelectedItem is not null && _session is not null);
     }
@@ -337,7 +337,7 @@ public sealed class ShellViewModel : ObservableObject
         Navigation.LoadShares(_session.Shares);
         IsLoggedIn = true;
         Login.Password = "";
-        FileList.Clear("");
+        FileList.ShowShareRoot(_session);
         Preview.ShowSelection(null);
         RefreshFileCommands();
         Status.Message = $"已连接 {_session.Host}。";
@@ -513,6 +513,14 @@ public sealed class ShellViewModel : ObservableObject
 
     private async Task RefreshCurrentDirectoryAsync()
     {
+        if (_session is not null && FileList.IsShareRootView)
+        {
+            FileList.ShowShareRoot(_session);
+            Status.Message = $"已刷新，共 {_session.Shares.Count} 个共享。";
+            RefreshFileCommands();
+            return;
+        }
+
         await _directoryNavigationCoordinator.RefreshAsync(_session, RefreshFileCommands);
     }
 
@@ -699,7 +707,11 @@ public sealed class ShellViewModel : ObservableObject
         }
     }
 
-    private bool CanUseCurrentDirectory() => _session is not null && _directoryNavigationCoordinator.HasCurrentDirectory;
+    private bool CanRefreshCurrentView() => _session is not null
+        && (_directoryNavigationCoordinator.HasCurrentDirectory || FileList.IsShareRootView);
+
+    private bool CanUseCurrentDirectory() => _session is not null
+        && _directoryNavigationCoordinator.HasCurrentDirectory;
 
     private bool CanPasteRemoteClipboard() => CanUseCurrentDirectory() && _remoteClipboardCoordinator.CanPaste;
 
@@ -708,6 +720,12 @@ public sealed class ShellViewModel : ObservableObject
         var selected = FileList.SelectedItem?.Item;
         if (selected is null || !selected.IsDirectory)
         {
+            return;
+        }
+
+        if (selected.IsShareRoot)
+        {
+            await LoadDirectoryAsync(selected.Share, "/", null, expandNavigationNode: false);
             return;
         }
 

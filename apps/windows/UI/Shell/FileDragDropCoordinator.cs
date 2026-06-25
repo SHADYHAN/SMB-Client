@@ -58,7 +58,7 @@ public sealed class FileDragDropCoordinator
         }
 
         var selectedItems = DragSelectionFor(item, preservedSelection);
-        if (selectedItems.Count == 0)
+        if (selectedItems.Count == 0 || selectedItems.Any(selected => selected.IsShareRoot))
         {
             return;
         }

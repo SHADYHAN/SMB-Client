@@ -29,6 +29,7 @@ This is the active WPF client for the rebuilt Windows line. It currently include
 - Login and saved-server bootstrap
 - Server settings dialog
 - SMB session connection and share navigation
+- Login lands on an "全部共享" virtual root in the content pane, matching the macOS share-root directory model.
 - Explorer-style navigation tree basics
 - File list with refresh, search, rename, delete, create folder, and copy link
 - Multi-select remote cut/copy/paste with same-name overwrite confirmation
@@ -52,7 +53,8 @@ Remaining feature migration should be added module by module rather than porting
 - Cross-platform WPF static smoke checks cover startup arguments, local redirect, protocol registration, and single-instance forwarding.
 - Remote copy/move logic is isolated in `RemoteCopyMoveService`, and shell paste state is isolated in `RemoteClipboardCoordinator`.
 - Remote cut/copy/paste supports extended multi-selection in the file list.
-- Internal remote drag/drop publishes a Windows-local payload and commits through `FileDragDropCoordinator`.
+- File-list keyboard polish includes Ctrl+A for selecting visible rows and Esc for leaving search / clearing selection.
+- Internal remote drag/drop publishes a Windows-local payload and commits through `FileDragDropCoordinator`; file-list and navigation-tree drop targets now both show valid-target hover feedback.
 - Link startup parsing, pending activation, and session matching are isolated in `LinkActivationCoordinator`.
 - Directory loading, current path/share state, and navigation-tree selection are isolated in `DirectoryNavigationCoordinator`.
 - File selection preview loading is isolated in `PreviewCoordinator`.
@@ -65,7 +67,7 @@ Remaining feature migration should be added module by module rather than porting
 Near-term product work:
 
 - Validate and refine in-app remote copy, move, paste, and drag/drop on real Windows SMB shares.
-- Refine internal drag visuals and hover feedback so dragging without a valid cross-directory target remains visual only.
+- Refine cursor feedback and real-device feel for internal drag/drop; invalid targets already avoid hover highlighting and do not commit.
 - Validate and refine shell drag-out visuals and same-name behavior on the Desktop.
 - Decide whether Windows needs the same favorites/quick-link library UI as macOS.
 - Keep the optional browser-extension idea documented: a Chrome/Edge MV3 helper could close `127.0.0.1:19527/s/*` bridge tabs with `chrome.tabs.remove`, but it would only work in browsers where the extension is installed and would not cover DingTalk's embedded WebView.

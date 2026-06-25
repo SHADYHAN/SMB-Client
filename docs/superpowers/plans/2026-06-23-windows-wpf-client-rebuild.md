@@ -18,6 +18,7 @@
   - `UI/` for WPF Views and ViewModels.
 - [x] Add login, auto-login bootstrap, and server settings.
 - [x] Add directory tree, file list, status bar, and preview pane regions.
+- [x] Add a macOS-aligned `全部共享` virtual root so the content pane shows share folders immediately after login.
 - [x] Add basic file operations: refresh, create folder, rename, delete, upload by local drag/drop.
 - [x] Add upload same-name confirmation before replacing.
 - [x] Add fixed quick-link generation and clipboard copy.
@@ -33,6 +34,7 @@
 - Windows build was confirmed by the user after the build script was simplified.
 - Link activation now brings the client to the foreground in the tested cases.
 - Windows copy-link keeps only the plain-text HTTP short link for DingTalk/chat/docs, avoiding DingTalk document rewrites of `rynat://` hrefs.
+- Windows login now lands on a virtual share-root directory in the content pane instead of an empty file area.
 - Local short-link browser requests now return an already-activated close page after activation instead of reopening `rynat://`.
 - Current macOS-side validation also covers `scripts/check-bridge-surface.sh`, `scripts/ffi-smoke-test.sh`, and `scripts/windows-app-service-smoke.sh`.
 - Windows WPF has multi-select remote copy / move / paste plumbing with same-name confirmation, pending Windows SMB validation.
@@ -44,6 +46,8 @@
 - File drag-out and local drop upload coordination are isolated in `FileDragDropCoordinator`.
 - In-app remote drag/drop now uses a Windows-local payload and reuses `RemoteCopyMoveService` for directory-target copy/move.
 - File list remote drag hover now highlights only valid directory drop targets and clears the visual state on invalid targets, leave, or drop.
+- Navigation tree remote drag hover now uses the same valid-target-only highlight and cleanup behavior.
+- File list selection polish now includes Ctrl+A for visible rows and Esc for clearing search / selection.
 - Preview and drag caches have age/size cleanup with stale `.part` removal.
 - Large videos no longer auto-cache for inline preview; smaller cached videos show a Shell-generated poster before playback.
 - Cross-platform WPF static smoke checks cover startup arguments, local redirect, protocol registration, and single-instance forwarding.
@@ -51,12 +55,12 @@
 ## Remaining Product Work
 
 - [ ] Validate and refine remote copy / move / paste / drag/drop on real Windows SMB shares.
-- [ ] Validate and refine in-app drag/drop hover visuals on real Windows, including navigation-tree parity and cursor feedback.
+- [ ] Validate and refine in-app drag/drop hover visuals on real Windows, especially cursor feedback and perceived timing.
 - [ ] Further refine Explorer/Desktop drag-out visuals and same-name overwrite behavior on real Windows.
 - [ ] Improve preview performance: image thumbnails and Shell video posters are in place; validate poster quality across codecs and consider fallback extraction only if needed.
 - [ ] Observe preview/drag cache cleanup behavior during Windows real-use testing.
 - [ ] Add favorites/quick-link library UI if Windows needs parity with macOS favorites.
-- [ ] Add broader keyboard shortcuts and selection polish after real-user testing.
+- [ ] Continue broader keyboard shortcuts and selection polish after real-user testing.
 
 ## Remaining Architecture Work
 

@@ -6,7 +6,8 @@ public sealed record RemoteFileItem(
     string Path,
     RemoteFileKind Kind,
     ulong Size,
-    DateTimeOffset? ModifiedAt
+    DateTimeOffset? ModifiedAt,
+    bool IsShareRoot = false
 )
 {
     public bool IsDirectory => Kind == RemoteFileKind.Directory;

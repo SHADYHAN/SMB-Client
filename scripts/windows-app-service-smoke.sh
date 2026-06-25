@@ -45,8 +45,12 @@ preview_coordinator="$ROOT_DIR/apps/windows/UI/Shell/PreviewCoordinator.cs"
 remote_clipboard_coordinator="$ROOT_DIR/apps/windows/UI/Shell/RemoteClipboardCoordinator.cs"
 main_window="$ROOT_DIR/apps/windows/MainWindow.xaml.cs"
 file_item_view_model="$ROOT_DIR/apps/windows/UI/Files/FileItemViewModel.cs"
+file_list_view_model="$ROOT_DIR/apps/windows/UI/Files/FileListViewModel.cs"
 file_list_xaml="$ROOT_DIR/apps/windows/UI/Files/FileListView.xaml"
 file_list_view="$ROOT_DIR/apps/windows/UI/Files/FileListView.xaml.cs"
+navigation_node_view_model="$ROOT_DIR/apps/windows/UI/Navigation/NavigationNodeViewModel.cs"
+navigation_tree_xaml="$ROOT_DIR/apps/windows/UI/Navigation/NavigationTreeView.xaml"
+navigation_tree_view="$ROOT_DIR/apps/windows/UI/Navigation/NavigationTreeView.xaml.cs"
 preview_pane_view="$ROOT_DIR/apps/windows/UI/Preview/PreviewPaneView.xaml"
 preview_pane_view_model="$ROOT_DIR/apps/windows/UI/Preview/PreviewPaneViewModel.cs"
 file_operation_interface="$ROOT_DIR/apps/windows/Services/FileOperations/IFileOperationService.cs"
@@ -184,6 +188,11 @@ assert_file_contains "$shell_view_model" 'StartFileDragAsync' 'shell starts drag
 assert_file_contains "$shell_view_model" 'GetRemoteDropEffect' 'shell exposes remote drag/drop effect resolution'
 assert_file_contains "$shell_view_model" 'DropRemoteItemsAsync' 'shell exposes remote drag/drop commit workflow'
 assert_file_contains "$shell_view_model" 'FileDragDropCoordinator' 'shell delegates file drag/drop workflow'
+assert_file_contains "$shell_view_model" 'ShowShareRoot\(_session\)' 'shell shows share root directory after login'
+assert_file_contains "$shell_view_model" 'selected\.IsShareRoot' 'shell opens share-root entries as SMB share roots'
+assert_file_contains "$shell_view_model" 'HasWritableSelection' 'shell excludes share roots from remote cut/copy commands'
+assert_file_contains "$shell_view_model" 'HasSingleWritableSelection' 'shell excludes share roots from rename/delete commands'
+assert_file_contains "$shell_view_model" 'CanRefreshCurrentView' 'shell can refresh the virtual share-root view'
 assert_file_contains "$file_drag_drop_coordinator" 'StartFileDragAsync' 'file drag/drop coordinator owns drag-out workflow'
 assert_file_contains "$file_drag_drop_coordinator" 'GetRemoteDropEffect' 'file drag/drop coordinator resolves internal remote drop effects'
 assert_file_contains "$file_drag_drop_coordinator" 'DropRemoteItemsAsync' 'file drag/drop coordinator owns internal remote drop workflow'
@@ -218,12 +227,29 @@ assert_file_contains "$file_list_view" 'e\.Effects == DragDropEffects\.None \? n
 assert_file_contains "$file_list_xaml" 'DragLeave="ListView_OnDragLeave"' 'file list clears drag hover on leave'
 assert_file_contains "$file_list_xaml" 'RemoteDropState\.ValidTarget' 'file list binds valid remote drop target styling'
 assert_file_contains "$file_list_view" 'DataFormats\.FileDrop' 'file list accepts local file drops'
+assert_file_contains "$file_list_xaml" 'x:Name="FilesListView"' 'file list exposes named list for keyboard focus management'
+assert_file_contains "$file_list_xaml" 'KeyDown="SearchBox_OnKeyDown"' 'search box handles escape key'
+assert_file_contains "$file_list_view" 'Key\.A' 'file list handles select-all shortcut'
+assert_file_contains "$file_list_view" 'SelectAll\(\)' 'file list select-all uses WPF selection'
+assert_file_contains "$file_list_view" 'Key\.Escape' 'file list handles escape key'
+assert_file_contains "$file_list_view" 'ClearSearchOrSelection' 'file list escape clears search or selection'
 assert_file_contains "$file_list_view" 'Key\.Delete' 'file list handles delete key'
 assert_file_contains "$file_list_view" 'Key\.F2' 'file list handles rename shortcut'
 assert_file_contains "$file_list_view" 'Key\.F5' 'file list handles refresh shortcut'
 assert_file_contains "$file_list_view" 'Key\.X' 'file list handles cut shortcut'
 assert_file_contains "$file_list_view" 'Key\.C' 'file list handles remote copy shortcut'
 assert_file_contains "$file_list_view" 'Key\.V' 'file list handles paste shortcut'
+assert_file_contains "$file_list_view_model" 'ShowShareRoot' 'file list can show virtual share root entries'
+assert_file_contains "$file_list_view_model" 'IsShareRootView' 'file list tracks virtual share-root view'
+assert_file_contains "$file_list_view_model" 'IsShareRoot: true' 'file list marks share root entries'
+assert_file_contains "$file_list_view_model" 'HasWritableSelection' 'file list distinguishes writable selections'
+assert_file_contains "$file_drag_drop_coordinator" 'selectedItems\.Any\(selected => selected\.IsShareRoot\)' 'drag source excludes share-root entries'
+assert_file_contains "$navigation_node_view_model" 'enum NavigationDropState' 'navigation node tracks remote drop hover state'
+assert_file_contains "$navigation_node_view_model" 'RemoteDropState' 'navigation node exposes remote drop hover state'
+assert_file_contains "$navigation_tree_xaml" 'DragLeave="TreeView_OnDragLeave"' 'navigation tree clears drag hover on leave'
+assert_file_contains "$navigation_tree_xaml" 'NavigationDropState\.ValidTarget' 'navigation tree binds valid remote drop target styling'
+assert_file_contains "$navigation_tree_view" 'SetRemoteDropTarget' 'navigation tree updates remote drop hover state'
+assert_file_contains "$navigation_tree_view" 'e\.Effects == DragDropEffects\.None \? null : target' 'navigation tree highlights only valid remote drop targets'
 
 assert_file_contains "$file_operation_interface" 'CreateDirectoryAsync' 'file operation interface supports create folder'
 assert_file_contains "$file_operation_interface" 'DeleteAsync' 'file operation interface supports delete'

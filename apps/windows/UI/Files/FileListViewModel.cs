@@ -27,6 +27,14 @@ public sealed class FileListViewModel : ObservableObject
 
     public bool HasSingleSelection => _selectedRemoteItems.Count == 1;
 
+    public bool HasWritableSelection => _selectedRemoteItems.Count > 0
+        && _selectedRemoteItems.All(item => !item.IsShareRoot);
+
+    public bool HasSingleWritableSelection => _selectedRemoteItems.Count == 1
+        && !_selectedRemoteItems[0].IsShareRoot;
+
+    public bool IsShareRootView { get; private set; }
+
     public string PathTitle
     {
         get => _pathTitle;
@@ -147,6 +155,7 @@ public sealed class FileListViewModel : ObservableObject
 
     public void ShowDirectory(RemoteDirectory directory)
     {
+        IsShareRootView = false;
         PathTitle = directory.Path == "/"
             ? directory.Share
             : $"{directory.Share}{directory.Path}";
@@ -163,8 +172,32 @@ public sealed class FileListViewModel : ObservableObject
         ApplyFilter();
     }
 
+    public void ShowShareRoot(ServerSession session)
+    {
+        IsShareRootView = true;
+        PathTitle = "全部共享";
+        SearchText = string.Empty;
+        _allItems.Clear();
+
+        foreach (var share in session.Shares.OrderBy(share => share.Name, StringComparer.CurrentCultureIgnoreCase))
+        {
+            _allItems.Add(new FileItemViewModel(new RemoteFileItem(
+                share.Name,
+                share.Name,
+                "/",
+                RemoteFileKind.Directory,
+                0,
+                null,
+                IsShareRoot: true
+            )));
+        }
+
+        ApplyFilter();
+    }
+
     public void Clear(string title)
     {
+        IsShareRootView = false;
         PathTitle = title;
         SearchText = string.Empty;
         _allItems.Clear();
