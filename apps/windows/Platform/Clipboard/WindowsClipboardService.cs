@@ -27,7 +27,7 @@ public sealed class WindowsClipboardService : IClipboardService
         data.SetText(displayUrl, TextDataFormat.Text);
         data.SetText(displayUrl, TextDataFormat.UnicodeText);
         data.SetText(BuildHtmlFragment(displayUrl, activationUrl), TextDataFormat.Html);
-        Clipboard.SetDataObject(data, true);
+        System.Windows.Clipboard.SetDataObject(data, true);
     }
 
     private static string BuildHtmlFragment(string displayUrl, string activationUrl)

@@ -194,6 +194,7 @@ assert_file_contains "$shell_view_model" 'OpenLinkRequestAsync' 'shell opens act
 assert_file_contains "$shell_view_model" 'SetShareLink\(link\.HttpUrl, link\.DeepLinkUrl\)' 'Windows copy-link keeps HTTP text with direct activation metadata'
 assert_file_contains "$windows_clipboard_service" 'TextDataFormat\.Html' 'Windows clipboard publishes rich share-link HTML'
 assert_file_contains "$windows_clipboard_service" 'TextDataFormat\.UnicodeText' 'Windows clipboard keeps a Unicode plain-text share link fallback'
+assert_file_contains "$windows_clipboard_service" 'System\.Windows\.Clipboard\.SetDataObject' 'Windows clipboard avoids project namespace collision'
 assert_file_contains "$windows_clipboard_service" 'StartFragment' 'Windows clipboard builds CF_HTML fragments'
 assert_file_contains "$link_activation_coordinator" 'ActivateStartupArgumentsAsync' 'link activation coordinator parses startup arguments'
 assert_file_contains "$link_activation_coordinator" 'ConsumePendingIfPossibleAsync' 'link activation coordinator owns pending activation'

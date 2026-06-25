@@ -212,6 +212,7 @@ Assert-FileContains -Path $shellViewModel -Pattern "OpenLinkRequestAsync" -Descr
 Assert-FileContains -Path $shellViewModel -Pattern "SetShareLink\(link\.HttpUrl, link\.DeepLinkUrl\)" -Description "Windows copy-link keeps HTTP text with direct activation metadata"
 Assert-FileContains -Path $windowsClipboardService -Pattern "TextDataFormat\.Html" -Description "Windows clipboard publishes rich share-link HTML"
 Assert-FileContains -Path $windowsClipboardService -Pattern "TextDataFormat\.UnicodeText" -Description "Windows clipboard keeps a Unicode plain-text share link fallback"
+Assert-FileContains -Path $windowsClipboardService -Pattern "System\.Windows\.Clipboard\.SetDataObject" -Description "Windows clipboard avoids project namespace collision"
 Assert-FileContains -Path $windowsClipboardService -Pattern "StartFragment" -Description "Windows clipboard builds CF_HTML fragments"
 Assert-FileContains -Path $linkActivationCoordinator -Pattern "ActivateStartupArgumentsAsync" -Description "link activation coordinator parses startup arguments"
 Assert-FileContains -Path $linkActivationCoordinator -Pattern "ConsumePendingIfPossibleAsync" -Description "link activation coordinator owns pending activation"
