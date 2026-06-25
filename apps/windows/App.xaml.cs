@@ -51,7 +51,7 @@ public partial class App : Application
         var bridge = new RynatCoreBridge();
         var protocolRegistrationService = new WindowsProtocolRegistrationService();
         protocolRegistrationService.EnsureRegistered();
-        _localLinkRedirectService = new LocalLinkRedirectService(bridge);
+        _localLinkRedirectService = new LocalLinkRedirectService();
 
         var bootstrapService = new BootstrapService(bridge);
         var sessionService = new SmbSessionService(bridge);

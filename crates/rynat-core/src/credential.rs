@@ -2,6 +2,8 @@ use aes_gcm::aead::{Aead, KeyInit as AeadKeyInit};
 use aes_gcm::{Aes256Gcm, Nonce};
 use hmac::{Hmac, KeyInit as HmacKeyInit, Mac};
 use sha2::Sha256;
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
 use std::sync::OnceLock;
 
 use crate::error::{CoreError, CoreResult};
@@ -190,10 +192,10 @@ fn hostname_from_env() -> Option<String> {
 
 fn system_command(args: &[&str]) -> Option<String> {
     let (program, rest) = args.split_first()?;
-    let output = std::process::Command::new(program)
-        .args(rest)
-        .output()
-        .ok()?;
+    let mut command = std::process::Command::new(program);
+    command.args(rest);
+    configure_system_command(&mut command);
+    let output = command.output().ok()?;
     if !output.status.success() {
         return None;
     }
@@ -202,6 +204,15 @@ fn system_command(args: &[&str]) -> Option<String> {
         .map(|value| value.trim().to_string())
         .filter(|value| !value.is_empty())
 }
+
+#[cfg(target_os = "windows")]
+fn configure_system_command(command: &mut std::process::Command) {
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    command.creation_flags(CREATE_NO_WINDOW);
+}
+
+#[cfg(not(target_os = "windows"))]
+fn configure_system_command(_command: &mut std::process::Command) {}
 
 #[cfg(any(target_os = "macos", test))]
 fn parse_ioplatform_uuid(output: &str) -> Option<String> {

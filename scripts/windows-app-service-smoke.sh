@@ -36,6 +36,7 @@ windows_app="$ROOT_DIR/apps/windows/App.xaml.cs"
 native_methods="$ROOT_DIR/apps/windows/CoreAdapter/NativeMethods.cs"
 core_bridge="$ROOT_DIR/apps/windows/CoreAdapter/RynatCoreBridge.cs"
 json_context="$ROOT_DIR/apps/windows/CoreAdapter/RynatJsonContext.cs"
+core_credential="$ROOT_DIR/crates/rynat-core/src/credential.rs"
 shell_view_model="$ROOT_DIR/apps/windows/UI/Shell/ShellViewModel.cs"
 directory_navigation_coordinator="$ROOT_DIR/apps/windows/UI/Shell/DirectoryNavigationCoordinator.cs"
 file_drag_drop_coordinator="$ROOT_DIR/apps/windows/UI/Shell/FileDragDropCoordinator.cs"
@@ -133,7 +134,7 @@ assert_file_contains "$windows_app" 'new QuickLinkService\(bridge\)' 'QuickLinkS
 assert_file_contains "$windows_app" 'new LinkActivationService\(bridge\)' 'LinkActivationService registered'
 assert_file_contains "$windows_app" 'new PreviewService\(bridge\)' 'PreviewService registered'
 assert_file_contains "$windows_app" 'new ServerProfileService\(bridge\)' 'ServerProfileService registered'
-assert_file_contains "$windows_app" 'new LocalLinkRedirectService\(bridge\)' 'local HTTP redirect service registered'
+assert_file_contains "$windows_app" 'new LocalLinkRedirectService\(\)' 'local HTTP redirect service registered'
 assert_file_contains "$windows_app" 'WindowsSingleInstanceService' 'single-instance service registered'
 assert_file_contains "$windows_app" 'WindowsWindowForegroundService' 'foreground activation adapter registered'
 assert_file_contains "$main_window" 'ShellViewModel' 'MainWindow depends only on shell view model'
@@ -146,6 +147,7 @@ assert_file_contains "$core_bridge" 'public SmbWriteResult SmbCopyFile' 'C# brid
 assert_file_contains "$core_bridge" 'public SmbTaskStartResult SmbStartTask' 'C# bridge wraps task start'
 assert_file_contains "$json_context" 'JsonSerializable\(typeof\(SmbCopyFileRequest\)\)' 'JSON source generation covers copy request'
 assert_file_contains "$json_context" 'JsonSerializable\(typeof\(BridgeResponse<SmbTaskStatus>\)\)' 'JSON source generation covers task status'
+assert_file_contains "$core_credential" 'CREATE_NO_WINDOW' 'Windows credential helper commands run without a visible console'
 
 printf 'Checking WPF feature plumbing...\n'
 
@@ -188,6 +190,7 @@ assert_file_contains "$shell_view_model" 'PreviewCoordinator' 'shell delegates p
 assert_file_contains "$shell_view_model" 'ActivateExternalArgumentsAsync' 'shell accepts external activation'
 assert_file_contains "$shell_view_model" 'LinkActivationCoordinator' 'shell delegates link activation workflow'
 assert_file_contains "$shell_view_model" 'OpenLinkRequestAsync' 'shell opens activated links'
+assert_file_contains "$shell_view_model" 'SetText\(link\.HttpUrl\)' 'Windows copy-link uses document-friendly HTTP share links'
 assert_file_contains "$link_activation_coordinator" 'ActivateStartupArgumentsAsync' 'link activation coordinator parses startup arguments'
 assert_file_contains "$link_activation_coordinator" 'ConsumePendingIfPossibleAsync' 'link activation coordinator owns pending activation'
 assert_file_contains "$link_activation_coordinator" 'CanOpenWithSession' 'link activation coordinator checks active session'
@@ -270,7 +273,8 @@ assert_file_contains "$local_redirect_service" 'GET' 'local redirect only accept
 assert_file_contains "$local_redirect_service" 'Uri\.TryCreate' 'local redirect parses local URL safely'
 assert_file_contains "$local_redirect_service" 'rynat://s' 'local redirect emits rynat deep link'
 assert_file_contains "$local_redirect_service" '404 Not Found' 'local redirect rejects unsupported paths'
-assert_file_contains "$local_redirect_service" 'AlreadyActivated:\s*true' 'local redirect returns already-activated close page'
+assert_file_contains "$local_redirect_service" '204 No Content' 'local redirect acknowledges activated links without a browser close page'
+assert_file_contains "$local_redirect_service" 'Cache-Control: no-store' 'local redirect disables caching for activation responses'
 
 assert_file_contains "$single_instance_service" 'MutexName' 'single-instance uses mutex'
 assert_file_contains "$single_instance_service" 'PipeName' 'single-instance uses named pipe'

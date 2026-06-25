@@ -22,7 +22,7 @@
 - [x] Add upload same-name confirmation before replacing.
 - [x] Add fixed quick-link generation and clipboard copy.
 - [x] Add link activation flow: `rynat://`, local HTTP redirect, single-instance forwarding, and foreground activation.
-- [x] Add compact `/s/<code>` link support and local browser tab close page for already-activated links.
+- [x] Add compact `/s/<code>` link support and local `204 No Content` acknowledgement for already-activated links.
 - [x] Add basic image/video preview cache and playback panel.
 - [x] Add virtual-file drag-out foundation for downloading files to Explorer/Desktop.
 - [x] Add one-click Windows pull/build/run scripts.
@@ -32,7 +32,8 @@
 - `cargo test -p rynat-core` passes locally: 79 tests.
 - Windows build was confirmed by the user after the build script was simplified.
 - Link activation now brings the client to the foreground in the tested cases.
-- Local short-link browser tabs now return an already-activated close page instead of reopening `rynat://`.
+- Windows copy-link keeps the HTTP short link so DingTalk/chat/docs can recognize it as clickable.
+- Local short-link browser requests now return `204 No Content` after activation instead of rendering a script-close page or reopening `rynat://`.
 - Current macOS-side validation also covers `scripts/check-bridge-surface.sh`, `scripts/ffi-smoke-test.sh`, and `scripts/windows-app-service-smoke.sh`.
 - Windows WPF has multi-select remote copy / move / paste plumbing with same-name confirmation, pending Windows SMB validation.
 - Remote copy/move implementation is isolated in `RemoteCopyMoveService`; paste state and conflict flow are isolated in `RemoteClipboardCoordinator`.

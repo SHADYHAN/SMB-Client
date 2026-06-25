@@ -46,7 +46,8 @@ Remaining feature migration should be added module by module rather than porting
 - Windows build and runtime flow has been validated through the one-click script.
 - Link activation works through `rynat://`, local HTTP redirect, single-instance forwarding, and foreground activation.
 - Compact `/s/<code>` quick links are supported.
-- Local short-link pages now close through an already-activated page instead of reopening the protocol.
+- Windows copy-link keeps the document-friendly HTTP share link so DingTalk/chat/docs can recognize it as clickable.
+- Local short-link requests now return `204 No Content` after activation instead of rendering a script-close page or reopening the protocol.
 - WPF smoke checks now target the current `CoreAdapter` / `Services` / `Platform` / `UI` layout instead of the old WinUI app-services tree.
 - Cross-platform WPF static smoke checks cover startup arguments, local redirect, protocol registration, and single-instance forwarding.
 - Remote copy/move logic is isolated in `RemoteCopyMoveService`, and shell paste state is isolated in `RemoteClipboardCoordinator`.
