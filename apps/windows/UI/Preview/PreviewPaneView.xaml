@@ -48,7 +48,7 @@
                                 <Style TargetType="Image">
                                     <Setter Property="Visibility" Value="Collapsed" />
                                     <Style.Triggers>
-                                        <DataTrigger Binding="{Binding HasImagePreview}" Value="True">
+                                        <DataTrigger Binding="{Binding ShouldShowImagePreview}" Value="True">
                                             <Setter Property="Visibility" Value="Visible" />
                                         </DataTrigger>
                                     </Style.Triggers>
@@ -65,7 +65,7 @@
                                 <Style TargetType="MediaElement">
                                     <Setter Property="Visibility" Value="Collapsed" />
                                     <Style.Triggers>
-                                        <DataTrigger Binding="{Binding HasVideoPreview}" Value="True">
+                                        <DataTrigger Binding="{Binding ShouldShowVideoPreview}" Value="True">
                                             <Setter Property="Visibility" Value="Visible" />
                                         </DataTrigger>
                                     </Style.Triggers>

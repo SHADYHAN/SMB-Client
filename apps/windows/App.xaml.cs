@@ -51,7 +51,7 @@ public partial class App : Application
         var bridge = new RynatCoreBridge();
         var protocolRegistrationService = new WindowsProtocolRegistrationService();
         protocolRegistrationService.EnsureRegistered();
-        _localLinkRedirectService = new LocalLinkRedirectService();
+        _localLinkRedirectService = new LocalLinkRedirectService(bridge);
 
         var bootstrapService = new BootstrapService(bridge);
         var sessionService = new SmbSessionService(bridge);
@@ -61,7 +61,8 @@ public partial class App : Application
         var fileTransferService = new FileTransferService(bridge);
         var quickLinkService = new QuickLinkService(bridge);
         var linkActivationService = new LinkActivationService(bridge);
-        var previewService = new PreviewService(bridge);
+        var thumbnailService = new WindowsThumbnailService();
+        var previewService = new PreviewService(bridge, thumbnailService);
         var serverProfileService = new ServerProfileService(bridge);
         var clipboardService = new WindowsClipboardService();
         var userDialogService = new WindowsUserDialogService();

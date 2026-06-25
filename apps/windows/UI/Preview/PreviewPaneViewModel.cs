@@ -12,6 +12,7 @@ public sealed class PreviewPaneViewModel : ObservableObject
     private string? _message;
     private string? _localImagePath;
     private string? _localVideoPath;
+    private bool _isVideoPlaying;
     private bool _isLoading;
     private RemoteFileItem? _selectedItem;
     private bool _isVisible = true;
@@ -56,6 +57,8 @@ public sealed class PreviewPaneViewModel : ObservableObject
                 OnPropertyChanged(nameof(LocalImageUri));
                 OnPropertyChanged(nameof(HasImagePreview));
                 OnPropertyChanged(nameof(HasPreviewMedia));
+                OnPropertyChanged(nameof(ShouldShowImagePreview));
+                OnPropertyChanged(nameof(ShouldShowVideoPreview));
                 OnPropertyChanged(nameof(PreviewText));
             }
         }
@@ -71,6 +74,8 @@ public sealed class PreviewPaneViewModel : ObservableObject
                 OnPropertyChanged(nameof(LocalVideoUri));
                 OnPropertyChanged(nameof(HasVideoPreview));
                 OnPropertyChanged(nameof(HasPreviewMedia));
+                OnPropertyChanged(nameof(ShouldShowImagePreview));
+                OnPropertyChanged(nameof(ShouldShowVideoPreview));
                 OnPropertyChanged(nameof(PreviewText));
             }
         }
@@ -96,7 +101,26 @@ public sealed class PreviewPaneViewModel : ObservableObject
 
     public bool HasVideoPreview => !string.IsNullOrWhiteSpace(LocalVideoPath);
 
-    public bool HasPreviewMedia => HasImagePreview || HasVideoPreview;
+    public bool HasPreviewMedia => ShouldShowImagePreview || ShouldShowVideoPreview;
+
+    public bool ShouldShowImagePreview => HasImagePreview && (!HasVideoPreview || !IsVideoPlaying);
+
+    public bool ShouldShowVideoPreview => HasVideoPreview && IsVideoPlaying;
+
+    public bool IsVideoPlaying
+    {
+        get => _isVideoPlaying;
+        set
+        {
+            if (SetProperty(ref _isVideoPlaying, value))
+            {
+                OnPropertyChanged(nameof(ShouldShowImagePreview));
+                OnPropertyChanged(nameof(ShouldShowVideoPreview));
+                OnPropertyChanged(nameof(HasPreviewMedia));
+                OnPropertyChanged(nameof(PreviewText));
+            }
+        }
+    }
 
     public string PreviewText
     {
@@ -153,6 +177,7 @@ public sealed class PreviewPaneViewModel : ObservableObject
         SelectedItem = item;
         LocalImagePath = null;
         LocalVideoPath = null;
+        IsVideoPlaying = false;
         Message = null;
         IsLoading = false;
         if (item is null)
@@ -175,6 +200,7 @@ public sealed class PreviewPaneViewModel : ObservableObject
     {
         LocalImagePath = null;
         LocalVideoPath = null;
+        IsVideoPlaying = false;
         Message = null;
         IsLoading = true;
     }
@@ -186,6 +212,7 @@ public sealed class PreviewPaneViewModel : ObservableObject
         Message = info.Message;
         LocalImagePath = info.LocalImagePath;
         LocalVideoPath = info.LocalVideoPath;
+        IsVideoPlaying = false;
         OnPropertyChanged(nameof(PreviewText));
     }
 
@@ -194,6 +221,7 @@ public sealed class PreviewPaneViewModel : ObservableObject
         IsLoading = false;
         LocalImagePath = null;
         LocalVideoPath = null;
+        IsVideoPlaying = false;
         ContentType = "";
         Message = null;
         OnPropertyChanged(nameof(PreviewText));

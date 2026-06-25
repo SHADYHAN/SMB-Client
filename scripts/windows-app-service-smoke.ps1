@@ -21,17 +21,21 @@ $remoteClipboardCoordinator = Join-Path $root "apps\windows\UI\Shell\RemoteClipb
 $mainWindow = Join-Path $root "apps\windows\MainWindow.xaml.cs"
 $fileListXaml = Join-Path $root "apps\windows\UI\Files\FileListView.xaml"
 $fileListView = Join-Path $root "apps\windows\UI\Files\FileListView.xaml.cs"
+$previewPaneView = Join-Path $root "apps\windows\UI\Preview\PreviewPaneView.xaml"
+$previewPaneViewModel = Join-Path $root "apps\windows\UI\Preview\PreviewPaneViewModel.cs"
 $fileOperationInterface = Join-Path $root "apps\windows\Services\FileOperations\IFileOperationService.cs"
 $fileOperationService = Join-Path $root "apps\windows\Services\FileOperations\FileOperationService.cs"
 $remoteCopyMoveService = Join-Path $root "apps\windows\Services\FileOperations\RemoteCopyMoveService.cs"
 $fileTransferService = Join-Path $root "apps\windows\Services\FileTransfers\FileTransferService.cs"
 $cacheCleanupService = Join-Path $root "apps\windows\Services\Cache\WindowsCacheCleanupService.cs"
 $previewService = Join-Path $root "apps\windows\Services\Preview\PreviewService.cs"
+$thumbnailServiceInterface = Join-Path $root "apps\windows\Services\Preview\IThumbnailService.cs"
 $linkActivationService = Join-Path $root "apps\windows\Services\LinkActivation\LinkActivationService.cs"
 $localRedirectService = Join-Path $root "apps\windows\Platform\Activation\LocalLinkRedirectService.cs"
 $singleInstanceService = Join-Path $root "apps\windows\Platform\Activation\WindowsSingleInstanceService.cs"
 $protocolRegistrationService = Join-Path $root "apps\windows\Platform\Activation\WindowsProtocolRegistrationService.cs"
 $shellDragDropService = Join-Path $root "apps\windows\Platform\Shell\WindowsShellDragDropService.cs"
+$windowsThumbnailService = Join-Path $root "apps\windows\Platform\Shell\WindowsThumbnailService.cs"
 $windowsClipboardService = Join-Path $root "apps\windows\Platform\Clipboard\WindowsClipboardService.cs"
 
 if ([string]::IsNullOrWhiteSpace($BuildOutputDir)) {
@@ -109,6 +113,7 @@ $requiredFiles = @(
     "apps\windows\Services\LinkActivation\LinkActivationService.cs",
     "apps\windows\Services\Links\QuickLinkService.cs",
     "apps\windows\Services\Preview\PreviewService.cs",
+    "apps\windows\Services\Preview\IThumbnailService.cs",
     "apps\windows\Services\Profiles\ServerProfileService.cs",
     "apps\windows\Services\Smb\SmbSessionService.cs",
     "apps\windows\Platform\Activation\LocalLinkRedirectService.cs",
@@ -117,6 +122,7 @@ $requiredFiles = @(
     "apps\windows\Platform\Clipboard\WindowsClipboardService.cs",
     "apps\windows\Platform\Dialogs\WindowsUserDialogService.cs",
     "apps\windows\Platform\Shell\WindowsShellDragDropService.cs",
+    "apps\windows\Platform\Shell\WindowsThumbnailService.cs",
     "apps\windows\Platform\Shell\WindowsWindowForegroundService.cs",
     "apps\windows\UI\Shell\ShellViewModel.cs",
     "apps\windows\UI\Shell\DirectoryNavigationCoordinator.cs",
@@ -151,9 +157,10 @@ Assert-FileContains -Path $windowsApp -Pattern "new FileOperationService\(bridge
 Assert-FileContains -Path $windowsApp -Pattern "new FileTransferService\(bridge\)" -Description "FileTransferService registered"
 Assert-FileContains -Path $windowsApp -Pattern "new QuickLinkService\(bridge\)" -Description "QuickLinkService registered"
 Assert-FileContains -Path $windowsApp -Pattern "new LinkActivationService\(bridge\)" -Description "LinkActivationService registered"
-Assert-FileContains -Path $windowsApp -Pattern "new PreviewService\(bridge\)" -Description "PreviewService registered"
+Assert-FileContains -Path $windowsApp -Pattern "new WindowsThumbnailService\(\)" -Description "Windows thumbnail service registered"
+Assert-FileContains -Path $windowsApp -Pattern "new PreviewService\(bridge, thumbnailService\)" -Description "PreviewService registered"
 Assert-FileContains -Path $windowsApp -Pattern "new ServerProfileService\(bridge\)" -Description "ServerProfileService registered"
-Assert-FileContains -Path $windowsApp -Pattern "new LocalLinkRedirectService\(\)" -Description "local HTTP redirect service registered"
+Assert-FileContains -Path $windowsApp -Pattern "new LocalLinkRedirectService\(bridge\)" -Description "local HTTP redirect service registered"
 Assert-FileContains -Path $windowsApp -Pattern "WindowsSingleInstanceService" -Description "single-instance service registered"
 Assert-FileContains -Path $windowsApp -Pattern "WindowsWindowForegroundService" -Description "foreground activation adapter registered"
 
@@ -209,11 +216,7 @@ Assert-FileContains -Path $shellViewModel -Pattern "PreviewCoordinator" -Descrip
 Assert-FileContains -Path $shellViewModel -Pattern "ActivateExternalArgumentsAsync" -Description "shell accepts external activation"
 Assert-FileContains -Path $shellViewModel -Pattern "LinkActivationCoordinator" -Description "shell delegates link activation workflow"
 Assert-FileContains -Path $shellViewModel -Pattern "OpenLinkRequestAsync" -Description "shell opens activated links"
-Assert-FileContains -Path $shellViewModel -Pattern "SetShareLink\(link\.HttpUrl, link\.DeepLinkUrl\)" -Description "Windows copy-link keeps HTTP text with direct activation metadata"
-Assert-FileContains -Path $windowsClipboardService -Pattern "TextDataFormat\.Html" -Description "Windows clipboard publishes rich share-link HTML"
-Assert-FileContains -Path $windowsClipboardService -Pattern "TextDataFormat\.UnicodeText" -Description "Windows clipboard keeps a Unicode plain-text share link fallback"
-Assert-FileContains -Path $windowsClipboardService -Pattern "System\.Windows\.Clipboard\.SetDataObject" -Description "Windows clipboard avoids project namespace collision"
-Assert-FileContains -Path $windowsClipboardService -Pattern "StartFragment" -Description "Windows clipboard builds CF_HTML fragments"
+Assert-FileContains -Path $shellViewModel -Pattern "SetText\(link\.HttpUrl\)" -Description "Windows copy-link uses document-friendly HTTP share links"
 Assert-FileContains -Path $linkActivationCoordinator -Pattern "ActivateStartupArgumentsAsync" -Description "link activation coordinator parses startup arguments"
 Assert-FileContains -Path $linkActivationCoordinator -Pattern "ConsumePendingIfPossibleAsync" -Description "link activation coordinator owns pending activation"
 Assert-FileContains -Path $linkActivationCoordinator -Pattern "CanOpenWithSession" -Description "link activation coordinator checks active session"
@@ -259,9 +262,21 @@ Assert-FileContains -Path $shellDragDropService -Pattern "RemoteDragPayload\.Dat
 
 Assert-FileContains -Path $previewService -Pattern "PreviewCache" -Description "preview service uses preview cache"
 Assert-FileContains -Path $previewService -Pattern "SmbCacheFile" -Description "preview service caches remote files through core"
+Assert-FileContains -Path $previewService -Pattern "CreateImageThumbnail" -Description "preview service generates lightweight image thumbnails"
+Assert-FileContains -Path $previewService -Pattern "CreateVideoPoster" -Description "preview service generates video poster thumbnails"
+Assert-FileContains -Path $previewService -Pattern "TryCreateThumbnail" -Description "preview service delegates video thumbnails to platform shell"
+Assert-FileContains -Path $previewService -Pattern "DecodePixelWidth" -Description "preview service decodes scaled image previews"
+Assert-FileContains -Path $previewService -Pattern "图片较大，暂不自动缓存预览" -Description "preview service skips large automatic image preview caching"
 Assert-FileContains -Path $previewService -Pattern "InlineVideoPreviewMaxBytes" -Description "preview service caps inline video preview caching"
 Assert-FileContains -Path $previewService -Pattern "暂不自动缓存预览" -Description "preview service skips large automatic video caching"
 Assert-FileContains -Path $previewService -Pattern "maxBytes" -Description "preview service limits preview cache bytes"
+Assert-FileContains -Path $thumbnailServiceInterface -Pattern "TryCreateThumbnail" -Description "thumbnail abstraction exposes platform thumbnail creation"
+Assert-FileContains -Path $windowsThumbnailService -Pattern "IShellItemImageFactory" -Description "Windows thumbnail service uses shell thumbnail extraction"
+Assert-FileContains -Path $windowsThumbnailService -Pattern "SHCreateItemFromParsingName" -Description "Windows thumbnail service creates shell items from local paths"
+Assert-FileContains -Path $windowsThumbnailService -Pattern "DeleteObject" -Description "Windows thumbnail service releases shell HBITMAP handles"
+Assert-FileContains -Path $previewPaneView -Pattern "ShouldShowImagePreview" -Description "preview pane shows video poster before playback"
+Assert-FileContains -Path $previewPaneView -Pattern "ShouldShowVideoPreview" -Description "preview pane shows video control only during playback"
+Assert-FileContains -Path $previewPaneViewModel -Pattern "IsVideoPlaying" -Description "preview state tracks video playback display mode"
 Assert-FileContains -Path $previewService -Pattern "CleanupDirectory" -Description "preview cache cleanup is triggered"
 Assert-FileContains -Path $cacheCleanupService -Pattern "PartialFileMaxAge" -Description "cache cleanup removes stale partial files"
 Assert-FileContains -Path $cacheCleanupService -Pattern "DeleteEmptyDirectories" -Description "cache cleanup prunes empty directories"
@@ -269,8 +284,8 @@ Assert-FileContains -Path $cacheCleanupService -Pattern "DeleteEmptyDirectories"
 Assert-FileContains -Path $linkActivationService -Pattern "rynat://" -Description "link activation accepts rynat protocol"
 Assert-FileContains -Path $linkActivationService -Pattern "http://" -Description "link activation accepts local HTTP links"
 Assert-FileContains -Path $localRedirectService -Pattern "TcpListener" -Description "local redirect owns local HTTP listener"
-Assert-FileContains -Path $localRedirectService -Pattern "204 No Content" -Description "local redirect acknowledges activated links without a browser close page"
-Assert-FileContains -Path $localRedirectService -Pattern "Cache-Control: no-store" -Description "local redirect disables caching for activation responses"
+Assert-FileContains -Path $localRedirectService -Pattern "RedirectPageRequest\(deepLink, AlreadyActivated: true\)" -Description "local redirect serves the already-activated close page"
+Assert-FileContains -Path $localRedirectService -Pattern "text/html; charset=utf-8" -Description "local redirect returns browser-close HTML after activation"
 Assert-FileContains -Path $singleInstanceService -Pattern "NamedPipe" -Description "single-instance forwarding uses named pipes"
 
 Write-Host "Checking Windows activation plumbing..." -ForegroundColor Cyan

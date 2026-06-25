@@ -2,6 +2,7 @@ using System.IO;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using Rynat.Client;
 
 namespace Rynat.WindowsClient.Platform.Activation;
 
@@ -13,9 +14,15 @@ public sealed class LocalLinkRedirectService : ILocalLinkRedirectService
     private TcpListener? _listener;
     private CancellationTokenSource? _cancellation;
     private Task? _serverTask;
+    private readonly RynatCoreBridge _bridge;
     private bool _disposed;
 
     public event EventHandler<ExternalActivationEventArgs>? Activated;
+
+    public LocalLinkRedirectService(RynatCoreBridge bridge)
+    {
+        _bridge = bridge;
+    }
 
     public Task StartAsync(CancellationToken cancellationToken = default)
     {
@@ -104,7 +111,8 @@ public sealed class LocalLinkRedirectService : ILocalLinkRedirectService
                 }
 
                 Activated?.Invoke(this, new ExternalActivationEventArgs(new[] { deepLink }));
-                await WriteEmptyResponseAsync(stream, "204 No Content", timeout.Token);
+                var body = BuildActivationResponseBody(deepLink);
+                await WriteResponseAsync(stream, "200 OK", "text/html; charset=utf-8", body, timeout.Token);
             }
             catch
             {
@@ -180,15 +188,17 @@ public sealed class LocalLinkRedirectService : ILocalLinkRedirectService
         await stream.FlushAsync(cancellationToken);
     }
 
-    private static async Task WriteEmptyResponseAsync(
-        NetworkStream stream,
-        string status,
-        CancellationToken cancellationToken
-    )
+    private string BuildActivationResponseBody(string deepLink)
     {
-        var header = $"HTTP/1.1 {status}\r\nContent-Length: 0\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n";
-        var headerBytes = Encoding.ASCII.GetBytes(header);
-        await stream.WriteAsync(headerBytes, cancellationToken);
-        await stream.FlushAsync(cancellationToken);
+        try
+        {
+            return _bridge.RedirectPage(new RedirectPageRequest(deepLink, AlreadyActivated: true));
+        }
+        catch
+        {
+            return "<!doctype html><html lang=\"zh-CN\"><head><meta charset=\"utf-8\">" +
+                "<title>RYNAT 共享网盘</title></head>" +
+                "<body>已打开 RYNAT 共享网盘，可以关闭此标签页。</body></html>";
+        }
     }
 }

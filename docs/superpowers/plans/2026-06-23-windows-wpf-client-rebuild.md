@@ -22,7 +22,7 @@
 - [x] Add upload same-name confirmation before replacing.
 - [x] Add fixed quick-link generation and clipboard copy.
 - [x] Add link activation flow: `rynat://`, local HTTP redirect, single-instance forwarding, and foreground activation.
-- [x] Add compact `/s/<code>` link support and local `204 No Content` acknowledgement for already-activated links.
+- [x] Add compact `/s/<code>` link support and a local already-activated close page for browser-opened links.
 - [x] Add basic image/video preview cache and playback panel.
 - [x] Add virtual-file drag-out foundation for downloading files to Explorer/Desktop.
 - [x] Add one-click Windows pull/build/run scripts.
@@ -32,10 +32,11 @@
 - `cargo test -p rynat-core` passes locally: 79 tests.
 - Windows build was confirmed by the user after the build script was simplified.
 - Link activation now brings the client to the foreground in the tested cases.
-- Windows copy-link keeps the plain-text HTTP short link for DingTalk/chat/docs, and also publishes rich clipboard HTML whose href points to the `rynat://` direct app link when the paste target preserves it.
-- Local short-link browser requests now return `204 No Content` after activation instead of rendering a script-close page or reopening `rynat://`.
+- Windows copy-link keeps only the plain-text HTTP short link for DingTalk/chat/docs, avoiding DingTalk document rewrites of `rynat://` hrefs.
+- Local short-link browser requests now return an already-activated close page after activation instead of reopening `rynat://`.
 - Current macOS-side validation also covers `scripts/check-bridge-surface.sh`, `scripts/ffi-smoke-test.sh`, and `scripts/windows-app-service-smoke.sh`.
 - Windows WPF has multi-select remote copy / move / paste plumbing with same-name confirmation, pending Windows SMB validation.
+- Windows image previews now generate lightweight local thumbnails; video previews use Windows Shell poster thumbnails before playback; oversized media skips automatic preview caching.
 - Remote copy/move implementation is isolated in `RemoteCopyMoveService`; paste state and conflict flow are isolated in `RemoteClipboardCoordinator`.
 - Link startup parsing, pending activation, and active-session matching are isolated in `LinkActivationCoordinator`.
 - Directory loading, current path/share state, and navigation-tree synchronization are isolated in `DirectoryNavigationCoordinator`.
@@ -44,7 +45,7 @@
 - In-app remote drag/drop now uses a Windows-local payload and reuses `RemoteCopyMoveService` for directory-target copy/move.
 - File list remote drag hover now highlights only valid directory drop targets and clears the visual state on invalid targets, leave, or drop.
 - Preview and drag caches have age/size cleanup with stale `.part` removal.
-- Large videos no longer auto-cache for inline preview; they show a lightweight message until a thumbnail/first-frame path is added.
+- Large videos no longer auto-cache for inline preview; smaller cached videos show a Shell-generated poster before playback.
 - Cross-platform WPF static smoke checks cover startup arguments, local redirect, protocol registration, and single-instance forwarding.
 
 ## Remaining Product Work
@@ -52,7 +53,7 @@
 - [ ] Validate and refine remote copy / move / paste / drag/drop on real Windows SMB shares.
 - [ ] Validate and refine in-app drag/drop hover visuals on real Windows, including navigation-tree parity and cursor feedback.
 - [ ] Further refine Explorer/Desktop drag-out visuals and same-name overwrite behavior on real Windows.
-- [ ] Improve preview performance: add lightweight thumbnail/video first-frame generation instead of relying on full media cache.
+- [ ] Improve preview performance: image thumbnails and Shell video posters are in place; validate poster quality across codecs and consider fallback extraction only if needed.
 - [ ] Observe preview/drag cache cleanup behavior during Windows real-use testing.
 - [ ] Add favorites/quick-link library UI if Windows needs parity with macOS favorites.
 - [ ] Add broader keyboard shortcuts and selection polish after real-user testing.

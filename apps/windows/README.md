@@ -46,8 +46,8 @@ Remaining feature migration should be added module by module rather than porting
 - Windows build and runtime flow has been validated through the one-click script.
 - Link activation works through `rynat://`, local HTTP redirect, single-instance forwarding, and foreground activation.
 - Compact `/s/<code>` quick links are supported.
-- Windows copy-link keeps the plain-text HTTP share link for DingTalk/chat/docs, and also publishes rich clipboard HTML whose href points to the `rynat://` direct app link when the paste target preserves it.
-- Local short-link requests now return `204 No Content` after activation instead of rendering a script-close page or reopening the protocol.
+- Windows copy-link keeps only the document-friendly HTTP share link so DingTalk/chat/docs do not rewrite `rynat://` hrefs into broken web links.
+- Local short-link requests return an already-activated close page after activation instead of reopening the protocol.
 - WPF smoke checks now target the current `CoreAdapter` / `Services` / `Platform` / `UI` layout instead of the old WinUI app-services tree.
 - Cross-platform WPF static smoke checks cover startup arguments, local redirect, protocol registration, and single-instance forwarding.
 - Remote copy/move logic is isolated in `RemoteCopyMoveService`, and shell paste state is isolated in `RemoteClipboardCoordinator`.
@@ -56,8 +56,9 @@ Remaining feature migration should be added module by module rather than porting
 - Link startup parsing, pending activation, and session matching are isolated in `LinkActivationCoordinator`.
 - Directory loading, current path/share state, and navigation-tree selection are isolated in `DirectoryNavigationCoordinator`.
 - File selection preview loading is isolated in `PreviewCoordinator`.
+- Image previews now cache a lightweight local thumbnail; video previews use a Windows Shell poster before playback; oversized images/videos skip automatic preview caching.
 - File drag-out and local drop upload coordination are isolated in `FileDragDropCoordinator`.
-- Preview and drag caches now have age/size cleanup with stale `.part` removal; large videos no longer auto-cache for inline preview.
+- Preview and drag caches now have age/size cleanup with stale `.part` removal; oversized media no longer auto-caches for inline preview.
 
 ## Remaining Work
 
@@ -67,10 +68,11 @@ Near-term product work:
 - Refine internal drag visuals and hover feedback so dragging without a valid cross-directory target remains visual only.
 - Validate and refine shell drag-out visuals and same-name behavior on the Desktop.
 - Decide whether Windows needs the same favorites/quick-link library UI as macOS.
+- Keep the optional browser-extension idea documented: a Chrome/Edge MV3 helper could close `127.0.0.1:19527/s/*` bridge tabs with `chrome.tabs.remove`, but it would only work in browsers where the extension is installed and would not cover DingTalk's embedded WebView.
 
 Follow-up quality work:
 
-- Improve preview performance with thumbnails/video first frames; large videos already avoid automatic inline caching.
+- Observe video poster quality across common codecs; image previews now use lightweight thumbnails and oversized media avoids automatic inline caching.
 - Observe preview/drag cache cleanup behavior during Windows real-use testing.
 - Keep `ShellViewModel` focused on composition and command routing; continue extracting login/server-setting coordination only if it starts to grow.
 - Keep broadening smoke checks when new Windows activation or Shell integration paths are added.

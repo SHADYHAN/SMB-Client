@@ -43,6 +43,11 @@ public partial class PreviewPaneView : UserControl
     {
         VideoPreview.Stop();
         _isVideoPlaying = false;
+        if (DataContext is PreviewPaneViewModel preview)
+        {
+            preview.IsVideoPlaying = false;
+        }
+
         VideoPlayButton.Content = "播放";
     }
 
@@ -52,8 +57,18 @@ public partial class PreviewPaneView : UserControl
         {
             VideoPreview.Pause();
             _isVideoPlaying = false;
+            if (DataContext is PreviewPaneViewModel preview)
+            {
+                preview.IsVideoPlaying = false;
+            }
+
             VideoPlayButton.Content = "播放";
             return;
+        }
+
+        if (DataContext is PreviewPaneViewModel activePreview)
+        {
+            activePreview.IsVideoPlaying = true;
         }
 
         VideoPreview.Play();

@@ -47,17 +47,21 @@ main_window="$ROOT_DIR/apps/windows/MainWindow.xaml.cs"
 file_item_view_model="$ROOT_DIR/apps/windows/UI/Files/FileItemViewModel.cs"
 file_list_xaml="$ROOT_DIR/apps/windows/UI/Files/FileListView.xaml"
 file_list_view="$ROOT_DIR/apps/windows/UI/Files/FileListView.xaml.cs"
+preview_pane_view="$ROOT_DIR/apps/windows/UI/Preview/PreviewPaneView.xaml"
+preview_pane_view_model="$ROOT_DIR/apps/windows/UI/Preview/PreviewPaneViewModel.cs"
 file_operation_interface="$ROOT_DIR/apps/windows/Services/FileOperations/IFileOperationService.cs"
 file_operation_service="$ROOT_DIR/apps/windows/Services/FileOperations/FileOperationService.cs"
 remote_copy_move_service="$ROOT_DIR/apps/windows/Services/FileOperations/RemoteCopyMoveService.cs"
 file_transfer_service="$ROOT_DIR/apps/windows/Services/FileTransfers/FileTransferService.cs"
 cache_cleanup_service="$ROOT_DIR/apps/windows/Services/Cache/WindowsCacheCleanupService.cs"
 preview_service="$ROOT_DIR/apps/windows/Services/Preview/PreviewService.cs"
+thumbnail_service_interface="$ROOT_DIR/apps/windows/Services/Preview/IThumbnailService.cs"
 link_activation_service="$ROOT_DIR/apps/windows/Services/LinkActivation/LinkActivationService.cs"
 local_redirect_service="$ROOT_DIR/apps/windows/Platform/Activation/LocalLinkRedirectService.cs"
 single_instance_service="$ROOT_DIR/apps/windows/Platform/Activation/WindowsSingleInstanceService.cs"
 protocol_registration_service="$ROOT_DIR/apps/windows/Platform/Activation/WindowsProtocolRegistrationService.cs"
 shell_drag_drop_service="$ROOT_DIR/apps/windows/Platform/Shell/WindowsShellDragDropService.cs"
+windows_thumbnail_service="$ROOT_DIR/apps/windows/Platform/Shell/WindowsThumbnailService.cs"
 windows_clipboard_service="$ROOT_DIR/apps/windows/Platform/Clipboard/WindowsClipboardService.cs"
 
 printf 'Checking bridge/header/Swift/C# ABI surface...\n'
@@ -90,6 +94,7 @@ required_files=(
     "apps/windows/Services/LinkActivation/LinkActivationService.cs"
     "apps/windows/Services/Links/QuickLinkService.cs"
     "apps/windows/Services/Preview/PreviewService.cs"
+    "apps/windows/Services/Preview/IThumbnailService.cs"
     "apps/windows/Services/Profiles/ServerProfileService.cs"
     "apps/windows/Services/Smb/SmbSessionService.cs"
     "apps/windows/Platform/Activation/LocalLinkRedirectService.cs"
@@ -98,6 +103,7 @@ required_files=(
     "apps/windows/Platform/Clipboard/WindowsClipboardService.cs"
     "apps/windows/Platform/Dialogs/WindowsUserDialogService.cs"
     "apps/windows/Platform/Shell/WindowsShellDragDropService.cs"
+    "apps/windows/Platform/Shell/WindowsThumbnailService.cs"
     "apps/windows/Platform/Shell/WindowsWindowForegroundService.cs"
     "apps/windows/UI/Shell/ShellViewModel.cs"
     "apps/windows/UI/Shell/DirectoryNavigationCoordinator.cs"
@@ -133,9 +139,10 @@ assert_file_contains "$windows_app" 'new FileOperationService\(bridge\)' 'FileOp
 assert_file_contains "$windows_app" 'new FileTransferService\(bridge\)' 'FileTransferService registered'
 assert_file_contains "$windows_app" 'new QuickLinkService\(bridge\)' 'QuickLinkService registered'
 assert_file_contains "$windows_app" 'new LinkActivationService\(bridge\)' 'LinkActivationService registered'
-assert_file_contains "$windows_app" 'new PreviewService\(bridge\)' 'PreviewService registered'
+assert_file_contains "$windows_app" 'new WindowsThumbnailService\(\)' 'Windows thumbnail service registered'
+assert_file_contains "$windows_app" 'new PreviewService\(bridge, thumbnailService\)' 'PreviewService registered'
 assert_file_contains "$windows_app" 'new ServerProfileService\(bridge\)' 'ServerProfileService registered'
-assert_file_contains "$windows_app" 'new LocalLinkRedirectService\(\)' 'local HTTP redirect service registered'
+assert_file_contains "$windows_app" 'new LocalLinkRedirectService\(bridge\)' 'local HTTP redirect service registered'
 assert_file_contains "$windows_app" 'WindowsSingleInstanceService' 'single-instance service registered'
 assert_file_contains "$windows_app" 'WindowsWindowForegroundService' 'foreground activation adapter registered'
 assert_file_contains "$main_window" 'ShellViewModel' 'MainWindow depends only on shell view model'
@@ -191,11 +198,7 @@ assert_file_contains "$shell_view_model" 'PreviewCoordinator' 'shell delegates p
 assert_file_contains "$shell_view_model" 'ActivateExternalArgumentsAsync' 'shell accepts external activation'
 assert_file_contains "$shell_view_model" 'LinkActivationCoordinator' 'shell delegates link activation workflow'
 assert_file_contains "$shell_view_model" 'OpenLinkRequestAsync' 'shell opens activated links'
-assert_file_contains "$shell_view_model" 'SetShareLink\(link\.HttpUrl, link\.DeepLinkUrl\)' 'Windows copy-link keeps HTTP text with direct activation metadata'
-assert_file_contains "$windows_clipboard_service" 'TextDataFormat\.Html' 'Windows clipboard publishes rich share-link HTML'
-assert_file_contains "$windows_clipboard_service" 'TextDataFormat\.UnicodeText' 'Windows clipboard keeps a Unicode plain-text share link fallback'
-assert_file_contains "$windows_clipboard_service" 'System\.Windows\.Clipboard\.SetDataObject' 'Windows clipboard avoids project namespace collision'
-assert_file_contains "$windows_clipboard_service" 'StartFragment' 'Windows clipboard builds CF_HTML fragments'
+assert_file_contains "$shell_view_model" 'SetText\(link\.HttpUrl\)' 'Windows copy-link uses document-friendly HTTP share links'
 assert_file_contains "$link_activation_coordinator" 'ActivateStartupArgumentsAsync' 'link activation coordinator parses startup arguments'
 assert_file_contains "$link_activation_coordinator" 'ConsumePendingIfPossibleAsync' 'link activation coordinator owns pending activation'
 assert_file_contains "$link_activation_coordinator" 'CanOpenWithSession' 'link activation coordinator checks active session'
@@ -247,9 +250,21 @@ assert_file_contains "$shell_drag_drop_service" 'RemoteDragPayload\.DataFormat' 
 
 assert_file_contains "$preview_service" 'PreviewCache' 'preview service uses preview cache'
 assert_file_contains "$preview_service" 'SmbCacheFile' 'preview service caches remote files through core'
+assert_file_contains "$preview_service" 'CreateImageThumbnail' 'preview service generates lightweight image thumbnails'
+assert_file_contains "$preview_service" 'CreateVideoPoster' 'preview service generates video poster thumbnails'
+assert_file_contains "$preview_service" 'TryCreateThumbnail' 'preview service delegates video thumbnails to platform shell'
+assert_file_contains "$preview_service" 'DecodePixelWidth' 'preview service decodes scaled image previews'
+assert_file_contains "$preview_service" '图片较大，暂不自动缓存预览' 'preview service skips large automatic image preview caching'
 assert_file_contains "$preview_service" 'InlineVideoPreviewMaxBytes' 'preview service caps inline video preview caching'
 assert_file_contains "$preview_service" '暂不自动缓存预览' 'preview service skips large automatic video caching'
 assert_file_contains "$preview_service" 'maxBytes' 'preview service limits preview cache bytes'
+assert_file_contains "$thumbnail_service_interface" 'TryCreateThumbnail' 'thumbnail abstraction exposes platform thumbnail creation'
+assert_file_contains "$windows_thumbnail_service" 'IShellItemImageFactory' 'Windows thumbnail service uses shell thumbnail extraction'
+assert_file_contains "$windows_thumbnail_service" 'SHCreateItemFromParsingName' 'Windows thumbnail service creates shell items from local paths'
+assert_file_contains "$windows_thumbnail_service" 'DeleteObject' 'Windows thumbnail service releases shell HBITMAP handles'
+assert_file_contains "$preview_pane_view" 'ShouldShowImagePreview' 'preview pane shows video poster before playback'
+assert_file_contains "$preview_pane_view" 'ShouldShowVideoPreview' 'preview pane shows video control only during playback'
+assert_file_contains "$preview_pane_view_model" 'IsVideoPlaying' 'preview state tracks video playback display mode'
 assert_file_contains "$preview_service" 'CleanupDirectory' 'preview cache cleanup is triggered'
 assert_file_contains "$cache_cleanup_service" 'PartialFileMaxAge' 'cache cleanup removes stale partial files'
 assert_file_contains "$cache_cleanup_service" 'DeleteEmptyDirectories' 'cache cleanup prunes empty directories'
@@ -278,8 +293,8 @@ assert_file_contains "$local_redirect_service" 'GET' 'local redirect only accept
 assert_file_contains "$local_redirect_service" 'Uri\.TryCreate' 'local redirect parses local URL safely'
 assert_file_contains "$local_redirect_service" 'rynat://s' 'local redirect emits rynat deep link'
 assert_file_contains "$local_redirect_service" '404 Not Found' 'local redirect rejects unsupported paths'
-assert_file_contains "$local_redirect_service" '204 No Content' 'local redirect acknowledges activated links without a browser close page'
-assert_file_contains "$local_redirect_service" 'Cache-Control: no-store' 'local redirect disables caching for activation responses'
+assert_file_contains "$local_redirect_service" 'RedirectPageRequest\(deepLink, AlreadyActivated: true\)' 'local redirect serves the already-activated close page'
+assert_file_contains "$local_redirect_service" 'text/html; charset=utf-8' 'local redirect returns browser-close HTML after activation'
 
 assert_file_contains "$single_instance_service" 'MutexName' 'single-instance uses mutex'
 assert_file_contains "$single_instance_service" 'PipeName' 'single-instance uses named pipe'

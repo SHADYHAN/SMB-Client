@@ -502,7 +502,7 @@ public sealed class ShellViewModel : ObservableObject
         {
             Status.Message = "正在生成链接...";
             var link = await _quickLinkService.BuildAsync(_session, item);
-            _clipboardService.SetShareLink(link.HttpUrl, link.DeepLinkUrl);
+            _clipboardService.SetText(link.HttpUrl);
             Status.Message = "分享链接已复制。";
         }
         catch (Exception ex)

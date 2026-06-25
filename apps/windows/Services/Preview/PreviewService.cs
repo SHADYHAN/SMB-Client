@@ -1,6 +1,7 @@
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
+using System.Windows.Media.Imaging;
 using Rynat.Client;
 using Rynat.WindowsClient.Domain;
 using Rynat.WindowsClient.Services.Cache;
@@ -11,14 +12,18 @@ public sealed class PreviewService : IPreviewService
 {
     private const uint DefaultPreviewEdgePx = 640;
     private const ulong ImagePreviewMaxBytes = 32UL * 1024 * 1024;
+    private const int ImageThumbnailMaxEdgePx = 640;
+    private const int VideoPosterMaxEdgePx = 640;
     private const ulong InlineVideoPreviewMaxBytes = 128UL * 1024 * 1024;
     private const long PreviewCacheMaxBytes = 2L * 1024 * 1024 * 1024;
     private static readonly TimeSpan PreviewCacheMaxAge = TimeSpan.FromDays(14);
     private readonly RynatCoreBridge _bridge;
+    private readonly IThumbnailService _thumbnailService;
 
-    public PreviewService(RynatCoreBridge bridge)
+    public PreviewService(RynatCoreBridge bridge, IThumbnailService thumbnailService)
     {
         _bridge = bridge;
+        _thumbnailService = thumbnailService;
     }
 
     public Task<PreviewInfo> PlanAsync(
@@ -45,14 +50,28 @@ public sealed class PreviewService : IPreviewService
             string? message = null;
             if (IsImage(plan.ContentType))
             {
-                localImagePath = CachePreviewFile(
-                    session,
-                    item,
-                    plan.CacheKey,
-                    operationId,
-                    ImagePreviewMaxBytes,
-                    cancellationToken
-                );
+                if (item.Size <= ImagePreviewMaxBytes)
+                {
+                    var originalImagePath = CachePreviewFile(
+                        session,
+                        item,
+                        plan.CacheKey,
+                        operationId,
+                        ImagePreviewMaxBytes,
+                        cancellationToken
+                    );
+                    localImagePath = CreateImageThumbnail(
+                        originalImagePath,
+                        item,
+                        previewDirectory: Path.GetDirectoryName(originalImagePath)!,
+                        ImageThumbnailMaxEdgePx,
+                        cancellationToken
+                    );
+                }
+                else
+                {
+                    message = "图片较大，暂不自动缓存预览。";
+                }
             }
             else if (IsVideo(plan.ContentType))
             {
@@ -64,6 +83,12 @@ public sealed class PreviewService : IPreviewService
                         plan.CacheKey,
                         operationId,
                         InlineVideoPreviewMaxBytes,
+                        cancellationToken
+                    );
+                    localImagePath = CreateVideoPoster(
+                        localVideoPath,
+                        previewDirectory: Path.GetDirectoryName(localVideoPath)!,
+                        VideoPosterMaxEdgePx,
                         cancellationToken
                     );
                 }
@@ -82,6 +107,118 @@ public sealed class PreviewService : IPreviewService
                 message
             );
         }, cancellationToken);
+    }
+
+    private static string CreateImageThumbnail(
+        string sourcePath,
+        RemoteFileItem item,
+        string previewDirectory,
+        int maxEdgePx,
+        CancellationToken cancellationToken
+    )
+    {
+        var extension = Path.GetExtension(item.Name);
+        var thumbnailExtension = IsJpegExtension(extension) ? ".jpg" : ".png";
+        var thumbnailPath = Path.Combine(
+            previewDirectory,
+            $"{Path.GetFileNameWithoutExtension(sourcePath)}-thumb-{maxEdgePx}{thumbnailExtension}"
+        );
+        if (IsCompleteThumbnailFile(thumbnailPath, sourcePath))
+        {
+            return thumbnailPath;
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        var bitmap = DecodeScaledBitmap(sourcePath, maxEdgePx);
+        BitmapEncoder encoder = IsJpegExtension(extension)
+            ? new JpegBitmapEncoder { QualityLevel = 88 }
+            : new PngBitmapEncoder();
+        encoder.Frames.Add(BitmapFrame.Create(bitmap));
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var partialPath = thumbnailPath + ".part";
+        DeleteIfExists(partialPath);
+        try
+        {
+            using (var stream = File.Create(partialPath))
+            {
+                encoder.Save(stream);
+            }
+
+            ReplaceWithCompletedFile(partialPath, thumbnailPath);
+            File.SetLastWriteTimeUtc(thumbnailPath, File.GetLastWriteTimeUtc(sourcePath));
+            return thumbnailPath;
+        }
+        finally
+        {
+            DeleteIfExists(partialPath);
+        }
+    }
+
+    private static BitmapSource DecodeScaledBitmap(string sourcePath, int maxEdgePx)
+    {
+        var sourceUri = new Uri(sourcePath, UriKind.Absolute);
+        var decoder = BitmapDecoder.Create(
+            sourceUri,
+            BitmapCreateOptions.DelayCreation,
+            BitmapCacheOption.None
+        );
+        var frame = decoder.Frames[0];
+        var decodeWidth = Math.Max(1, frame.PixelWidth);
+        var decodeHeight = Math.Max(1, frame.PixelHeight);
+        if (decodeWidth > maxEdgePx || decodeHeight > maxEdgePx)
+        {
+            var scale = Math.Min((double)maxEdgePx / decodeWidth, (double)maxEdgePx / decodeHeight);
+            decodeWidth = Math.Max(1, (int)Math.Round(decodeWidth * scale));
+            decodeHeight = Math.Max(1, (int)Math.Round(decodeHeight * scale));
+        }
+
+        var bitmap = new BitmapImage();
+        bitmap.BeginInit();
+        bitmap.CacheOption = BitmapCacheOption.OnLoad;
+        bitmap.UriSource = sourceUri;
+        bitmap.DecodePixelWidth = decodeWidth;
+        bitmap.DecodePixelHeight = decodeHeight;
+        bitmap.EndInit();
+        bitmap.Freeze();
+        return bitmap;
+    }
+
+    private string? CreateVideoPoster(
+        string sourcePath,
+        string previewDirectory,
+        int maxEdgePx,
+        CancellationToken cancellationToken
+    )
+    {
+        var posterPath = Path.Combine(
+            previewDirectory,
+            $"{Path.GetFileNameWithoutExtension(sourcePath)}-poster-{maxEdgePx}.png"
+        );
+        if (IsCompleteThumbnailFile(posterPath, sourcePath))
+        {
+            return posterPath;
+        }
+
+        var partialPath = posterPath + ".part";
+        DeleteIfExists(partialPath);
+        try
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!_thumbnailService.TryCreateThumbnail(sourcePath, partialPath, maxEdgePx))
+            {
+                return null;
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+            ReplaceWithCompletedFile(partialPath, posterPath);
+            File.SetLastWriteTimeUtc(posterPath, File.GetLastWriteTimeUtc(sourcePath));
+            return posterPath;
+        }
+        finally
+        {
+            DeleteIfExists(partialPath);
+        }
     }
 
     private string CachePreviewFile(
@@ -147,6 +284,11 @@ public sealed class PreviewService : IPreviewService
     private static bool IsVideo(string contentType) =>
         contentType.Equals("video", StringComparison.OrdinalIgnoreCase);
 
+    private static bool IsJpegExtension(string? extension) =>
+        extension is not null
+        && (extension.Equals(".jpg", StringComparison.OrdinalIgnoreCase)
+            || extension.Equals(".jpeg", StringComparison.OrdinalIgnoreCase));
+
     private static bool IsCompleteCacheFile(string localPath, ulong expectedSize, ulong maxBytes)
     {
         try
@@ -159,6 +301,33 @@ public sealed class PreviewService : IPreviewService
             var info = new FileInfo(localPath);
             var expectedCachedBytes = Math.Min(expectedSize, maxBytes);
             return info.Length > 0 && unchecked((ulong)info.Length) >= expectedCachedBytes;
+        }
+        catch (IOException)
+        {
+            return false;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return false;
+        }
+    }
+
+    private static bool IsCompleteThumbnailFile(string thumbnailPath, string sourcePath)
+    {
+        try
+        {
+            if (!File.Exists(thumbnailPath))
+            {
+                return false;
+            }
+
+            var thumbnail = new FileInfo(thumbnailPath);
+            if (thumbnail.Length <= 0)
+            {
+                return false;
+            }
+
+            return thumbnail.LastWriteTimeUtc >= File.GetLastWriteTimeUtc(sourcePath);
         }
         catch (IOException)
         {
