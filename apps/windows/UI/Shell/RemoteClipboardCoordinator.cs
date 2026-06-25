@@ -83,10 +83,10 @@ public sealed class RemoteClipboardCoordinator
         );
         if (sameTarget is not null)
         {
-            var summary = clipboard.Mode == RemoteClipboardMode.Cut
+            var sameTargetSummary = clipboard.Mode == RemoteClipboardMode.Cut
                 ? SameTargetSummary("项目已在当前位置。", "部分项目已在当前位置", sameTarget, clipboard.Items)
                 : SameTargetSummary("不能复制到原位置。", "部分项目不能复制到原位置", sameTarget, clipboard.Items);
-            return StatusOnly(summary, "file.same_target");
+            return StatusOnly(sameTargetSummary, "file.same_target");
         }
 
         var nestedTarget = clipboard.Items.FirstOrDefault(item =>
@@ -94,10 +94,10 @@ public sealed class RemoteClipboardCoordinator
         );
         if (nestedTarget is not null)
         {
-            var summary = clipboard.Mode == RemoteClipboardMode.Cut
+            var nestedTargetSummary = clipboard.Mode == RemoteClipboardMode.Cut
                 ? $"不能移动到自身内部：{nestedTarget.Name}。"
                 : $"不能复制到自身内部：{nestedTarget.Name}。";
-            return StatusOnly(summary, "file.nested_target");
+            return StatusOnly(nestedTargetSummary, "file.nested_target");
         }
 
         var conflictNames = clipboard.Items

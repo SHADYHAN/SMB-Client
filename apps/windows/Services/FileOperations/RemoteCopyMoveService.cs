@@ -172,7 +172,7 @@ public sealed class RemoteCopyMoveService : IRemoteCopyMoveService
                 childItem.Path,
                 targetShare,
                 childTargetPath,
-                replaceExisting: false,
+                ReplaceExisting: false,
                 session.ConnectionId,
                 OperationId("copy")
             ));

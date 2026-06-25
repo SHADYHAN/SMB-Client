@@ -16,7 +16,7 @@ public static class WindowsCacheCleanupService
         };
         foreach (var bucket in buckets.Where(bucket => !string.IsNullOrWhiteSpace(bucket)))
         {
-            segments.Add(bucket);
+            segments.Add(bucket!);
         }
 
         return Path.Combine(segments.ToArray());
@@ -35,13 +35,13 @@ public static class WindowsCacheCleanupService
 
         try
         {
-            if (!Directory.Exists(directory))
+            if (!System.IO.Directory.Exists(directory))
             {
                 return;
             }
 
             var cutoff = DateTimeOffset.UtcNow.Subtract(maxAge);
-            var files = Directory.EnumerateFiles(directory, "*", SearchOption.AllDirectories)
+            var files = System.IO.Directory.EnumerateFiles(directory, "*", SearchOption.AllDirectories)
                 .Select(path => FileEntry.TryCreate(path))
                 .Where(entry => entry is not null)
                 .Cast<FileEntry>()
@@ -111,14 +111,14 @@ public static class WindowsCacheCleanupService
 
     private static void DeleteEmptyDirectories(string rootDirectory)
     {
-        foreach (var directory in Directory.EnumerateDirectories(rootDirectory, "*", SearchOption.AllDirectories)
+        foreach (var directory in System.IO.Directory.EnumerateDirectories(rootDirectory, "*", SearchOption.AllDirectories)
             .OrderByDescending(path => path.Length))
         {
             try
             {
-                if (!Directory.EnumerateFileSystemEntries(directory).Any())
+                if (!System.IO.Directory.EnumerateFileSystemEntries(directory).Any())
                 {
-                    Directory.Delete(directory);
+                    System.IO.Directory.Delete(directory);
                 }
             }
             catch (IOException)
