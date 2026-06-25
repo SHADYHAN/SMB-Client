@@ -1,6 +1,7 @@
 <UserControl x:Class="Rynat.WindowsClient.UI.Files.FileListView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:files="clr-namespace:Rynat.WindowsClient.UI.Files">
     <Border Background="{StaticResource PanelBackgroundBrush}"
             Padding="12,14">
         <DockPanel>
@@ -60,12 +61,29 @@
                       PreviewMouseLeftButtonDown="ListView_OnPreviewMouseLeftButtonDown"
                       PreviewMouseMove="ListView_OnPreviewMouseMove"
                       DragOver="ListView_OnDragOver"
+                      DragLeave="ListView_OnDragLeave"
                       Drop="ListView_OnDrop"
                       KeyDown="ListView_OnKeyDown"
                       MouseDoubleClick="ListView_OnMouseDoubleClick"
                       PreviewMouseRightButtonDown="ListView_OnPreviewMouseRightButtonDown"
                       SelectionChanged="ListView_OnSelectionChanged"
                       BorderThickness="0">
+                <ListView.ItemContainerStyle>
+                    <Style TargetType="ListViewItem">
+                        <Setter Property="MinHeight" Value="30" />
+                        <Setter Property="Padding" Value="4,2" />
+                        <Setter Property="Margin" Value="0,1" />
+                        <Setter Property="BorderThickness" Value="1" />
+                        <Setter Property="BorderBrush" Value="Transparent" />
+                        <Setter Property="Background" Value="Transparent" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding RemoteDropState}" Value="{x:Static files:RemoteDropState.ValidTarget}">
+                                <Setter Property="Background" Value="{StaticResource AccentSoftBrush}" />
+                                <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </ListView.ItemContainerStyle>
                 <ListView.ContextMenu>
                     <ContextMenu>
                         <MenuItem Header="剪切"

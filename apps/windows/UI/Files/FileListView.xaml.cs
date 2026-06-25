@@ -12,6 +12,7 @@ public partial class FileListView : UserControl
     private Point? _dragStartPoint;
     private FileItemViewModel? _dragStartItem;
     private IReadOnlyList<RemoteFileItem>? _dragStartSelection;
+    private FileItemViewModel? _remoteDropTarget;
 
     public FileListView()
     {
@@ -74,16 +75,26 @@ public partial class FileListView : UserControl
         {
             e.Effects = shell.GetRemoteDropEffect(
                 payload,
-                target.Share,
-                target.Path,
+                target.Item.Share,
+                target.Item.Path,
                 IsCopyRequested(e)
             );
+            SetRemoteDropTarget(e.Effects == DragDropEffects.None ? null : target);
             e.Handled = true;
             return;
         }
 
+        SetRemoteDropTarget(null);
         e.Effects = HasFileDrop(e) ? DragDropEffects.Copy : DragDropEffects.None;
         e.Handled = true;
+    }
+
+    private void ListView_OnDragLeave(object sender, DragEventArgs e)
+    {
+        if (!IsMouseWithin((FrameworkElement)sender, e))
+        {
+            SetRemoteDropTarget(null);
+        }
     }
 
     private async void ListView_OnDrop(object sender, DragEventArgs e)
@@ -93,15 +104,17 @@ public partial class FileListView : UserControl
             && TryGetDirectoryDropTarget(e, out var target)
             && FindShellViewModel() is { } remoteShell)
         {
+            SetRemoteDropTarget(null);
             await remoteShell.DropRemoteItemsAsync(
                 payload,
-                target.Share,
-                target.Path,
+                target.Item.Share,
+                target.Item.Path,
                 IsCopyRequested(e)
             );
             return;
         }
 
+        SetRemoteDropTarget(null);
         if (!HasFileDrop(e) || e.Data.GetData(DataFormats.FileDrop) is not string[] paths)
         {
             return;
@@ -131,7 +144,7 @@ public partial class FileListView : UserControl
 
     private static bool TryGetDirectoryDropTarget(
         DragEventArgs e,
-        out RemoteFileItem target
+        out FileItemViewModel target
     )
     {
         target = null!;
@@ -141,8 +154,37 @@ public partial class FileListView : UserControl
             return false;
         }
 
-        target = fileItem.Item;
+        target = fileItem;
         return true;
+    }
+
+    private void SetRemoteDropTarget(FileItemViewModel? target)
+    {
+        if (ReferenceEquals(_remoteDropTarget, target))
+        {
+            return;
+        }
+
+        if (_remoteDropTarget is not null)
+        {
+            _remoteDropTarget.RemoteDropState = RemoteDropState.None;
+        }
+
+        _remoteDropTarget = target;
+
+        if (_remoteDropTarget is not null)
+        {
+            _remoteDropTarget.RemoteDropState = RemoteDropState.ValidTarget;
+        }
+    }
+
+    private static bool IsMouseWithin(FrameworkElement element, DragEventArgs e)
+    {
+        var point = e.GetPosition(element);
+        return point.X >= 0
+            && point.Y >= 0
+            && point.X <= element.ActualWidth
+            && point.Y <= element.ActualHeight;
     }
 
     private static bool IsCopyRequested(DragEventArgs e)

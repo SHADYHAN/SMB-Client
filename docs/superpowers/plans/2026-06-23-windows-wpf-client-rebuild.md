@@ -41,6 +41,7 @@
 - File selection preview loading and stale-preview protection are isolated in `PreviewCoordinator`.
 - File drag-out and local drop upload coordination are isolated in `FileDragDropCoordinator`.
 - In-app remote drag/drop now uses a Windows-local payload and reuses `RemoteCopyMoveService` for directory-target copy/move.
+- File list remote drag hover now highlights only valid directory drop targets and clears the visual state on invalid targets, leave, or drop.
 - Preview and drag caches have age/size cleanup with stale `.part` removal.
 - Large videos no longer auto-cache for inline preview; they show a lightweight message until a thumbnail/first-frame path is added.
 - Cross-platform WPF static smoke checks cover startup arguments, local redirect, protocol registration, and single-instance forwarding.
@@ -48,7 +49,7 @@
 ## Remaining Product Work
 
 - [ ] Validate and refine remote copy / move / paste / drag/drop on real Windows SMB shares.
-- [ ] Refine in-app drag/drop hover visuals: dragging without a valid cross-directory target should remain visual only.
+- [ ] Validate and refine in-app drag/drop hover visuals on real Windows, including navigation-tree parity and cursor feedback.
 - [ ] Further refine Explorer/Desktop drag-out visuals and same-name overwrite behavior on real Windows.
 - [ ] Improve preview performance: add lightweight thumbnail/video first-frame generation instead of relying on full media cache.
 - [ ] Observe preview/drag cache cleanup behavior during Windows real-use testing.

@@ -43,6 +43,7 @@ link_activation_coordinator="$ROOT_DIR/apps/windows/UI/Shell/LinkActivationCoord
 preview_coordinator="$ROOT_DIR/apps/windows/UI/Shell/PreviewCoordinator.cs"
 remote_clipboard_coordinator="$ROOT_DIR/apps/windows/UI/Shell/RemoteClipboardCoordinator.cs"
 main_window="$ROOT_DIR/apps/windows/MainWindow.xaml.cs"
+file_item_view_model="$ROOT_DIR/apps/windows/UI/Files/FileItemViewModel.cs"
 file_list_xaml="$ROOT_DIR/apps/windows/UI/Files/FileListView.xaml"
 file_list_view="$ROOT_DIR/apps/windows/UI/Files/FileListView.xaml.cs"
 file_operation_interface="$ROOT_DIR/apps/windows/Services/FileOperations/IFileOperationService.cs"
@@ -103,6 +104,7 @@ required_files=(
     "apps/windows/UI/Shell/PreviewCoordinator.cs"
     "apps/windows/UI/Shell/RemoteClipboardCoordinator.cs"
     "apps/windows/UI/Shell/RemoteClipboardPasteResult.cs"
+    "apps/windows/UI/Files/FileItemViewModel.cs"
     "apps/windows/UI/Files/FileListView.xaml"
     "apps/windows/UI/Files/FileListView.xaml.cs"
     "apps/windows/UI/Navigation/NavigationTreeView.xaml"
@@ -196,8 +198,14 @@ assert_file_contains "$preview_coordinator" 'ShowPreviewUnavailable' 'preview co
 
 assert_file_contains "$file_list_view" 'PreviewMouseMove' 'file list starts drag from pointer movement'
 assert_file_contains "$file_list_xaml" 'SelectionMode="Extended"' 'file list supports extended selection'
+assert_file_contains "$file_item_view_model" 'enum RemoteDropState' 'file item tracks remote drop hover state'
+assert_file_contains "$file_item_view_model" 'ObservableObject' 'file item notifies remote drop hover state changes'
 assert_file_contains "$file_list_view" 'RemoteDragPayload' 'file list recognizes internal remote drag payloads'
 assert_file_contains "$file_list_view" 'TryGetDirectoryDropTarget' 'file list resolves directory drop targets'
+assert_file_contains "$file_list_view" 'SetRemoteDropTarget' 'file list updates remote drop hover state'
+assert_file_contains "$file_list_view" 'e\.Effects == DragDropEffects\.None \? null : target' 'file list highlights only valid remote drop targets'
+assert_file_contains "$file_list_xaml" 'DragLeave="ListView_OnDragLeave"' 'file list clears drag hover on leave'
+assert_file_contains "$file_list_xaml" 'RemoteDropState\.ValidTarget' 'file list binds valid remote drop target styling'
 assert_file_contains "$file_list_view" 'DataFormats\.FileDrop' 'file list accepts local file drops'
 assert_file_contains "$file_list_view" 'Key\.Delete' 'file list handles delete key'
 assert_file_contains "$file_list_view" 'Key\.F2' 'file list handles rename shortcut'
