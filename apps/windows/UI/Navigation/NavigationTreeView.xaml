@@ -3,35 +3,55 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:navigation="clr-namespace:Rynat.WindowsClient.UI.Navigation">
     <Border Background="{StaticResource PanelBackgroundBrush}"
-            Padding="12,14">
+            Padding="12">
         <DockPanel>
-            <Grid DockPanel.Dock="Top"
-                  Margin="0,0,0,12">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <Button Grid.Column="0"
-                        Content="共享"
-                        MinHeight="30"
-                        Padding="8,4"
-                        Margin="0,0,4,0"
-                        Command="{Binding ShowSharesCommand}" />
-                <Button Grid.Column="1"
-                        Content="收藏"
-                        MinHeight="30"
-                        Padding="8,4"
-                        Margin="0,0,8,0"
-                        Command="{Binding ShowFavoritesCommand}" />
-                <Button Grid.Column="2"
+            <DockPanel DockPanel.Dock="Top"
+                       Margin="0,0,0,14">
+                <Button DockPanel.Dock="Right"
+                        Style="{StaticResource IconButtonStyle}"
                         Content="+"
-                        MinWidth="30"
-                        MinHeight="30"
-                        Padding="0"
+                        Margin="8,0,0,0"
                         ToolTip="添加当前项目到收藏"
                         Command="{Binding AddFavoriteCommand}" />
-            </Grid>
+                <Border Background="{StaticResource SubtleBackgroundBrush}"
+                        CornerRadius="9"
+                        Padding="3">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0"
+                                Content="共享"
+                                Command="{Binding ShowSharesCommand}">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource SegmentButtonStyle}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsSharesTabActive}" Value="True">
+                                            <Setter Property="Background" Value="{StaticResource PanelBackgroundBrush}" />
+                                            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+                        <Button Grid.Column="1"
+                                Content="收藏"
+                                Command="{Binding ShowFavoritesCommand}">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource SegmentButtonStyle}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsFavoritesTabActive}" Value="True">
+                                            <Setter Property="Background" Value="{StaticResource PanelBackgroundBrush}" />
+                                            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+                    </Grid>
+                </Border>
+            </DockPanel>
             <TreeView ItemsSource="{Binding Roots}"
                       SelectedItemChanged="TreeView_OnSelectedItemChanged"
                       MouseDoubleClick="TreeView_OnMouseDoubleClick"
@@ -52,13 +72,9 @@
                     </Style>
                 </TreeView.Style>
                 <TreeView.ItemContainerStyle>
-                    <Style TargetType="TreeViewItem">
+                    <Style TargetType="TreeViewItem" BasedOn="{StaticResource RynatTreeViewItemStyle}">
                         <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
                         <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}" />
-                        <Setter Property="Margin" Value="0,1" />
-                        <Setter Property="BorderThickness" Value="1" />
-                        <Setter Property="BorderBrush" Value="Transparent" />
-                        <Setter Property="Background" Value="Transparent" />
                         <Style.Triggers>
                             <DataTrigger Binding="{Binding RemoteDropState}" Value="{x:Static navigation:NavigationDropState.ValidTarget}">
                                 <Setter Property="Background" Value="{StaticResource AccentSoftBrush}" />
@@ -71,7 +87,8 @@
                     <HierarchicalDataTemplate DataType="{x:Type navigation:NavigationNodeViewModel}"
                                               ItemsSource="{Binding Children}">
                         <TextBlock Text="{Binding Title}"
-                                   Padding="4,3" />
+                                   TextTrimming="CharacterEllipsis"
+                                   Padding="4,2" />
                     </HierarchicalDataTemplate>
                 </TreeView.Resources>
             </TreeView>
@@ -102,13 +119,14 @@
                 </ListView.ContextMenu>
                 <ListView.ItemTemplate>
                     <DataTemplate DataType="{x:Type navigation:FavoriteLinkViewModel}">
-                        <StackPanel Margin="2,4">
+                        <StackPanel Margin="2,3">
                             <TextBlock Text="{Binding Name}"
                                        FontWeight="SemiBold"
                                        TextTrimming="CharacterEllipsis" />
                             <TextBlock Text="{Binding Location}"
                                        Foreground="{StaticResource TextSecondaryBrush}"
                                        FontSize="11"
+                                       Margin="0,2,0,0"
                                        TextTrimming="CharacterEllipsis" />
                         </StackPanel>
                     </DataTemplate>

@@ -12,6 +12,7 @@
         MinWidth="920"
         MinHeight="620"
         WindowStartupLocation="CenterScreen"
+        FontFamily="Segoe UI Variable Text, Segoe UI, Microsoft YaHei UI"
         Background="{StaticResource AppBackgroundBrush}">
     <Grid>
         <Grid>
@@ -41,22 +42,22 @@
             </Grid.Style>
 
             <Grid.RowDefinitions>
-                <RowDefinition Height="44" />
+                <RowDefinition Height="50" />
                 <RowDefinition Height="*" />
                 <RowDefinition Height="30" />
             </Grid.RowDefinitions>
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="260" MinWidth="220" />
+                <ColumnDefinition Width="268" MinWidth="220" />
                 <ColumnDefinition Width="*" MinWidth="420" />
                 <ColumnDefinition x:Name="PreviewColumn" Width="320" MinWidth="0" />
             </Grid.ColumnDefinitions>
 
             <Border Grid.Row="0"
                     Grid.ColumnSpan="3"
-                    Background="{StaticResource SubtleBackgroundBrush}"
+                    Background="{StaticResource PanelBackgroundBrush}"
                     BorderBrush="{StaticResource BorderBrush}"
                     BorderThickness="0,0,0,1">
-                <Grid Margin="14,0">
+                <Grid Margin="14,0,12,0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
@@ -68,19 +69,15 @@
                     </Grid.ColumnDefinitions>
 
                     <Button Grid.Column="0"
+                            Style="{StaticResource IconButtonStyle}"
                             Content="‹"
-                            Width="32"
-                            MinHeight="30"
-                            Padding="0"
                             Margin="0,0,6,0"
                             VerticalAlignment="Center"
                             Command="{Binding FileList.GoUpCommand}"
                             ToolTip="返回上级" />
                     <Button Grid.Column="1"
+                            Style="{StaticResource IconButtonStyle}"
                             Content="⌂"
-                            Width="32"
-                            MinHeight="30"
-                            Padding="0"
                             Margin="0,0,12,0"
                             VerticalAlignment="Center"
                             Command="{Binding FileList.GoShareRootCommand}"
@@ -89,6 +86,7 @@
                                Text="{Binding FileList.BreadcrumbText}"
                                FontSize="17"
                                FontWeight="SemiBold"
+                               Foreground="{StaticResource TextPrimaryBrush}"
                                VerticalAlignment="Center"
                                TextTrimming="CharacterEllipsis"
                                ToolTip="{Binding FileList.LocationTitle}" />
@@ -97,29 +95,25 @@
                              MinHeight="30"
                              Padding="8,4"
                              Margin="12,0,8,0"
+                             Background="{StaticResource ControlBackgroundBrush}"
                              Text="{Binding FileList.SearchText, UpdateSourceTrigger=PropertyChanged}"
                              VerticalAlignment="Center"
                              VerticalContentAlignment="Center"
                              KeyDown="WorkspaceSearchBox_OnKeyDown"
                              ToolTip="搜索已加载目录" />
                     <Button Grid.Column="4"
+                            Style="{StaticResource IconButtonStyle}"
                             Content="↻"
-                            Width="32"
-                            MinHeight="30"
-                            Padding="0"
                             Margin="0,0,6,0"
                             VerticalAlignment="Center"
                             Command="{Binding FileList.RefreshCommand}"
                             ToolTip="刷新" />
                     <Button Grid.Column="5"
-                            Width="32"
-                            MinHeight="30"
-                            Padding="0"
                             Margin="0,0,8,0"
                             VerticalAlignment="Center"
                             Command="{Binding Preview.ToggleCommand}">
                         <Button.Style>
-                            <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                            <Style TargetType="Button" BasedOn="{StaticResource IconButtonStyle}">
                                 <Setter Property="Content" Value="▯" />
                                 <Setter Property="ToolTip" Value="打开预览面板" />
                                 <Style.Triggers>
@@ -134,31 +128,42 @@
                     <Button Grid.Column="6"
                             Content="新建文件夹"
                             MinHeight="30"
-                            Padding="10,4"
+                            Padding="12,4"
                             VerticalAlignment="Center"
                             Command="{Binding FileList.CreateFolderCommand}" />
                 </Grid>
             </Border>
 
-            <navigation:NavigationTreeView Grid.Row="1"
-                                           Grid.Column="0"
-                                           DataContext="{Binding Navigation}" />
-            <files:FileListView Grid.Row="1"
-                                Grid.Column="1" />
-            <preview:PreviewPaneView Grid.Row="1"
-                                     Grid.Column="2"
-                                     DataContext="{Binding Preview}">
-                <preview:PreviewPaneView.Style>
-                    <Style TargetType="preview:PreviewPaneView">
-                        <Setter Property="Visibility" Value="Visible" />
-                        <Style.Triggers>
-                            <DataTrigger Binding="{Binding IsVisible}" Value="False">
-                                <Setter Property="Visibility" Value="Collapsed" />
-                            </DataTrigger>
-                        </Style.Triggers>
-                    </Style>
-                </preview:PreviewPaneView.Style>
-            </preview:PreviewPaneView>
+            <Border Grid.Row="1"
+                    Grid.Column="0"
+                    Background="{StaticResource PanelAltBackgroundBrush}"
+                    BorderBrush="{StaticResource BorderBrush}"
+                    BorderThickness="0,0,1,0">
+                <navigation:NavigationTreeView DataContext="{Binding Navigation}" />
+            </Border>
+            <Border Grid.Row="1"
+                    Grid.Column="1"
+                    Background="{StaticResource PanelBackgroundBrush}">
+                <files:FileListView />
+            </Border>
+            <Border Grid.Row="1"
+                    Grid.Column="2"
+                    Background="{StaticResource PanelAltBackgroundBrush}"
+                    BorderBrush="{StaticResource BorderBrush}"
+                    BorderThickness="1,0,0,0">
+                <preview:PreviewPaneView DataContext="{Binding Preview}">
+                    <preview:PreviewPaneView.Style>
+                        <Style TargetType="preview:PreviewPaneView">
+                            <Setter Property="Visibility" Value="Visible" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsVisible}" Value="False">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </preview:PreviewPaneView.Style>
+                </preview:PreviewPaneView>
+            </Border>
             <status:StatusBarView Grid.Row="2"
                                   Grid.ColumnSpan="3"
                                   DataContext="{Binding Status}" />

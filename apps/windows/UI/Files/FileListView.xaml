@@ -3,7 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:files="clr-namespace:Rynat.WindowsClient.UI.Files">
     <Border Background="{StaticResource PanelBackgroundBrush}"
-            Padding="12">
+            Padding="14,12">
             <ListView x:Name="FilesListView"
                       ItemsSource="{Binding FileList.Items}"
                       SelectedItem="{Binding FileList.SelectedItem, Mode=TwoWay}"
@@ -18,15 +18,12 @@
                       MouseDoubleClick="ListView_OnMouseDoubleClick"
                       PreviewMouseRightButtonDown="ListView_OnPreviewMouseRightButtonDown"
                       SelectionChanged="ListView_OnSelectionChanged"
-                      BorderThickness="0">
+                      BorderThickness="0"
+                      Background="{StaticResource PanelBackgroundBrush}">
                 <ListView.ItemContainerStyle>
-                    <Style TargetType="ListViewItem">
-                        <Setter Property="MinHeight" Value="30" />
-                        <Setter Property="Padding" Value="4,2" />
-                        <Setter Property="Margin" Value="0,1" />
-                        <Setter Property="BorderThickness" Value="1" />
-                        <Setter Property="BorderBrush" Value="Transparent" />
-                        <Setter Property="Background" Value="Transparent" />
+                    <Style TargetType="ListViewItem" BasedOn="{StaticResource RynatListViewItemStyle}">
+                        <Setter Property="MinHeight" Value="36" />
+                        <Setter Property="Padding" Value="8,4" />
                         <Style.Triggers>
                             <DataTrigger Binding="{Binding RemoteDropState}" Value="{x:Static files:RemoteDropState.ValidTarget}">
                                 <Setter Property="Background" Value="{StaticResource AccentSoftBrush}" />
@@ -58,7 +55,10 @@
                         <GridViewColumn Header="名称" Width="320">
                             <GridViewColumn.CellTemplate>
                                 <DataTemplate>
-                                    <TextBlock Text="{Binding Name}" />
+                                    <TextBlock Text="{Binding Name}"
+                                               FontWeight="SemiBold"
+                                               TextTrimming="CharacterEllipsis"
+                                               VerticalAlignment="Center" />
                                 </DataTemplate>
                             </GridViewColumn.CellTemplate>
                         </GridViewColumn>
