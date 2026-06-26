@@ -48,4 +48,24 @@ public partial class MainWindow : Window
             ? new GridLength(320)
             : new GridLength(0);
     }
+
+    public void FocusWorkspaceSearch()
+    {
+        WorkspaceSearchBox.Focus();
+        WorkspaceSearchBox.SelectAll();
+    }
+
+    private void WorkspaceSearchBox_OnKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+    {
+        if (e.Key != System.Windows.Input.Key.Escape || _shell is null)
+        {
+            return;
+        }
+
+        if (!string.IsNullOrEmpty(_shell.FileList.SearchText))
+        {
+            _shell.FileList.SearchText = string.Empty;
+            e.Handled = true;
+        }
+    }
 }

@@ -106,6 +106,7 @@ public sealed class ShellViewModel : ObservableObject
         FileList.PasteCommand = new AsyncRelayCommand(PasteRemoteClipboardAsync, CanPasteRemoteClipboard);
         FileList.RefreshCommand = new AsyncRelayCommand(RefreshCurrentDirectoryAsync, CanRefreshCurrentView);
         FileList.GoUpCommand = new AsyncRelayCommand(GoUpDirectoryAsync, CanGoUpDirectory);
+        FileList.GoShareRootCommand = new RelayCommand(GoShareRoot, CanGoShareRoot);
         FileList.CreateFolderCommand = new AsyncRelayCommand(CreateFolderAsync, CanUseCurrentDirectory);
         FileList.DeleteCommand = new AsyncRelayCommand(DeleteSelectedItemAsync, () => FileList.HasSingleWritableSelection && _session is not null);
         FileList.RenameCommand = new AsyncRelayCommand(RenameSelectedItemAsync, () => FileList.HasSingleWritableSelection && _session is not null);
@@ -626,6 +627,11 @@ public sealed class ShellViewModel : ObservableObject
             goUpCommand.RaiseCanExecuteChanged();
         }
 
+        if (FileList.GoShareRootCommand is RelayCommand goShareRootCommand)
+        {
+            goShareRootCommand.RaiseCanExecuteChanged();
+        }
+
         if (FileList.CreateFolderCommand is AsyncRelayCommand createFolderCommand)
         {
             createFolderCommand.RaiseCanExecuteChanged();
@@ -661,6 +667,8 @@ public sealed class ShellViewModel : ObservableObject
     private bool CanGoUpDirectory() => _session is not null
         && _directoryNavigationCoordinator.HasCurrentDirectory
         && !FileList.IsShareRootView;
+
+    private bool CanGoShareRoot() => _session is not null && !FileList.IsShareRootView;
 
     private bool CanPasteRemoteClipboard() => CanUseCurrentDirectory() && _remoteClipboardCoordinator.CanPaste;
 
@@ -702,6 +710,20 @@ public sealed class ShellViewModel : ObservableObject
         }
 
         await LoadDirectoryAsync(currentShare, ParentPath(currentPath), null, expandNavigationNode: false);
+    }
+
+    private void GoShareRoot()
+    {
+        if (_session is null)
+        {
+            return;
+        }
+
+        _directoryNavigationCoordinator.ShowShareRoot(
+            _session,
+            $"已返回全部共享，共 {_session.Shares.Count} 个共享。",
+            RefreshFileCommands
+        );
     }
 
     private async Task<bool> LoadDirectoryAsync(

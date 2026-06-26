@@ -3,87 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:files="clr-namespace:Rynat.WindowsClient.UI.Files">
     <Border Background="{StaticResource PanelBackgroundBrush}"
-            Padding="12,14">
-        <DockPanel>
-            <Grid DockPanel.Dock="Top"
-                  Margin="0,0,0,12">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="180" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <StackPanel VerticalAlignment="Center">
-                    <TextBlock Text="{Binding FileList.PathTitle}"
-                               FontWeight="SemiBold" />
-                    <TextBlock Text="{Binding FileList.LocationTitle}"
-                               Foreground="{StaticResource TextSecondaryBrush}"
-                               FontSize="11"
-                               TextTrimming="CharacterEllipsis" />
-                </StackPanel>
-                <Button Grid.Column="1"
-                        Content="上级"
-                        MinHeight="30"
-                        Padding="10,4"
-                        Margin="0,0,8,0"
-                        Command="{Binding FileList.GoUpCommand}" />
-                <Button Grid.Column="2"
-                        Content="刷新"
-                        MinHeight="30"
-                        Padding="10,4"
-                        Margin="0,0,8,0"
-                        Command="{Binding FileList.RefreshCommand}" />
-                <Button Grid.Column="3"
-                        Content="新建文件夹"
-                        MinHeight="30"
-                        Padding="10,4"
-                        Margin="0,0,12,0"
-                        Command="{Binding FileList.CreateFolderCommand}" />
-                <TextBlock Grid.Column="4"
-                           Text="正在加载..."
-                           Foreground="{StaticResource TextSecondaryBrush}"
-                           Margin="0,0,12,0"
-                           VerticalAlignment="Center">
-                    <TextBlock.Style>
-                        <Style TargetType="TextBlock">
-                            <Setter Property="Visibility" Value="Collapsed" />
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding FileList.IsLoading}" Value="True">
-                                    <Setter Property="Visibility" Value="Visible" />
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </TextBlock.Style>
-                </TextBlock>
-                <TextBox x:Name="SearchBox"
-                         Grid.Column="5"
-                         MinHeight="30"
-                         Padding="8,4"
-                         Text="{Binding FileList.SearchText, UpdateSourceTrigger=PropertyChanged}"
-                         VerticalContentAlignment="Center"
-                         KeyDown="SearchBox_OnKeyDown"
-                         ToolTip="搜索当前目录" />
-                <Button Grid.Column="6"
-                        MinHeight="30"
-                        Padding="10,4"
-                        Margin="8,0,0,0"
-                        Command="{Binding Preview.ToggleCommand}">
-                    <Button.Style>
-                        <Style TargetType="Button">
-                            <Setter Property="Content" Value="预览" />
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding Preview.IsVisible}" Value="True">
-                                    <Setter Property="Content" Value="收起预览" />
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Button.Style>
-                </Button>
-            </Grid>
-
+            Padding="12">
             <ListView x:Name="FilesListView"
                       ItemsSource="{Binding FileList.Items}"
                       SelectedItem="{Binding FileList.SelectedItem, Mode=TwoWay}"
@@ -154,6 +74,5 @@
                     </GridView>
                 </ListView.View>
             </ListView>
-        </DockPanel>
     </Border>
 </UserControl>

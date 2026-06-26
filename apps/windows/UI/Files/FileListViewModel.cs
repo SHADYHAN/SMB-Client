@@ -13,6 +13,7 @@ public sealed class FileListViewModel : ObservableObject
     private FileItemViewModel? _selectedItem;
     private string _pathTitle = "未连接";
     private string _locationTitle = "未连接";
+    private string _breadcrumbText = "未连接";
     private string _searchText = string.Empty;
     private bool _isLoading;
 
@@ -46,6 +47,12 @@ public sealed class FileListViewModel : ObservableObject
     {
         get => _locationTitle;
         set => SetProperty(ref _locationTitle, value);
+    }
+
+    public string BreadcrumbText
+    {
+        get => _breadcrumbText;
+        set => SetProperty(ref _breadcrumbText, value);
     }
 
     public string SearchText
@@ -96,6 +103,8 @@ public sealed class FileListViewModel : ObservableObject
     public ICommand RefreshCommand { get; set; } = new RelayCommand(_ => { });
 
     public ICommand GoUpCommand { get; set; } = new RelayCommand(_ => { });
+
+    public ICommand GoShareRootCommand { get; set; } = new RelayCommand(_ => { });
 
     public ICommand CreateFolderCommand { get; set; } = new RelayCommand(_ => { });
 
@@ -169,6 +178,7 @@ public sealed class FileListViewModel : ObservableObject
             ? directory.Share
             : $"{directory.Share}{directory.Path}";
         LocationTitle = DirectoryLocationTitle(serverHost, directory.Share, directory.Path);
+        BreadcrumbText = DirectoryBreadcrumbText(directory.Share, directory.Path);
         SearchText = string.Empty;
         _allItems.Clear();
 
@@ -187,6 +197,7 @@ public sealed class FileListViewModel : ObservableObject
         IsShareRootView = true;
         PathTitle = "全部共享";
         LocationTitle = $"{session.Host} > 全部共享";
+        BreadcrumbText = "全部共享";
         SearchText = string.Empty;
         _allItems.Clear();
 
@@ -211,6 +222,7 @@ public sealed class FileListViewModel : ObservableObject
         IsShareRootView = false;
         PathTitle = title;
         LocationTitle = title;
+        BreadcrumbText = title;
         SearchText = string.Empty;
         _allItems.Clear();
         Items.Clear();
@@ -261,5 +273,17 @@ public sealed class FileListViewModel : ObservableObject
         }
 
         return string.Join(" > ", parts);
+    }
+
+    private static string DirectoryBreadcrumbText(string share, string path)
+    {
+        if (path == "/")
+        {
+            return share;
+        }
+
+        var parts = new List<string> { share };
+        parts.AddRange(path.Split('/', StringSplitOptions.RemoveEmptyEntries));
+        return string.Join(" / ", parts);
     }
 }

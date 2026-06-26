@@ -61,6 +61,7 @@ file_drag_drop_coordinator="$ROOT_DIR/apps/windows/UI/Shell/FileDragDropCoordina
 link_activation_coordinator="$ROOT_DIR/apps/windows/UI/Shell/LinkActivationCoordinator.cs"
 preview_coordinator="$ROOT_DIR/apps/windows/UI/Shell/PreviewCoordinator.cs"
 remote_clipboard_coordinator="$ROOT_DIR/apps/windows/UI/Shell/RemoteClipboardCoordinator.cs"
+main_window_xaml="$ROOT_DIR/apps/windows/MainWindow.xaml"
 main_window="$ROOT_DIR/apps/windows/MainWindow.xaml.cs"
 login_view_model="$ROOT_DIR/apps/windows/UI/Login/LoginViewModel.cs"
 file_item_view_model="$ROOT_DIR/apps/windows/UI/Files/FileItemViewModel.cs"
@@ -194,6 +195,7 @@ assert_file_contains "$shell_view_model" 'CutCommand' 'shell exposes cut command
 assert_file_contains "$shell_view_model" 'CopyFileCommand' 'shell exposes remote copy command'
 assert_file_contains "$shell_view_model" 'PasteCommand' 'shell exposes remote paste command'
 assert_file_contains "$shell_view_model" 'GoUpCommand' 'shell exposes parent-directory command'
+assert_file_contains "$shell_view_model" 'GoShareRootCommand' 'shell exposes share-root command'
 assert_file_contains "$shell_view_model" 'LoginCoordinator' 'shell delegates login workflow'
 assert_file_contains "$login_coordinator" 'LoginAsync' 'login coordinator owns manual login workflow'
 assert_file_contains "$login_coordinator" 'TryAutoLoginAsync' 'login coordinator owns auto-login workflow'
@@ -279,13 +281,18 @@ assert_file_contains "$file_list_xaml" 'DragLeave="ListView_OnDragLeave"' 'file 
 assert_file_contains "$file_list_xaml" 'RemoteDropState\.ValidTarget' 'file list binds valid remote drop target styling'
 assert_file_contains "$file_list_view" 'DataFormats\.FileDrop' 'file list accepts local file drops'
 assert_file_contains "$file_list_xaml" 'x:Name="FilesListView"' 'file list exposes named list for keyboard focus management'
-assert_file_contains "$file_list_xaml" 'KeyDown="SearchBox_OnKeyDown"' 'search box handles escape key'
-assert_file_contains "$file_list_xaml" 'Content="上级"' 'file list toolbar exposes parent-directory button'
-assert_file_contains "$file_list_xaml" 'Command="\{Binding FileList\.GoUpCommand\}"' 'file list toolbar binds parent-directory command'
-assert_file_contains "$file_list_xaml" 'FileList\.LocationTitle' 'file list toolbar shows full current location'
-assert_file_contains "$file_list_xaml" 'Preview\.ToggleCommand' 'file list toolbar keeps preview toggle visible'
+assert_file_contains "$main_window_xaml" 'x:Name="WorkspaceSearchBox"' 'workspace header owns search box'
+assert_file_contains "$main_window_xaml" 'KeyDown="WorkspaceSearchBox_OnKeyDown"' 'workspace header search handles escape key'
+assert_file_contains "$main_window_xaml" 'FileList\.BreadcrumbText' 'workspace header shows macOS-style breadcrumb'
+assert_file_contains "$main_window_xaml" 'FileList\.LocationTitle' 'workspace breadcrumb keeps full-location tooltip'
+assert_file_contains "$main_window_xaml" 'FileList\.GoUpCommand' 'workspace header binds parent-directory command'
+assert_file_contains "$main_window_xaml" 'FileList\.GoShareRootCommand' 'workspace header binds share-root command'
+assert_file_contains "$main_window_xaml" 'FileList\.RefreshCommand' 'workspace header binds refresh command'
+assert_file_contains "$main_window_xaml" 'Preview\.ToggleCommand' 'workspace header keeps preview toggle visible'
 assert_file_contains "$file_list_xaml" 'FileList\.CopyLinkCommand' 'file list context menu commands bind through shell data context'
 assert_file_contains "$file_list_view_model" 'DirectoryLocationTitle' 'file list builds a macOS-style location title'
+assert_file_contains "$file_list_view_model" 'DirectoryBreadcrumbText' 'file list builds a macOS-style breadcrumb'
+assert_file_contains "$file_list_view" 'FocusWorkspaceSearch' 'file list Ctrl+F focuses workspace search'
 assert_file_contains "$file_list_view" 'Key\.A' 'file list handles select-all shortcut'
 assert_file_contains "$file_list_view" 'SelectAll\(\)' 'file list select-all uses WPF selection'
 assert_file_contains "$file_list_view" 'Key\.Escape' 'file list handles escape key'
@@ -304,6 +311,7 @@ assert_file_contains "$file_list_view_model" 'ShowShareRoot' 'file list can show
 assert_file_contains "$file_list_view_model" 'IsShareRootView' 'file list tracks virtual share-root view'
 assert_file_contains "$file_list_view_model" 'IsShareRoot: true' 'file list marks share root entries'
 assert_file_contains "$file_list_view_model" 'GoUpCommand' 'file list exposes parent-directory command'
+assert_file_contains "$file_list_view_model" 'GoShareRootCommand' 'file list exposes share-root command'
 assert_file_contains "$file_list_view_model" 'HasWritableSelection' 'file list distinguishes writable selections'
 assert_file_contains "$file_drag_drop_coordinator" 'selectedItems\.Any\(selected => selected\.IsShareRoot\)' 'drag source excludes share-root entries'
 assert_file_contains "$navigation_node_view_model" 'enum NavigationDropState' 'navigation node tracks remote drop hover state'

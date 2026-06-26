@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using Rynat.WindowsClient;
 using Rynat.WindowsClient.Domain;
 using Rynat.WindowsClient.UI.Shell;
 
@@ -231,8 +232,7 @@ public partial class FileListView : UserControl
                     e.Handled = true;
                     return;
                 case Key.F:
-                    SearchBox.Focus();
-                    SearchBox.SelectAll();
+                    FindMainWindow()?.FocusWorkspaceSearch();
                     e.Handled = true;
                     return;
             }
@@ -286,17 +286,6 @@ public partial class FileListView : UserControl
     private static bool IsKey(KeyEventArgs e, Key key)
     {
         return e.Key == key || e.SystemKey == key;
-    }
-
-    private void SearchBox_OnKeyDown(object sender, KeyEventArgs e)
-    {
-        if (e.Key != Key.Escape || CurrentViewModel() is not { } viewModel)
-        {
-            return;
-        }
-
-        ClearSearchOrSelection(viewModel, FilesListView);
-        e.Handled = true;
     }
 
     private void ClearSearchOrSelection(FileListViewModel viewModel, ListView? listView)
@@ -383,6 +372,22 @@ public partial class FileListView : UserControl
             if (current is FrameworkElement { DataContext: ShellViewModel shell })
             {
                 return shell;
+            }
+
+            current = VisualTreeHelper.GetParent(current);
+        }
+
+        return null;
+    }
+
+    private MainWindow? FindMainWindow()
+    {
+        DependencyObject? current = this;
+        while (current is not null)
+        {
+            if (current is MainWindow mainWindow)
+            {
+                return mainWindow;
             }
 
             current = VisualTreeHelper.GetParent(current);

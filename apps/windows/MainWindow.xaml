@@ -41,6 +41,7 @@
             </Grid.Style>
 
             <Grid.RowDefinitions>
+                <RowDefinition Height="44" />
                 <RowDefinition Height="*" />
                 <RowDefinition Height="30" />
             </Grid.RowDefinitions>
@@ -50,10 +51,102 @@
                 <ColumnDefinition x:Name="PreviewColumn" Width="320" MinWidth="0" />
             </Grid.ColumnDefinitions>
 
-            <navigation:NavigationTreeView Grid.Column="0"
+            <Border Grid.Row="0"
+                    Grid.ColumnSpan="3"
+                    Background="{StaticResource SubtleBackgroundBrush}"
+                    BorderBrush="{StaticResource BorderBrush}"
+                    BorderThickness="0,0,0,1">
+                <Grid Margin="14,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="236" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <Button Grid.Column="0"
+                            Content="‹"
+                            Width="32"
+                            MinHeight="30"
+                            Padding="0"
+                            Margin="0,0,6,0"
+                            VerticalAlignment="Center"
+                            Command="{Binding FileList.GoUpCommand}"
+                            ToolTip="返回上级" />
+                    <Button Grid.Column="1"
+                            Content="⌂"
+                            Width="32"
+                            MinHeight="30"
+                            Padding="0"
+                            Margin="0,0,12,0"
+                            VerticalAlignment="Center"
+                            Command="{Binding FileList.GoShareRootCommand}"
+                            ToolTip="共享根目录" />
+                    <TextBlock Grid.Column="2"
+                               Text="{Binding FileList.BreadcrumbText}"
+                               FontSize="17"
+                               FontWeight="SemiBold"
+                               VerticalAlignment="Center"
+                               TextTrimming="CharacterEllipsis"
+                               ToolTip="{Binding FileList.LocationTitle}" />
+                    <TextBox x:Name="WorkspaceSearchBox"
+                             Grid.Column="3"
+                             MinHeight="30"
+                             Padding="8,4"
+                             Margin="12,0,8,0"
+                             Text="{Binding FileList.SearchText, UpdateSourceTrigger=PropertyChanged}"
+                             VerticalAlignment="Center"
+                             VerticalContentAlignment="Center"
+                             KeyDown="WorkspaceSearchBox_OnKeyDown"
+                             ToolTip="搜索已加载目录" />
+                    <Button Grid.Column="4"
+                            Content="↻"
+                            Width="32"
+                            MinHeight="30"
+                            Padding="0"
+                            Margin="0,0,6,0"
+                            VerticalAlignment="Center"
+                            Command="{Binding FileList.RefreshCommand}"
+                            ToolTip="刷新" />
+                    <Button Grid.Column="5"
+                            Width="32"
+                            MinHeight="30"
+                            Padding="0"
+                            Margin="0,0,8,0"
+                            VerticalAlignment="Center"
+                            Command="{Binding Preview.ToggleCommand}">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                                <Setter Property="Content" Value="▯" />
+                                <Setter Property="ToolTip" Value="打开预览面板" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Preview.IsVisible}" Value="True">
+                                        <Setter Property="Content" Value="▰" />
+                                        <Setter Property="ToolTip" Value="关闭预览面板" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+                    <Button Grid.Column="6"
+                            Content="新建文件夹"
+                            MinHeight="30"
+                            Padding="10,4"
+                            VerticalAlignment="Center"
+                            Command="{Binding FileList.CreateFolderCommand}" />
+                </Grid>
+            </Border>
+
+            <navigation:NavigationTreeView Grid.Row="1"
+                                           Grid.Column="0"
                                            DataContext="{Binding Navigation}" />
-            <files:FileListView Grid.Column="1" />
-            <preview:PreviewPaneView Grid.Column="2"
+            <files:FileListView Grid.Row="1"
+                                Grid.Column="1" />
+            <preview:PreviewPaneView Grid.Row="1"
+                                     Grid.Column="2"
                                      DataContext="{Binding Preview}">
                 <preview:PreviewPaneView.Style>
                     <Style TargetType="preview:PreviewPaneView">
@@ -66,7 +159,7 @@
                     </Style>
                 </preview:PreviewPaneView.Style>
             </preview:PreviewPaneView>
-            <status:StatusBarView Grid.Row="1"
+            <status:StatusBarView Grid.Row="2"
                                   Grid.ColumnSpan="3"
                                   DataContext="{Binding Status}" />
         </Grid>
