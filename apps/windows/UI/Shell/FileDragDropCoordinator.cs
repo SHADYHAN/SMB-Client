@@ -21,6 +21,8 @@ public sealed class FileDragDropCoordinator
     private readonly FileListViewModel _fileList;
     private readonly StatusBarViewModel _status;
     private readonly Func<Exception, string, string> _userFacingError;
+    private readonly Func<Exception, Task<bool>> _handleSessionIssueAsync;
+    private readonly Func<FileOperationResult, Task<bool>> _handleOperationResultAsync;
 
     public FileDragDropCoordinator(
         IFileTransferService fileTransferService,
@@ -31,7 +33,9 @@ public sealed class FileDragDropCoordinator
         IUserDialogService userDialogService,
         FileListViewModel fileList,
         StatusBarViewModel status,
-        Func<Exception, string, string> userFacingError
+        Func<Exception, string, string> userFacingError,
+        Func<Exception, Task<bool>> handleSessionIssueAsync,
+        Func<FileOperationResult, Task<bool>> handleOperationResultAsync
     )
     {
         _fileTransferService = fileTransferService;
@@ -43,6 +47,8 @@ public sealed class FileDragDropCoordinator
         _fileList = fileList;
         _status = status;
         _userFacingError = userFacingError;
+        _handleSessionIssueAsync = handleSessionIssueAsync;
+        _handleOperationResultAsync = handleOperationResultAsync;
     }
 
     public async Task StartFileDragAsync(
@@ -70,10 +76,16 @@ public sealed class FileDragDropCoordinator
             var supportsShellDragOut = _shellDragDropService.CanStartDrag(selectedItems);
             if (supportsShellDragOut)
             {
+                _status.Message = "正在准备拖出文件...";
                 var result = await _fileTransferService.CreateDragDownloadPayloadAsync(session, selectedItems);
                 if (result.Succeeded)
                 {
                     shellFiles = result.Files;
+                }
+                else
+                {
+                    _status.Message = result.Summary;
+                    return;
                 }
             }
 
@@ -88,6 +100,11 @@ public sealed class FileDragDropCoordinator
         }
         catch (Exception ex)
         {
+            if (await _handleSessionIssueAsync(ex))
+            {
+                return;
+            }
+
             _status.Message = _userFacingError(ex, "拖拽失败");
         }
     }
@@ -178,6 +195,11 @@ public sealed class FileDragDropCoordinator
 
                 if (!result.Succeeded)
                 {
+                    if (await _handleOperationResultAsync(result))
+                    {
+                        return;
+                    }
+
                     _status.Message = $"{result.Summary}（已完成 {completed}/{payload.Items.Count} 项）";
                     if (completed > 0)
                     {
@@ -197,6 +219,11 @@ public sealed class FileDragDropCoordinator
         }
         catch (Exception ex)
         {
+            if (await _handleSessionIssueAsync(ex))
+            {
+                return;
+            }
+
             _status.Message = _userFacingError(ex, "拖放失败");
         }
     }
@@ -240,6 +267,11 @@ public sealed class FileDragDropCoordinator
                 localPaths,
                 replaceExisting: conflicts.Length > 0
             );
+            if (await _handleOperationResultAsync(result))
+            {
+                return;
+            }
+
             _status.Message = result.Summary;
             if (result.Succeeded)
             {
@@ -248,6 +280,11 @@ public sealed class FileDragDropCoordinator
         }
         catch (Exception ex)
         {
+            if (await _handleSessionIssueAsync(ex))
+            {
+                return;
+            }
+
             _status.Message = _userFacingError(ex, "上传失败");
         }
     }

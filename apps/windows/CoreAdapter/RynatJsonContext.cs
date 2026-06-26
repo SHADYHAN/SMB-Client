@@ -19,6 +19,8 @@ namespace Rynat.Client;
 [JsonSerializable(typeof(BridgeResponse<SmbDiagnostics>))]
 [JsonSerializable(typeof(BridgeResponse<SmbTaskStartResult>))]
 [JsonSerializable(typeof(BridgeResponse<SmbTaskStatus>))]
+[JsonSerializable(typeof(SmbCachedFile))]
+[JsonSerializable(typeof(SmbWriteResult))]
 [JsonSerializable(typeof(QuickLinkTarget))]
 [JsonSerializable(typeof(LocalFileEndpoint))]
 [JsonSerializable(typeof(TransferEndpoint))]

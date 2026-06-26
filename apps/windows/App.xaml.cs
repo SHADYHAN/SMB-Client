@@ -21,6 +21,7 @@ public partial class App : Application
 {
     private IAppSingleInstanceService? _singleInstanceService;
     private ILocalLinkRedirectService? _localLinkRedirectService;
+    private ShellViewModel? _shellViewModel;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -55,10 +56,11 @@ public partial class App : Application
 
         var bootstrapService = new BootstrapService(bridge);
         var sessionService = new SmbSessionService(bridge);
+        var taskService = new SmbTaskService(bridge);
         var directoryService = new DirectoryService(bridge);
         var remoteCopyMoveService = new RemoteCopyMoveService(bridge);
-        var fileOperationService = new FileOperationService(bridge);
-        var fileTransferService = new FileTransferService(bridge);
+        var fileOperationService = new FileOperationService(taskService);
+        var fileTransferService = new FileTransferService(taskService);
         var quickLinkService = new QuickLinkService(bridge);
         var linkActivationService = new LinkActivationService(bridge);
         var thumbnailService = new WindowsThumbnailService();
@@ -86,6 +88,7 @@ public partial class App : Application
             serverSettingsDialogService,
             shellDragDropService
         );
+        _shellViewModel = viewModel;
 
         _singleInstanceService.Activated += (_, args) =>
         {
@@ -142,6 +145,15 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        try
+        {
+            _shellViewModel?.ShutdownAsync().GetAwaiter().GetResult();
+        }
+        catch
+        {
+            // Shutdown should continue even if the SMB disconnect path fails.
+        }
+
         _localLinkRedirectService?.Dispose();
         _singleInstanceService?.Dispose();
         base.OnExit(e);

@@ -64,12 +64,20 @@ public sealed class WindowsShellDragDropService : IWindowsShellDragDropService
             MemoryStream? preferredDropEffect = null;
             if (file is not null)
             {
-                descriptor = BuildFileGroupDescriptor(file);
-                content = file.OpenReadStream();
                 preferredDropEffect = BuildPreferredDropEffect(DragDropEffects.Copy);
 
-                dataObject.SetData(FileGroupDescriptorW, descriptor, false);
-                dataObject.SetData(FileContents, content, false);
+                if (!string.IsNullOrWhiteSpace(file.LocalPath))
+                {
+                    dataObject.SetData(DataFormats.FileDrop, new[] { file.LocalPath }, false);
+                }
+                else
+                {
+                    descriptor = BuildFileGroupDescriptor(file);
+                    content = file.OpenReadStream();
+                    dataObject.SetData(FileGroupDescriptorW, descriptor, false);
+                    dataObject.SetData(FileContents, content, false);
+                }
+
                 dataObject.SetData(PreferredDropEffect, preferredDropEffect, false);
             }
 

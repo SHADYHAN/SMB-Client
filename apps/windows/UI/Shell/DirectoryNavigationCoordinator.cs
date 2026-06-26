@@ -16,8 +16,11 @@ public sealed class DirectoryNavigationCoordinator
     private readonly PreviewPaneViewModel _preview;
     private readonly StatusBarViewModel _status;
     private readonly Func<Exception, string, string> _userFacingError;
+    private readonly Func<Exception, Task<bool>> _handleSessionIssueAsync;
     private readonly SemaphoreSlim _directoryLoadLock = new(1, 1);
     private string? _loadingDirectoryKey;
+    private CancellationTokenSource? _directoryLoadCancellation;
+    private long _directoryLoadGeneration;
 
     public DirectoryNavigationCoordinator(
         IDirectoryService directoryService,
@@ -25,7 +28,8 @@ public sealed class DirectoryNavigationCoordinator
         NavigationTreeViewModel navigation,
         PreviewPaneViewModel preview,
         StatusBarViewModel status,
-        Func<Exception, string, string> userFacingError
+        Func<Exception, string, string> userFacingError,
+        Func<Exception, Task<bool>> handleSessionIssueAsync
     )
     {
         _directoryService = directoryService;
@@ -34,6 +38,7 @@ public sealed class DirectoryNavigationCoordinator
         _preview = preview;
         _status = status;
         _userFacingError = userFacingError;
+        _handleSessionIssueAsync = handleSessionIssueAsync;
     }
 
     public string? CurrentShare { get; private set; }
@@ -44,9 +49,9 @@ public sealed class DirectoryNavigationCoordinator
 
     public void Clear()
     {
+        CancelActiveDirectoryLoad();
         CurrentShare = null;
         CurrentPath = "/";
-        _loadingDirectoryKey = null;
     }
 
     public void ShowShareRoot(ServerSession session, string statusMessage, Action refreshCommands)
@@ -90,6 +95,11 @@ public sealed class DirectoryNavigationCoordinator
             return false;
         }
 
+        if (_loadingDirectoryKey is not null)
+        {
+            CancelActiveDirectoryLoad();
+        }
+
         await _directoryLoadLock.WaitAsync();
         try
         {
@@ -103,13 +113,19 @@ public sealed class DirectoryNavigationCoordinator
                 return false;
             }
 
-            _loadingDirectoryKey = normalizedKey;
+            var loadGeneration = BeginDirectoryLoad(normalizedKey);
+            var loadCancellationToken = _directoryLoadCancellation?.Token ?? CancellationToken.None;
             _fileList.IsLoading = true;
             _status.Message = "正在加载目录...";
 
             try
             {
-                var directory = await _directoryService.ListAsync(session, share, path);
+                var directory = await _directoryService.ListAsync(session, share, path, loadCancellationToken);
+                if (!IsCurrentLoad(loadGeneration) || loadCancellationToken.IsCancellationRequested)
+                {
+                    return false;
+                }
+
                 CurrentShare = directory.Share;
                 CurrentPath = directory.Path;
                 _fileList.ShowDirectory(directory, session.Host);
@@ -134,19 +150,33 @@ public sealed class DirectoryNavigationCoordinator
                 _status.Message = $"{directory.Items.Count} 个项目";
                 return true;
             }
+            catch (OperationCanceledException) when (!IsCurrentLoad(loadGeneration) || loadCancellationToken.IsCancellationRequested)
+            {
+                return false;
+            }
             catch (Exception ex)
             {
+                if (!IsCurrentLoad(loadGeneration))
+                {
+                    return false;
+                }
+
+                if (await _handleSessionIssueAsync(ex))
+                {
+                    return false;
+                }
+
                 _status.Message = _userFacingError(ex, "目录加载失败");
                 return false;
             }
             finally
             {
-                if (_loadingDirectoryKey == normalizedKey)
+                if (IsCurrentLoad(loadGeneration))
                 {
                     _loadingDirectoryKey = null;
+                    _directoryLoadCancellation = null;
+                    _fileList.IsLoading = false;
                 }
-
-                _fileList.IsLoading = false;
             }
         }
         finally
@@ -184,4 +214,23 @@ public sealed class DirectoryNavigationCoordinator
         var normalized = path.Replace('\\', '/').Trim();
         return normalized.StartsWith('/') ? normalized : "/" + normalized;
     }
+
+    private long BeginDirectoryLoad(string normalizedKey)
+    {
+        _directoryLoadCancellation = new CancellationTokenSource();
+        _loadingDirectoryKey = normalizedKey;
+        return Interlocked.Increment(ref _directoryLoadGeneration);
+    }
+
+    private void CancelActiveDirectoryLoad()
+    {
+        Interlocked.Increment(ref _directoryLoadGeneration);
+        _directoryLoadCancellation?.Cancel();
+        _directoryLoadCancellation = null;
+        _loadingDirectoryKey = null;
+        _fileList.IsLoading = false;
+    }
+
+    private bool IsCurrentLoad(long generation) =>
+        Interlocked.Read(ref _directoryLoadGeneration) == generation;
 }

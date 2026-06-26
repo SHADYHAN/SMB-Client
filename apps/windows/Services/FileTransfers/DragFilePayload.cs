@@ -6,5 +6,6 @@ public sealed record DragFilePayload(
     string FileName,
     ulong Size,
     DateTimeOffset? ModifiedAt,
-    Func<Stream> OpenReadStream
+    Func<Stream> OpenReadStream,
+    string? LocalPath = null
 );

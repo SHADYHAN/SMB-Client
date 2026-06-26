@@ -14,6 +14,13 @@ public interface IServerProfileService
         CancellationToken cancellationToken = default
     );
 
+    Task<ServerProfileSaveResult> SaveLoginProfileAsync(
+        ServerProfile? existingProfile,
+        string host,
+        string username,
+        CancellationToken cancellationToken = default
+    );
+
     Task<ServerProfileSaveResult> UpdateCredentialOptionsAsync(
         ServerProfile profile,
         bool rememberPassword,

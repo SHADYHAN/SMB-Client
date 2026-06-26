@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Input;
+using Rynat.WindowsClient.Infrastructure;
 using Rynat.WindowsClient.Domain;
 using Rynat.WindowsClient.Platform.Clipboard;
 using Rynat.WindowsClient.Platform.Dialogs;
@@ -39,6 +40,7 @@ public sealed class ShellViewModel : ObservableObject
     private readonly PreviewCoordinator _previewCoordinator;
     private readonly RemoteClipboardCoordinator _remoteClipboardCoordinator;
     private bool _isLoggedIn;
+    private bool _isHandlingSessionDisconnect;
 
     public ShellViewModel(
         IBootstrapService bootstrapService,
@@ -80,7 +82,8 @@ public sealed class ShellViewModel : ObservableObject
             Navigation,
             Preview,
             Status,
-            UserFacingError
+            UserFacingError,
+            HandleSessionIssueAsync
         );
         _fileDragDropCoordinator = new FileDragDropCoordinator(
             fileTransferService,
@@ -91,10 +94,12 @@ public sealed class ShellViewModel : ObservableObject
             _userDialogService,
             FileList,
             Status,
-            UserFacingError
+            UserFacingError,
+            HandleSessionIssueAsync,
+            HandleOperationResultAsync
         );
         _linkActivationCoordinator = new LinkActivationCoordinator(linkActivationService);
-        _previewCoordinator = new PreviewCoordinator(previewService, FileList, Preview);
+        _previewCoordinator = new PreviewCoordinator(previewService, FileList, Preview, HandleSessionIssueAsync);
         _remoteClipboardCoordinator = new RemoteClipboardCoordinator(
             _remoteCopyMoveService,
             names => _userDialogService.ConfirmOverwrite(names)
@@ -172,7 +177,7 @@ public sealed class ShellViewModel : ObservableObject
 
     public async Task SelectNavigationNodeAsync(NavigationNodeViewModel node)
     {
-        if (_session is null)
+        if (_session is null || !await EnsureActiveSessionAsync())
         {
             return;
         }
@@ -182,6 +187,12 @@ public sealed class ShellViewModel : ObservableObject
 
     public void ReportUiError(Exception exception, string fallback)
     {
+        if (BridgeExceptionClassifier.IsReconnectable(exception))
+        {
+            _ = HandleSessionDisconnectedAsync();
+            return;
+        }
+
         Status.Message = UserFacingError(exception, fallback);
     }
 
@@ -190,9 +201,14 @@ public sealed class ShellViewModel : ObservableObject
         await ActivateStartupLinkAsync(rawArguments);
     }
 
+    public async Task ShutdownAsync()
+    {
+        await DisconnectCurrentSessionAsync(updateUi: false);
+    }
+
     public async Task ToggleNavigationNodeAsync(NavigationNodeViewModel node)
     {
-        if (_session is null)
+        if (_session is null || !await EnsureActiveSessionAsync())
         {
             return;
         }
@@ -207,6 +223,11 @@ public sealed class ShellViewModel : ObservableObject
 
     public async Task SelectFileAsync(FileItemViewModel? item)
     {
+        if (_session is not null && item?.Item is { IsDirectory: false } && !await EnsureActiveSessionAsync())
+        {
+            return;
+        }
+
         await _previewCoordinator.SelectFileAsync(_session, item, RefreshFileCommands);
     }
 
@@ -216,6 +237,11 @@ public sealed class ShellViewModel : ObservableObject
         IReadOnlyList<RemoteFileItem>? preservedSelection = null
     )
     {
+        if (!await EnsureActiveSessionAsync())
+        {
+            return;
+        }
+
         await _fileDragDropCoordinator.StartFileDragAsync(
             _session,
             dragSource,
@@ -226,6 +252,11 @@ public sealed class ShellViewModel : ObservableObject
 
     public async Task UploadDroppedFilesAsync(IReadOnlyList<string> localPaths)
     {
+        if (!await EnsureActiveSessionAsync())
+        {
+            return;
+        }
+
         await _fileDragDropCoordinator.UploadDroppedFilesAsync(
             _session,
             _directoryNavigationCoordinator.CurrentShare,
@@ -257,6 +288,11 @@ public sealed class ShellViewModel : ObservableObject
         bool copyRequested
     )
     {
+        if (!await EnsureActiveSessionAsync())
+        {
+            return;
+        }
+
         await _fileDragDropCoordinator.DropRemoteItemsAsync(
             _session,
             payload,
@@ -269,7 +305,7 @@ public sealed class ShellViewModel : ObservableObject
 
     public async Task OpenFavoriteAsync(FavoriteLinkViewModel favorite)
     {
-        if (_session is null)
+        if (_session is null || !await EnsureActiveSessionAsync())
         {
             return;
         }
@@ -317,45 +353,117 @@ public sealed class ShellViewModel : ObservableObject
 
     private async Task LogoutAsync()
     {
+        Status.Message = "正在退出登录...";
+        var disconnected = await DisconnectCurrentSessionAsync(updateUi: true);
+        if (disconnected)
+        {
+            Status.Message = "已退出登录。";
+        }
+    }
+
+    private async Task<bool> DisconnectCurrentSessionAsync(bool updateUi)
+    {
         var session = _session;
-        if (session is null)
+        _previewCoordinator.Cancel();
+        _directoryNavigationCoordinator.Clear();
+
+        if (session is not null)
+        {
+            _session = null;
+            try
+            {
+                await _sessionService.DisconnectAsync(session);
+            }
+            catch (Exception ex)
+            {
+                if (updateUi)
+                {
+                    Status.Message = UserFacingError(ex, "退出登录时断开连接失败");
+                }
+
+                ResetSessionUi();
+                return false;
+            }
+        }
+
+        ResetSessionUi();
+        return true;
+    }
+
+    private void ResetSessionUi()
+    {
+        _remoteClipboardCoordinator.Clear();
+        Navigation.Roots.Clear();
+        Navigation.SelectedNode = null;
+        Navigation.LoadFavorites(Array.Empty<FavoriteLinkItem>());
+        Navigation.ShowShares();
+        FileList.Clear("未连接");
+        Preview.ShowSelection(null);
+        Login.Password = "";
+        IsLoggedIn = false;
+        OnPropertyChanged(nameof(HeaderUserLabel));
+        RefreshFileCommands();
+        RefreshShellCommands();
+    }
+
+    private async Task<bool> HandleSessionIssueAsync(Exception exception)
+    {
+        if (!BridgeExceptionClassifier.IsReconnectable(exception))
+        {
+            return false;
+        }
+
+        await HandleSessionDisconnectedAsync();
+        return true;
+    }
+
+    private async Task<bool> HandleOperationResultAsync(FileOperationResult result)
+    {
+        if (result.Succeeded || !BridgeExceptionClassifier.IsReconnectableCode(result.ErrorCode))
+        {
+            return false;
+        }
+
+        await HandleSessionDisconnectedAsync();
+        return true;
+    }
+
+    private async Task HandleSessionDisconnectedAsync()
+    {
+        if (_isHandlingSessionDisconnect)
         {
             return;
         }
 
-        var disconnectFailed = false;
-        Status.Message = "正在退出登录...";
+        _isHandlingSessionDisconnect = true;
         try
         {
-            await _sessionService.DisconnectAsync(session);
-        }
-        catch (Exception ex)
-        {
-            disconnectFailed = true;
-            Status.Message = UserFacingError(ex, "退出登录时断开连接失败");
+            await DisconnectCurrentSessionAsync(updateUi: false);
+            Login.Message = "连接已断开，请重新登录。";
+            Status.Message = "连接已断开，请重新登录。";
         }
         finally
         {
-            _session = null;
-            _remoteClipboardCoordinator.Clear();
-            _directoryNavigationCoordinator.Clear();
-            Navigation.Roots.Clear();
-            Navigation.SelectedNode = null;
-            Navigation.LoadFavorites(Array.Empty<FavoriteLinkItem>());
-            Navigation.ShowShares();
-            FileList.Clear("未连接");
-            Preview.ShowSelection(null);
-            Login.Password = "";
-            IsLoggedIn = false;
-            OnPropertyChanged(nameof(HeaderUserLabel));
-            RefreshFileCommands();
-            RefreshShellCommands();
+            _isHandlingSessionDisconnect = false;
+        }
+    }
+
+    private async Task<bool> EnsureActiveSessionAsync()
+    {
+        var session = _session;
+        if (session is null)
+        {
+            return false;
         }
 
-        if (!disconnectFailed)
+        var connected = await _sessionService.IsConnectedAsync(session);
+        if (connected)
         {
-            Status.Message = "已退出登录。";
+            return true;
         }
+
+        await HandleSessionDisconnectedAsync();
+        return false;
     }
 
     private async Task CopySelectedFileLinkAsync()
@@ -482,7 +590,7 @@ public sealed class ShellViewModel : ObservableObject
 
     private async Task CopyLinkAsync(RemoteFileItem? item)
     {
-        if (_session is null || item is null)
+        if (_session is null || item is null || !await EnsureActiveSessionAsync())
         {
             return;
         }
@@ -502,6 +610,11 @@ public sealed class ShellViewModel : ObservableObject
 
     private async Task RefreshCurrentDirectoryAsync()
     {
+        if (!await EnsureActiveSessionAsync())
+        {
+            return;
+        }
+
         if (_session is not null && FileList.IsShareRootView)
         {
             _directoryNavigationCoordinator.ShowShareRoot(
@@ -518,7 +631,7 @@ public sealed class ShellViewModel : ObservableObject
     private async Task CreateFolderAsync()
     {
         var currentShare = _directoryNavigationCoordinator.CurrentShare;
-        if (_session is null || currentShare is null)
+        if (_session is null || currentShare is null || !await EnsureActiveSessionAsync())
         {
             return;
         }
@@ -535,6 +648,11 @@ public sealed class ShellViewModel : ObservableObject
             _directoryNavigationCoordinator.CurrentPath,
             name
         );
+        if (await HandleOperationResultAsync(result))
+        {
+            return;
+        }
+
         Status.Message = result.Summary;
         if (result.Succeeded)
         {
@@ -544,7 +662,7 @@ public sealed class ShellViewModel : ObservableObject
 
     private async Task DeleteSelectedItemAsync()
     {
-        if (_session is null || FileList.SelectedItem?.Item is not { } item)
+        if (_session is null || FileList.SelectedItem?.Item is not { } item || !await EnsureActiveSessionAsync())
         {
             return;
         }
@@ -555,6 +673,11 @@ public sealed class ShellViewModel : ObservableObject
         }
 
         var result = await _fileOperationService.DeleteAsync(_session, item);
+        if (await HandleOperationResultAsync(result))
+        {
+            return;
+        }
+
         Status.Message = result.Summary;
         if (result.Succeeded)
         {
@@ -564,7 +687,7 @@ public sealed class ShellViewModel : ObservableObject
 
     private async Task RenameSelectedItemAsync()
     {
-        if (_session is null || FileList.SelectedItem?.Item is not { } item)
+        if (_session is null || FileList.SelectedItem?.Item is not { } item || !await EnsureActiveSessionAsync())
         {
             return;
         }
@@ -576,6 +699,11 @@ public sealed class ShellViewModel : ObservableObject
         }
 
         var result = await _fileOperationService.RenameAsync(_session, item, name);
+        if (await HandleOperationResultAsync(result))
+        {
+            return;
+        }
+
         Status.Message = result.Summary;
         if (result.Succeeded)
         {
@@ -610,7 +738,7 @@ public sealed class ShellViewModel : ObservableObject
     private async Task PasteRemoteClipboardAsync()
     {
         var currentShare = _directoryNavigationCoordinator.CurrentShare;
-        if (_session is null || currentShare is null)
+        if (_session is null || currentShare is null || !await EnsureActiveSessionAsync())
         {
             return;
         }
@@ -625,6 +753,11 @@ public sealed class ShellViewModel : ObservableObject
                 FileList.ContainsName
             );
             if (pasteResult is null)
+            {
+                return;
+            }
+
+            if (await HandleOperationResultAsync(pasteResult.OperationResult))
             {
                 return;
             }
@@ -737,6 +870,11 @@ public sealed class ShellViewModel : ObservableObject
 
     private async Task OpenSelectedItemAsync()
     {
+        if (!await EnsureActiveSessionAsync())
+        {
+            return;
+        }
+
         var selected = FileList.SelectedItem?.Item;
         if (selected is null || !selected.IsDirectory)
         {
@@ -754,7 +892,7 @@ public sealed class ShellViewModel : ObservableObject
 
     private async Task GoUpDirectoryAsync()
     {
-        if (_session is null || _directoryNavigationCoordinator.CurrentShare is not { } currentShare)
+        if (_session is null || _directoryNavigationCoordinator.CurrentShare is not { } currentShare || !await EnsureActiveSessionAsync())
         {
             return;
         }

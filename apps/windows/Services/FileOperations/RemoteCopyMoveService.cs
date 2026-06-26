@@ -39,13 +39,13 @@ public sealed class RemoteCopyMoveService : IRemoteCopyMoveService
 
                 if (item.IsDirectory)
                 {
+                    if (replaceExisting && FindItem(session, targetShare, targetPath, cancellationToken) is not null)
+                    {
+                        return Failure("暂不支持覆盖文件夹，请先删除目标文件夹后重试。", "file.directory_replace_not_supported");
+                    }
+
                     CopyDirectoryRecursive(session, item, targetShare, targetPath, replaceExisting, cancellationToken);
                     return new FileOperationResult(true, "已复制文件夹。");
-                }
-
-                if (replaceExisting && FindItem(session, targetShare, targetPath, cancellationToken)?.IsDirectory == true)
-                {
-                    DeleteTargetIfExists(session, targetShare, targetPath, cancellationToken);
                 }
 
                 _bridge.SmbCopyFile(new SmbCopyFileRequest(
@@ -98,7 +98,7 @@ public sealed class RemoteCopyMoveService : IRemoteCopyMoveService
 
                 if (replaceExisting)
                 {
-                    DeleteTargetIfExists(session, targetShare, targetPath, cancellationToken);
+                    return Failure("暂不支持覆盖移动，请先删除目标后重试。", "file.move_replace_not_supported");
                 }
 
                 _bridge.SmbRename(new SmbRenameRequest(
@@ -130,7 +130,7 @@ public sealed class RemoteCopyMoveService : IRemoteCopyMoveService
         cancellationToken.ThrowIfCancellationRequested();
         if (replaceExisting)
         {
-            DeleteTargetIfExists(session, targetShare, targetPath, cancellationToken);
+            throw new InvalidOperationException("Directory replacement must be rejected before copy starts.");
         }
 
         _bridge.SmbCreateDirectory(new SmbCreateDirectoryRequest(
@@ -177,67 +177,6 @@ public sealed class RemoteCopyMoveService : IRemoteCopyMoveService
                 OperationId("copy")
             ));
         }
-    }
-
-    private void DeleteTargetIfExists(
-        ServerSession session,
-        string share,
-        string path,
-        CancellationToken cancellationToken
-    )
-    {
-        var existing = FindItem(session, share, path, cancellationToken);
-        if (existing is null)
-        {
-            return;
-        }
-
-        DeleteRemotePathRecursive(session, existing, cancellationToken);
-    }
-
-    private void DeleteRemotePathRecursive(
-        ServerSession session,
-        RemoteFileItem item,
-        CancellationToken cancellationToken
-    )
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        if (item.IsDirectory)
-        {
-            var children = _bridge.SmbListDirectory(new SmbListDirectoryRequest(
-                item.Share,
-                item.Path,
-                session.ConnectionId,
-                OperationId("delete-list")
-            ));
-
-            foreach (var child in children)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                DeleteRemotePathRecursive(
-                    session,
-                    new RemoteFileItem(
-                        child.Name,
-                        item.Share,
-                        NormalizeRemotePath(child.Path),
-                        child.IsDir ? RemoteFileKind.Directory : RemoteFileKind.File,
-                        child.Size,
-                        child.ModifiedTime is null
-                            ? null
-                            : DateTimeOffset.FromUnixTimeSeconds(child.ModifiedTime.Value)
-                    ),
-                    cancellationToken
-                );
-            }
-        }
-
-        _bridge.SmbDelete(new SmbDeleteRequest(
-            item.Share,
-            item.Path,
-            item.IsDirectory,
-            session.ConnectionId,
-            OperationId("replace-delete")
-        ));
     }
 
     private RemoteFileItem? FindItem(

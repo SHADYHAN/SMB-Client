@@ -25,15 +25,21 @@ public sealed class LoginViewModel : ObservableObject
         get => _selectedProfile;
         set
         {
+            var previousProfile = _selectedProfile;
             if (!SetProperty(ref _selectedProfile, value))
             {
                 return;
             }
 
+            if (!string.Equals(previousProfile?.Id, value?.Id, StringComparison.Ordinal))
+            {
+                Password = string.Empty;
+            }
+
             if (value is not null)
             {
                 ServerHost = value.Host;
-                Username = value.Username ?? Username;
+                Username = value.Username ?? string.Empty;
                 RememberPassword = value.HasStoredCredential || RememberPassword;
                 AutoLogin = value.AutoLogin;
             }
@@ -160,8 +166,9 @@ public sealed class LoginViewModel : ObservableObject
         AutoLogin = autoLogin || SelectedProfile?.AutoLogin == true;
     }
 
-    public void UpsertProfile(ServerProfile profile)
+    public void UpsertProfile(ServerProfile profile, bool preservePassword = false)
     {
+        var currentPassword = Password;
         var existing = ServerProfiles.FirstOrDefault(item => item.Id == profile.Id);
         if (existing is not null)
         {
@@ -174,6 +181,10 @@ public sealed class LoginViewModel : ObservableObject
         }
 
         SelectedProfile = profile;
+        if (preservePassword)
+        {
+            Password = currentPassword;
+        }
     }
 
     public void ReplaceServerProfiles(IReadOnlyList<ServerProfile> profiles, ServerProfile? activeProfile)

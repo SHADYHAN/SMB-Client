@@ -260,6 +260,17 @@ public sealed class PreviewService : IPreviewService
         DeleteIfExists(partialPath);
         try
         {
+            using var cancellationRegistration = cancellationToken.Register(() =>
+            {
+                try
+                {
+                    _bridge.SmbCancelOperation(new SmbCancelOperationRequest(operationId));
+                }
+                catch
+                {
+                    // Cancellation is best-effort across the native bridge.
+                }
+            });
             var cached = _bridge.SmbCacheFile(new SmbCacheFileRequest(
                 item.Share,
                 item.Path,

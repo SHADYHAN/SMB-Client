@@ -8,6 +8,7 @@ public interface ISmbSessionService
         string host,
         string username,
         string password,
+        string? connectionId = null,
         CancellationToken cancellationToken = default
     );
 
@@ -17,4 +18,6 @@ public interface ISmbSessionService
     );
 
     Task DisconnectAsync(ServerSession session, CancellationToken cancellationToken = default);
+
+    Task<bool> IsConnectedAsync(ServerSession session, CancellationToken cancellationToken = default);
 }

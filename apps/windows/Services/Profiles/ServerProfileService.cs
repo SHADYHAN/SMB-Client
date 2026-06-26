@@ -82,6 +82,50 @@ public sealed class ServerProfileService : IServerProfileService
         }, cancellationToken);
     }
 
+    public Task<ServerProfileSaveResult> SaveLoginProfileAsync(
+        ServerProfile? existingProfile,
+        string host,
+        string username,
+        CancellationToken cancellationToken = default
+    )
+    {
+        return Task.Run(() =>
+        {
+            try
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var normalizedHost = host.Trim();
+                var normalizedUsername = username.Trim();
+                if (string.IsNullOrWhiteSpace(normalizedHost) || string.IsNullOrWhiteSpace(normalizedUsername))
+                {
+                    return Failure("服务器和用户名不能为空。", "server_profile.invalid");
+                }
+
+                var profile = _bridge.SaveServerProfile(new SaveServerProfileRequest(
+                    string.IsNullOrWhiteSpace(existingProfile?.Id) ? null : existingProfile.Id,
+                    DisplayNameFor(existingProfile, normalizedHost),
+                    normalizedHost,
+                    normalizedUsername,
+                    "username_password",
+                    "smb3_preferred",
+                    true
+                ));
+                cancellationToken.ThrowIfCancellationRequested();
+
+                return new ServerProfileSaveResult(
+                    true,
+                    MapProfile(profile),
+                    "服务器已保存。",
+                    null
+                );
+            }
+            catch (Exception ex) when (BridgeExceptionClassifier.IsBridgeFailure(ex))
+            {
+                return Failure("服务器保存失败。", BridgeExceptionClassifier.ErrorCodeFor(ex));
+            }
+        }, cancellationToken);
+    }
+
     public Task<ServerProfileSaveResult> UpdateCredentialOptionsAsync(
         ServerProfile profile,
         bool rememberPassword,

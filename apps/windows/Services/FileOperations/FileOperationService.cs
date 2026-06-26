@@ -1,20 +1,22 @@
 using System.IO;
+using System.Text.Json;
 using Rynat.Client;
 using Rynat.WindowsClient.Domain;
 using Rynat.WindowsClient.Infrastructure;
+using Rynat.WindowsClient.Services.Smb;
 
 namespace Rynat.WindowsClient.Services.FileOperations;
 
 public sealed class FileOperationService : IFileOperationService
 {
-    private readonly RynatCoreBridge _bridge;
+    private readonly ISmbTaskService _taskService;
 
-    public FileOperationService(RynatCoreBridge bridge)
+    public FileOperationService(ISmbTaskService taskService)
     {
-        _bridge = bridge;
+        _taskService = taskService;
     }
 
-    public Task<FileOperationResult> CreateDirectoryAsync(
+    public async Task<FileOperationResult> CreateDirectoryAsync(
         ServerSession session,
         string share,
         string parentPath,
@@ -22,102 +24,105 @@ public sealed class FileOperationService : IFileOperationService
         CancellationToken cancellationToken = default
     )
     {
-        return Task.Run(() =>
+        try
         {
-            try
+            cancellationToken.ThrowIfCancellationRequested();
+            var normalizedName = name.Trim();
+            if (!IsValidNewDirectoryName(normalizedName))
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                var normalizedName = name.Trim();
-                if (!IsValidNewDirectoryName(normalizedName))
-                {
-                    return Failure("名称不可用。", "file.invalid_name");
-                }
+                return Failure("名称不可用。", "file.invalid_name");
+            }
 
-                _bridge.SmbCreateDirectory(new SmbCreateDirectoryRequest(
+            await RunWriteTaskAsync(
+                SmbTaskOperation.CreateDirectory,
+                new SmbCreateDirectoryRequest(
                     share,
                     JoinRemotePath(parentPath, normalizedName),
-                    session.ConnectionId,
-                    OperationId("mkdir")
-                ));
+                    session.ConnectionId
+                ),
+                OperationId("mkdir"),
+                cancellationToken
+            );
 
-                return new FileOperationResult(true, "文件夹已创建。");
-            }
-            catch (Exception ex) when (BridgeExceptionClassifier.IsBridgeFailure(ex))
-            {
-                return Failure("创建失败。", BridgeExceptionClassifier.ErrorCodeFor(ex));
-            }
-        }, cancellationToken);
+            return new FileOperationResult(true, "文件夹已创建。");
+        }
+        catch (Exception ex) when (BridgeExceptionClassifier.IsBridgeFailure(ex))
+        {
+            return Failure("创建失败。", BridgeExceptionClassifier.ErrorCodeFor(ex));
+        }
     }
 
-    public Task<FileOperationResult> DeleteAsync(
+    public async Task<FileOperationResult> DeleteAsync(
         ServerSession session,
         RemoteFileItem item,
         CancellationToken cancellationToken = default
     )
     {
-        return Task.Run(() =>
+        try
         {
-            try
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                _bridge.SmbDelete(new SmbDeleteRequest(
+            cancellationToken.ThrowIfCancellationRequested();
+            await RunWriteTaskAsync(
+                SmbTaskOperation.Delete,
+                new SmbDeleteRequest(
                     item.Share,
                     item.Path,
                     item.IsDirectory,
-                    session.ConnectionId,
-                    OperationId("delete")
-                ));
+                    session.ConnectionId
+                ),
+                OperationId("delete"),
+                cancellationToken
+            );
 
-                return new FileOperationResult(true, "已删除。");
-            }
-            catch (Exception ex) when (BridgeExceptionClassifier.IsBridgeFailure(ex))
-            {
-                return Failure("删除失败。", BridgeExceptionClassifier.ErrorCodeFor(ex));
-            }
-        }, cancellationToken);
+            return new FileOperationResult(true, "已删除。");
+        }
+        catch (Exception ex) when (BridgeExceptionClassifier.IsBridgeFailure(ex))
+        {
+            return Failure("删除失败。", BridgeExceptionClassifier.ErrorCodeFor(ex));
+        }
     }
 
-    public Task<FileOperationResult> RenameAsync(
+    public async Task<FileOperationResult> RenameAsync(
         ServerSession session,
         RemoteFileItem item,
         string newName,
         CancellationToken cancellationToken = default
     )
     {
-        return Task.Run(() =>
+        try
         {
-            try
+            cancellationToken.ThrowIfCancellationRequested();
+            var normalizedName = newName.Trim();
+            if (!IsValidNewDirectoryName(normalizedName))
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                var normalizedName = newName.Trim();
-                if (!IsValidNewDirectoryName(normalizedName))
-                {
-                    return Failure("名称不可用。", "file.invalid_name");
-                }
+                return Failure("名称不可用。", "file.invalid_name");
+            }
 
-                if (normalizedName.Equals(item.Name, StringComparison.CurrentCultureIgnoreCase))
-                {
-                    return new FileOperationResult(true, "名称未改变。");
-                }
+            if (normalizedName.Equals(item.Name, StringComparison.CurrentCultureIgnoreCase))
+            {
+                return new FileOperationResult(true, "名称未改变。");
+            }
 
-                _bridge.SmbRename(new SmbRenameRequest(
+            await RunWriteTaskAsync(
+                SmbTaskOperation.Rename,
+                new SmbRenameRequest(
                     item.Share,
                     item.Path,
                     JoinRemotePath(ParentPath(item.Path), normalizedName),
-                    session.ConnectionId,
-                    OperationId("rename")
-                ));
+                    session.ConnectionId
+                ),
+                OperationId("rename"),
+                cancellationToken
+            );
 
-                return new FileOperationResult(true, "已重命名。");
-            }
-            catch (Exception ex) when (BridgeExceptionClassifier.IsBridgeFailure(ex))
-            {
-                return Failure("重命名失败。", BridgeExceptionClassifier.ErrorCodeFor(ex));
-            }
-        }, cancellationToken);
+            return new FileOperationResult(true, "已重命名。");
+        }
+        catch (Exception ex) when (BridgeExceptionClassifier.IsBridgeFailure(ex))
+        {
+            return Failure("重命名失败。", BridgeExceptionClassifier.ErrorCodeFor(ex));
+        }
     }
 
-    public Task<FileOperationResult> UploadFilesAsync(
+    public async Task<FileOperationResult> UploadFilesAsync(
         ServerSession session,
         string share,
         string parentPath,
@@ -126,54 +131,55 @@ public sealed class FileOperationService : IFileOperationService
         CancellationToken cancellationToken = default
     )
     {
-        return Task.Run(() =>
+        try
         {
-            try
+            cancellationToken.ThrowIfCancellationRequested();
+            if (localPaths.Count == 0)
+            {
+                return Failure("请选择文件。", "upload.no_files");
+            }
+
+            if (localPaths.Any(System.IO.Directory.Exists))
+            {
+                return Failure("暂不支持上传文件夹。", "upload.directory_not_supported");
+            }
+
+            var uploaded = 0;
+            foreach (var localPath in localPaths)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                if (localPaths.Count == 0)
+                if (!File.Exists(localPath))
                 {
-                    return Failure("请选择文件。", "upload.no_files");
+                    return Failure("上传失败。", "upload.missing_file");
                 }
 
-                if (localPaths.Any(System.IO.Directory.Exists))
+                var fileName = Path.GetFileName(localPath);
+                if (!IsValidNewDirectoryName(fileName))
                 {
-                    return Failure("暂不支持上传文件夹。", "upload.directory_not_supported");
+                    return Failure("文件名不可用。", "upload.invalid_name");
                 }
 
-                var uploaded = 0;
-                foreach (var localPath in localPaths)
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    if (!File.Exists(localPath))
-                    {
-                        return Failure("上传失败。", "upload.missing_file");
-                    }
-
-                    var fileName = Path.GetFileName(localPath);
-                    if (!IsValidNewDirectoryName(fileName))
-                    {
-                        return Failure("文件名不可用。", "upload.invalid_name");
-                    }
-
-                    _bridge.SmbUploadFile(new SmbUploadFileRequest(
+                await RunWriteTaskAsync(
+                    SmbTaskOperation.UploadFile,
+                    new SmbUploadFileRequest(
                         share,
                         localPath,
                         JoinRemotePath(parentPath, fileName),
                         replaceExisting,
-                        session.ConnectionId,
-                        OperationId("upload")
-                    ));
-                    uploaded++;
-                }
+                        session.ConnectionId
+                    ),
+                    OperationId("upload"),
+                    cancellationToken
+                );
+                uploaded++;
+            }
 
-                return new FileOperationResult(true, uploaded == 1 ? "上传完成。" : $"已上传 {uploaded} 个文件。");
-            }
-            catch (Exception ex) when (BridgeExceptionClassifier.IsBridgeFailure(ex) || ex is IOException or UnauthorizedAccessException)
-            {
-                return Failure("上传失败。", BridgeExceptionClassifier.ErrorCodeFor(ex, "upload.failed"));
-            }
-        }, cancellationToken);
+            return new FileOperationResult(true, uploaded == 1 ? "上传完成。" : $"已上传 {uploaded} 个文件。");
+        }
+        catch (Exception ex) when (BridgeExceptionClassifier.IsBridgeFailure(ex) || ex is IOException or UnauthorizedAccessException)
+        {
+            return Failure("上传失败。", BridgeExceptionClassifier.ErrorCodeFor(ex, "upload.failed"));
+        }
     }
 
     private static FileOperationResult Failure(string summary, string errorCode) =>
@@ -181,6 +187,26 @@ public sealed class FileOperationService : IFileOperationService
 
     private static string OperationId(string prefix) =>
         prefix + "-" + Guid.NewGuid().ToString("N");
+
+    private async Task RunWriteTaskAsync<TRequest>(
+        string operation,
+        TRequest request,
+        string operationId,
+        CancellationToken cancellationToken
+    )
+    {
+        var payload = JsonSerializer.SerializeToElement(
+            request,
+            RynatJsonContext.Default.Options
+        );
+        await _taskService.RunAsync(
+            operation,
+            payload,
+            operationId,
+            useIsolatedConnection: false,
+            cancellationToken: cancellationToken
+        );
+    }
 
     private static bool IsValidNewDirectoryName(string name)
     {

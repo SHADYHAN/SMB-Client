@@ -53,11 +53,27 @@ public sealed class LoginCoordinator
         try
         {
             var storedProfile = StoredCredentialProfileForLogin();
-            var hasTypedPassword = !string.IsNullOrEmpty(_login.Password);
+            var typedPassword = _login.Password;
+            var hasTypedPassword = !string.IsNullOrEmpty(typedPassword);
             var useStoredCredential = storedProfile is not null && !hasTypedPassword;
+            ServerProfile? loginProfile = storedProfile ?? MatchingSelectedProfile();
+            if (!useStoredCredential)
+            {
+                loginProfile = await EnsureLoginProfileAsync();
+                if (loginProfile is null)
+                {
+                    return;
+                }
+            }
+
             var result = useStoredCredential && storedProfile is not null
                 ? await _sessionService.ConnectStoredCredentialAsync(storedProfile)
-                : await _sessionService.ConnectAsync(_login.ServerHost, _login.Username, _login.Password);
+                : await _sessionService.ConnectAsync(
+                    _login.ServerHost,
+                    _login.Username,
+                    typedPassword,
+                    loginProfile?.Id
+                );
 
             if (!result.Succeeded || result.Session is null)
             {
@@ -72,7 +88,7 @@ public sealed class LoginCoordinator
             }
             else
             {
-                await SaveLoginProfileAsync();
+                await SaveLoginProfileAsync(loginProfile, typedPassword);
             }
 
             await _completeLoginAsync(result.Session);
@@ -144,13 +160,32 @@ public sealed class LoginCoordinator
             && (!string.IsNullOrEmpty(_login.Password) || StoredCredentialProfileForLogin() is not null);
     }
 
-    private async Task SaveLoginProfileAsync()
+    private async Task<ServerProfile?> EnsureLoginProfileAsync()
     {
-        var saveResult = await _serverProfileService.SaveLoginAsync(
+        var saveResult = await _serverProfileService.SaveLoginProfileAsync(
             MatchingSelectedProfile(),
             _login.ServerHost,
+            _login.Username
+        );
+
+        if (saveResult.Succeeded && saveResult.Profile is not null)
+        {
+            _login.UpsertProfile(saveResult.Profile, preservePassword: true);
+            return saveResult.Profile;
+        }
+
+        _login.Message = saveResult.Summary;
+        _status.Message = saveResult.Summary;
+        return null;
+    }
+
+    private async Task SaveLoginProfileAsync(ServerProfile? loginProfile, string password)
+    {
+        var saveResult = await _serverProfileService.SaveLoginAsync(
+            loginProfile ?? MatchingSelectedProfile(),
+            _login.ServerHost,
             _login.Username,
-            _login.Password,
+            password,
             _login.RememberPassword,
             _login.AutoLogin
         );

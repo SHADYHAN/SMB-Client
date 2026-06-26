@@ -1,10 +1,12 @@
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using Rynat.Client;
 using Rynat.WindowsClient.Domain;
 using Rynat.WindowsClient.Infrastructure;
 using Rynat.WindowsClient.Services.Cache;
+using Rynat.WindowsClient.Services.Smb;
 
 namespace Rynat.WindowsClient.Services.FileTransfers;
 
@@ -12,26 +14,17 @@ public sealed class FileTransferService : IFileTransferService
 {
     private const long DragCacheMaxBytes = 4L * 1024 * 1024 * 1024;
     private static readonly TimeSpan DragCacheMaxAge = TimeSpan.FromDays(3);
-    private readonly RynatCoreBridge _bridge;
+    private readonly ISmbTaskService _taskService;
 
-    public FileTransferService(RynatCoreBridge bridge)
+    public FileTransferService(ISmbTaskService taskService)
     {
-        _bridge = bridge;
+        _taskService = taskService;
     }
 
-    public Task<DragFilePayloadResult> CreateDragDownloadPayloadAsync(
+    public async Task<DragFilePayloadResult> CreateDragDownloadPayloadAsync(
         ServerSession session,
         IReadOnlyList<RemoteFileItem> items,
         CancellationToken cancellationToken = default
-    )
-    {
-        return Task.FromResult(CreateDragDownloadPayload(session, items, cancellationToken));
-    }
-
-    private DragFilePayloadResult CreateDragDownloadPayload(
-        ServerSession session,
-        IReadOnlyList<RemoteFileItem> items,
-        CancellationToken cancellationToken
     )
     {
         if (items.Count == 0)
@@ -49,16 +42,17 @@ public sealed class FileTransferService : IFileTransferService
         {
             cancellationToken.ThrowIfCancellationRequested();
             var localPath = DragCachePath(session, item);
+            if (!IsCompleteLocalFile(localPath, item.Size))
+            {
+                await DownloadFileAsync(session, item, localPath, cancellationToken);
+            }
+
             files.Add(new DragFilePayload(
                 SafeFileName(item.Name),
                 item.Size,
                 item.ModifiedAt,
-                () => new LazyRemoteDownloadStream(
-                    _bridge,
-                    session,
-                    item,
-                    localPath
-                )
+                () => File.Open(localPath, FileMode.Open, FileAccess.Read, FileShare.Read),
+                localPath
             ));
         }
 
@@ -68,92 +62,11 @@ public sealed class FileTransferService : IFileTransferService
     private static DragFilePayloadResult Failure(string summary, string errorCode) =>
         new(false, summary, Array.Empty<DragFilePayload>(), errorCode);
 
-    private sealed class LazyRemoteDownloadStream : Stream
-    {
-        private readonly RynatCoreBridge _bridge;
-        private readonly ServerSession _session;
-        private readonly RemoteFileItem _item;
-        private readonly string _localPath;
-        private FileStream? _inner;
-
-        public LazyRemoteDownloadStream(
-            RynatCoreBridge bridge,
-            ServerSession session,
-            RemoteFileItem item,
-            string localPath
-        )
-        {
-            _bridge = bridge;
-            _session = session;
-            _item = item;
-            _localPath = localPath;
-        }
-
-        public override bool CanRead => true;
-
-        public override bool CanSeek => true;
-
-        public override bool CanWrite => false;
-
-        public override long Length => CheckedLength(_item.Size);
-
-        public override long Position
-        {
-            get => _inner?.Position ?? 0;
-            set => EnsureInnerStream().Position = value;
-        }
-
-        public override void Flush()
-        {
-        }
-
-        public override int Read(byte[] buffer, int offset, int count) =>
-            EnsureInnerStream().Read(buffer, offset, count);
-
-        public override int Read(Span<byte> buffer) =>
-            EnsureInnerStream().Read(buffer);
-
-        public override long Seek(long offset, SeekOrigin origin) =>
-            EnsureInnerStream().Seek(offset, origin);
-
-        public override void SetLength(long value) =>
-            throw new NotSupportedException();
-
-        public override void Write(byte[] buffer, int offset, int count) =>
-            throw new NotSupportedException();
-
-        protected override void Dispose(bool disposing)
-        {
-            if (disposing)
-            {
-                _inner?.Dispose();
-            }
-
-            base.Dispose(disposing);
-        }
-
-        private FileStream EnsureInnerStream()
-        {
-            if (_inner is not null)
-            {
-                return _inner;
-            }
-
-            if (!IsCompleteLocalFile(_localPath, _item.Size))
-            {
-                DownloadFile(_bridge, _session, _item, _localPath);
-            }
-
-            _inner = File.Open(_localPath, FileMode.Open, FileAccess.Read, FileShare.Read);
-            return _inner;
-        }
-    }
-
-    private static void DownloadFile(
-        RynatCoreBridge bridge,
+    private async Task DownloadFileAsync(
         ServerSession session,
         RemoteFileItem item,
-        string localPath
+        string localPath,
+        CancellationToken cancellationToken
     )
     {
         System.IO.Directory.CreateDirectory(Path.GetDirectoryName(localPath)!);
@@ -162,14 +75,27 @@ public sealed class FileTransferService : IFileTransferService
 
         try
         {
-            var cached = bridge.SmbCacheFile(new SmbCacheFileRequest(
-                item.Share,
-                item.Path,
-                partialPath,
-                null,
-                session.ConnectionId,
-                OperationId("drag-download")
-            ));
+            var payload = JsonSerializer.SerializeToElement(
+                new SmbCacheFileRequest(
+                    item.Share,
+                    item.Path,
+                    partialPath,
+                    null,
+                    session.ConnectionId
+                ),
+                RynatJsonContext.Default.SmbCacheFileRequest
+            );
+            var data = await _taskService.RunAsync(
+                SmbTaskOperation.CacheFile,
+                payload,
+                OperationId("drag-download"),
+                useIsolatedConnection: false,
+                cancellationToken: cancellationToken
+            );
+            var cached = data?.Deserialize(
+                RynatJsonContext.Default.SmbCachedFile
+            ) ?? new SmbCachedFile(partialPath, 0);
+            cancellationToken.ThrowIfCancellationRequested();
             ReplaceWithCompletedFile(cached.LocalPath, localPath);
         }
         catch (Exception ex) when (BridgeExceptionClassifier.IsBridgeFailure(ex) || ex is IOException or UnauthorizedAccessException)
@@ -259,15 +185,5 @@ public sealed class FileTransferService : IFileTransferService
         var input = string.Join("\n", parts);
         var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(input));
         return Convert.ToHexString(bytes).ToLowerInvariant()[..16];
-    }
-
-    private static long CheckedLength(ulong size)
-    {
-        if (size > long.MaxValue)
-        {
-            throw new IOException("文件过大。");
-        }
-
-        return unchecked((long)size);
     }
 }

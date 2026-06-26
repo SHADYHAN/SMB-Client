@@ -17,13 +17,16 @@ public sealed class SmbSessionService : ISmbSessionService
         string host,
         string username,
         string password,
+        string? connectionId = null,
         CancellationToken cancellationToken = default
     )
     {
         return Task.Run(() =>
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var connectionId = Guid.NewGuid().ToString("N");
+            var scopedConnectionId = string.IsNullOrWhiteSpace(connectionId)
+                ? Guid.NewGuid().ToString("N")
+                : connectionId.Trim();
 
             try
             {
@@ -31,7 +34,7 @@ public sealed class SmbSessionService : ISmbSessionService
                     host.Trim(),
                     username.Trim(),
                     password,
-                    connectionId
+                    scopedConnectionId
                 ));
                 cancellationToken.ThrowIfCancellationRequested();
 
@@ -39,12 +42,12 @@ public sealed class SmbSessionService : ISmbSessionService
             }
             catch (OperationCanceledException)
             {
-                DisconnectQuietly(connectionId);
+                DisconnectQuietly(scopedConnectionId);
                 return Cancelled();
             }
             catch (Exception ex) when (BridgeExceptionClassifier.IsBridgeFailure(ex))
             {
-                DisconnectQuietly(connectionId);
+                DisconnectQuietly(scopedConnectionId);
                 return Failure(ex);
             }
         }, cancellationToken);
@@ -89,6 +92,22 @@ public sealed class SmbSessionService : ISmbSessionService
         {
             cancellationToken.ThrowIfCancellationRequested();
             _bridge.SmbDisconnect(new SmbConnectionScopedRequest(session.ConnectionId));
+        }, cancellationToken);
+    }
+
+    public Task<bool> IsConnectedAsync(ServerSession session, CancellationToken cancellationToken = default)
+    {
+        return Task.Run(() =>
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                return _bridge.SmbDiagnostics(new SmbConnectionScopedRequest(session.ConnectionId)).Connected;
+            }
+            catch (Exception ex) when (BridgeExceptionClassifier.IsBridgeFailure(ex))
+            {
+                return false;
+            }
         }, cancellationToken);
     }
 

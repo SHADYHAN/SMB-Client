@@ -86,6 +86,13 @@ public partial class FileListView : UserControl
         }
 
         SetRemoteDropTarget(null);
+        if (e.Data.GetDataPresent(RemoteDragPayload.DataFormat))
+        {
+            e.Effects = DragDropEffects.None;
+            e.Handled = true;
+            return;
+        }
+
         e.Effects = HasFileDrop(e) ? DragDropEffects.Copy : DragDropEffects.None;
         e.Handled = true;
     }
@@ -116,6 +123,11 @@ public partial class FileListView : UserControl
         }
 
         SetRemoteDropTarget(null);
+        if (e.Data.GetDataPresent(RemoteDragPayload.DataFormat))
+        {
+            return;
+        }
+
         if (!HasFileDrop(e) || e.Data.GetData(DataFormats.FileDrop) is not string[] paths)
         {
             return;
