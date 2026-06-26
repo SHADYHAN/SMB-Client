@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Windows;
+using System.Windows.Controls;
 using Rynat.WindowsClient.UI.Shell;
 
 namespace Rynat.WindowsClient;
@@ -67,5 +68,17 @@ public partial class MainWindow : Window
             _shell.FileList.SearchText = string.Empty;
             e.Handled = true;
         }
+    }
+
+    private void HeaderUserMenuButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button button || button.ContextMenu is null)
+        {
+            return;
+        }
+
+        button.ContextMenu.PlacementTarget = button;
+        button.ContextMenu.IsOpen = true;
+        e.Handled = true;
     }
 }

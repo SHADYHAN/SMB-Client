@@ -42,7 +42,7 @@
             </Grid.Style>
 
             <Grid.RowDefinitions>
-                <RowDefinition Height="50" />
+                <RowDefinition Height="44" />
                 <RowDefinition Height="*" />
                 <RowDefinition Height="30" />
             </Grid.RowDefinitions>
@@ -70,18 +70,22 @@
 
                     <Button Grid.Column="0"
                             Style="{StaticResource IconButtonStyle}"
-                            Content="‹"
                             Margin="0,0,6,0"
                             VerticalAlignment="Center"
                             Command="{Binding FileList.GoUpCommand}"
-                            ToolTip="返回上级" />
+                            ToolTip="返回上级">
+                        <TextBlock Text="&#xE72B;"
+                                   Style="{StaticResource HeaderGlyphStyle}" />
+                    </Button>
                     <Button Grid.Column="1"
                             Style="{StaticResource IconButtonStyle}"
-                            Content="⌂"
                             Margin="0,0,12,0"
                             VerticalAlignment="Center"
                             Command="{Binding FileList.GoShareRootCommand}"
-                            ToolTip="共享根目录" />
+                            ToolTip="共享根目录">
+                        <TextBlock Text="&#xE80F;"
+                                   Style="{StaticResource HeaderGlyphStyle}" />
+                    </Button>
                     <TextBlock Grid.Column="2"
                                Text="{Binding FileList.BreadcrumbText}"
                                FontSize="17"
@@ -103,34 +107,72 @@
                              ToolTip="搜索已加载目录" />
                     <Button Grid.Column="4"
                             Style="{StaticResource IconButtonStyle}"
-                            Content="↻"
                             Margin="0,0,6,0"
                             VerticalAlignment="Center"
                             Command="{Binding FileList.RefreshCommand}"
-                            ToolTip="刷新" />
+                            ToolTip="刷新">
+                        <TextBlock Text="&#xE72C;"
+                                   Style="{StaticResource HeaderGlyphStyle}" />
+                    </Button>
                     <Button Grid.Column="5"
                             Margin="0,0,8,0"
                             VerticalAlignment="Center"
                             Command="{Binding Preview.ToggleCommand}">
                         <Button.Style>
                             <Style TargetType="Button" BasedOn="{StaticResource IconButtonStyle}">
-                                <Setter Property="Content" Value="▯" />
                                 <Setter Property="ToolTip" Value="打开预览面板" />
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding Preview.IsVisible}" Value="True">
-                                        <Setter Property="Content" Value="▰" />
                                         <Setter Property="ToolTip" Value="关闭预览面板" />
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>
                         </Button.Style>
+                        <TextBlock>
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock" BasedOn="{StaticResource HeaderGlyphStyle}">
+                                    <Setter Property="Text" Value="&#xE8A0;" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Preview.IsVisible}" Value="True">
+                                            <Setter Property="Text" Value="&#xE89F;" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
                     </Button>
-                    <Button Grid.Column="6"
-                            Content="新建文件夹"
-                            MinHeight="30"
-                            Padding="12,4"
+                    <Button x:Name="HeaderUserMenuButton"
+                            Grid.Column="6"
+                            Style="{StaticResource HeaderUserButtonStyle}"
                             VerticalAlignment="Center"
-                            Command="{Binding FileList.CreateFolderCommand}" />
+                            Click="HeaderUserMenuButton_OnClick"
+                            ToolTip="用户菜单">
+                        <StackPanel Orientation="Horizontal"
+                                    VerticalAlignment="Center">
+                            <TextBlock Text="&#xE77B;"
+                                       Style="{StaticResource HeaderGlyphStyle}"
+                                       Margin="0,0,6,0" />
+                            <TextBlock Text="{Binding HeaderUserLabel}"
+                                       MaxWidth="120"
+                                       TextTrimming="CharacterEllipsis"
+                                       VerticalAlignment="Center" />
+                            <TextBlock Text="&#xE70D;"
+                                       Style="{StaticResource HeaderGlyphStyle}"
+                                       FontSize="10"
+                                       Margin="8,1,0,0" />
+                        </StackPanel>
+                        <Button.ContextMenu>
+                            <ContextMenu>
+                                <MenuItem Header="{Binding PlacementTarget.DataContext.HeaderUserLabel, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                          IsEnabled="False" />
+                                <Separator />
+                                <MenuItem Header="服务器设置..."
+                                          Command="{Binding PlacementTarget.DataContext.Login.ServerSettingsCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                <MenuItem Header="退出登录"
+                                          Command="{Binding PlacementTarget.DataContext.LogoutCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                            </ContextMenu>
+                        </Button.ContextMenu>
+                    </Button>
                 </Grid>
             </Border>
 

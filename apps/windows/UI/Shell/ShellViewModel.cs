@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Windows.Input;
 using Rynat.WindowsClient.Domain;
 using Rynat.WindowsClient.Platform.Clipboard;
 using Rynat.WindowsClient.Platform.Dialogs;
@@ -24,6 +25,7 @@ namespace Rynat.WindowsClient.UI.Shell;
 public sealed class ShellViewModel : ObservableObject
 {
     private readonly IBootstrapService _bootstrapService;
+    private readonly ISmbSessionService _sessionService;
     private readonly IFileOperationService _fileOperationService;
     private readonly IRemoteCopyMoveService _remoteCopyMoveService;
     private readonly IQuickLinkService _quickLinkService;
@@ -56,6 +58,7 @@ public sealed class ShellViewModel : ObservableObject
     )
     {
         _bootstrapService = bootstrapService;
+        _sessionService = sessionService;
         _fileOperationService = fileOperationService;
         _remoteCopyMoveService = remoteCopyMoveService;
         _quickLinkService = quickLinkService;
@@ -116,6 +119,7 @@ public sealed class ShellViewModel : ObservableObject
         Navigation.RemoveFavoriteCommand = new AsyncRelayCommand(RemoveFavoriteAsync, parameter => parameter is FavoriteLinkViewModel);
         Preview.ToggleCommand = new RelayCommand(() => Preview.IsVisible = !Preview.IsVisible);
         Preview.CopyLinkCommand = new AsyncRelayCommand(CopyPreviewLinkAsync, () => Preview.SelectedItem is not null && _session is not null);
+        LogoutCommand = new AsyncRelayCommand(LogoutAsync, () => _session is not null);
     }
 
     public LoginViewModel Login { get; } = new();
@@ -127,6 +131,12 @@ public sealed class ShellViewModel : ObservableObject
     public PreviewPaneViewModel Preview { get; } = new();
 
     public StatusBarViewModel Status { get; } = new();
+
+    public ICommand LogoutCommand { get; }
+
+    public string HeaderUserLabel => string.IsNullOrWhiteSpace(Login.Username)
+        ? "用户"
+        : Login.Username;
 
     public bool IsLoggedIn
     {
@@ -299,8 +309,53 @@ public sealed class ShellViewModel : ObservableObject
             RefreshFileCommands
         );
         await LoadFavoritesAsync();
+        OnPropertyChanged(nameof(HeaderUserLabel));
+        RefreshShellCommands();
         Status.Message = $"已连接 {_session.Host}。";
         await ConsumePendingLinkIfPossibleAsync();
+    }
+
+    private async Task LogoutAsync()
+    {
+        var session = _session;
+        if (session is null)
+        {
+            return;
+        }
+
+        var disconnectFailed = false;
+        Status.Message = "正在退出登录...";
+        try
+        {
+            await _sessionService.DisconnectAsync(session);
+        }
+        catch (Exception ex)
+        {
+            disconnectFailed = true;
+            Status.Message = UserFacingError(ex, "退出登录时断开连接失败");
+        }
+        finally
+        {
+            _session = null;
+            _remoteClipboardCoordinator.Clear();
+            _directoryNavigationCoordinator.Clear();
+            Navigation.Roots.Clear();
+            Navigation.SelectedNode = null;
+            Navigation.LoadFavorites(Array.Empty<FavoriteLinkItem>());
+            Navigation.ShowShares();
+            FileList.Clear("未连接");
+            Preview.ShowSelection(null);
+            Login.Password = "";
+            IsLoggedIn = false;
+            OnPropertyChanged(nameof(HeaderUserLabel));
+            RefreshFileCommands();
+            RefreshShellCommands();
+        }
+
+        if (!disconnectFailed)
+        {
+            Status.Message = "已退出登录。";
+        }
     }
 
     private async Task CopySelectedFileLinkAsync()
@@ -655,6 +710,14 @@ public sealed class ShellViewModel : ObservableObject
         if (Navigation.AddFavoriteCommand is AsyncRelayCommand addFavoriteCommand)
         {
             addFavoriteCommand.RaiseCanExecuteChanged();
+        }
+    }
+
+    private void RefreshShellCommands()
+    {
+        if (LogoutCommand is AsyncRelayCommand logoutCommand)
+        {
+            logoutCommand.RaiseCanExecuteChanged();
         }
     }
 

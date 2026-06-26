@@ -34,6 +34,9 @@
                 </ListView.ItemContainerStyle>
                 <ListView.ContextMenu>
                     <ContextMenu>
+                        <MenuItem Header="新建文件夹"
+                                  Command="{Binding PlacementTarget.DataContext.FileList.CreateFolderCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                        <Separator />
                         <MenuItem Header="剪切"
                                   Command="{Binding PlacementTarget.DataContext.FileList.CutCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
                         <MenuItem Header="复制"

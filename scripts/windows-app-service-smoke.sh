@@ -73,6 +73,7 @@ navigation_tree_xaml="$ROOT_DIR/apps/windows/UI/Navigation/NavigationTreeView.xa
 navigation_tree_view="$ROOT_DIR/apps/windows/UI/Navigation/NavigationTreeView.xaml.cs"
 preview_pane_view="$ROOT_DIR/apps/windows/UI/Preview/PreviewPaneView.xaml"
 preview_pane_view_model="$ROOT_DIR/apps/windows/UI/Preview/PreviewPaneViewModel.cs"
+rynat_theme="$ROOT_DIR/apps/windows/UI/Styles/RynatTheme.xaml"
 file_operation_interface="$ROOT_DIR/apps/windows/Services/FileOperations/IFileOperationService.cs"
 file_operation_service="$ROOT_DIR/apps/windows/Services/FileOperations/FileOperationService.cs"
 remote_copy_move_service="$ROOT_DIR/apps/windows/Services/FileOperations/RemoteCopyMoveService.cs"
@@ -147,6 +148,7 @@ required_files=(
     "apps/windows/UI/Navigation/NavigationTreeView.xaml"
     "apps/windows/UI/Preview/PreviewPaneView.xaml"
     "apps/windows/UI/Status/StatusBarView.xaml"
+    "apps/windows/UI/Styles/RynatTheme.xaml"
 )
 
 for relative_path in "${required_files[@]}"; do
@@ -289,7 +291,12 @@ assert_file_contains "$main_window_xaml" 'FileList\.GoUpCommand' 'workspace head
 assert_file_contains "$main_window_xaml" 'FileList\.GoShareRootCommand' 'workspace header binds share-root command'
 assert_file_contains "$main_window_xaml" 'FileList\.RefreshCommand' 'workspace header binds refresh command'
 assert_file_contains "$main_window_xaml" 'Preview\.ToggleCommand' 'workspace header keeps preview toggle visible'
+assert_file_not_contains "$main_window_xaml" 'CreateFolderCommand' 'workspace header leaves create-folder out of the macOS-style toolbar'
+assert_file_contains "$main_window_xaml" 'HeaderUserMenuButton' 'workspace header exposes a macOS-style user menu'
+assert_file_contains "$main_window_xaml" 'LogoutCommand' 'workspace user menu exposes logout'
 assert_file_contains "$file_list_xaml" 'FileList\.CopyLinkCommand' 'file list context menu commands bind through shell data context'
+assert_file_contains "$file_list_xaml" 'FileList\.CreateFolderCommand' 'file list context menu exposes create-folder action'
+assert_file_not_contains "$rynat_theme" 'ControlTemplate TargetType="ListViewItem"' 'file list item styling preserves GridView column rendering'
 assert_file_contains "$file_list_view_model" 'DirectoryLocationTitle' 'file list builds a macOS-style location title'
 assert_file_contains "$file_list_view_model" 'DirectoryBreadcrumbText' 'file list builds a macOS-style breadcrumb'
 assert_file_contains "$file_list_view" 'FocusWorkspaceSearch' 'file list Ctrl+F focuses workspace search'
