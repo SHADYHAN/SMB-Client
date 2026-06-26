@@ -5,6 +5,7 @@ namespace Rynat.WindowsClient.Services.Directory;
 
 public sealed class DirectoryService : IDirectoryService
 {
+    private static readonly TimeSpan DirectoryListTimeout = TimeSpan.FromSeconds(20);
     private readonly RynatCoreBridge _bridge;
 
     public DirectoryService(RynatCoreBridge bridge)
@@ -12,14 +13,14 @@ public sealed class DirectoryService : IDirectoryService
         _bridge = bridge;
     }
 
-    public Task<RemoteDirectory> ListAsync(
+    public async Task<RemoteDirectory> ListAsync(
         ServerSession session,
         string share,
         string path,
         CancellationToken cancellationToken = default
     )
     {
-        return Task.Run(() =>
+        var listTask = Task.Run(() =>
         {
             cancellationToken.ThrowIfCancellationRequested();
             var items = _bridge.SmbListDirectory(new SmbListDirectoryRequest(
@@ -28,6 +29,7 @@ public sealed class DirectoryService : IDirectoryService
                 session.ConnectionId,
                 Guid.NewGuid().ToString("N")
             ));
+            cancellationToken.ThrowIfCancellationRequested();
 
             return new RemoteDirectory(
                 share,
@@ -35,6 +37,17 @@ public sealed class DirectoryService : IDirectoryService
                 items.Select(item => MapItem(share, item)).ToArray()
             );
         }, cancellationToken);
+
+        var completedTask = await Task.WhenAny(
+            listTask,
+            Task.Delay(DirectoryListTimeout, cancellationToken)
+        );
+        if (completedTask != listTask)
+        {
+            throw new TimeoutException("目录加载超时，请重试。");
+        }
+
+        return await listTask;
     }
 
     private static RemoteFileItem MapItem(string share, SmbFileItem item)

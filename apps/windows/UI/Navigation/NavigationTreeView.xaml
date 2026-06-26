@@ -75,8 +75,10 @@
                     </HierarchicalDataTemplate>
                 </TreeView.Resources>
             </TreeView>
-            <ListView ItemsSource="{Binding Favorites}"
+            <ListView x:Name="FavoritesListView"
+                      ItemsSource="{Binding Favorites}"
                       MouseDoubleClick="FavoritesList_OnMouseDoubleClick"
+                      KeyDown="FavoritesList_OnKeyDown"
                       BorderThickness="0"
                       Background="Transparent">
                 <ListView.Style>

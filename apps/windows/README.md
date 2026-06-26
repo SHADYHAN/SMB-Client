@@ -54,14 +54,18 @@ Remaining feature migration should be added module by module rather than porting
 - Cross-platform WPF static smoke checks cover startup arguments, local redirect, protocol registration, and single-instance forwarding.
 - Remote copy/move logic is isolated in `RemoteCopyMoveService`, and shell paste state is isolated in `RemoteClipboardCoordinator`.
 - Remote cut/copy/paste supports extended multi-selection in the file list.
-- File-list keyboard polish includes Ctrl+A for selecting visible rows and Esc for leaving search / clearing selection.
-- Favorites can be added from the current item, opened from the sidebar, and removed without changing document-friendly copy-link behavior.
+- File-list navigation polish includes an 上级 toolbar button, a visible preview toggle, a current-location line, Ctrl+A for selecting visible rows, Esc for leaving search / clearing selection, and Alt+Up / Backspace for parent-directory navigation.
+- Directory loading has a bounded SMB list wait and duplicate in-flight load feedback; navigation-tree double-click toggles expansion locally.
+- Login preserves the remember-password choice when choosing a profile without stored credentials, and typed passwords are saved instead of only updating credential options.
+- Favorites can be added from the current item, opened from the sidebar, and removed without changing document-friendly copy-link behavior; the favorites list supports Enter to open and Delete to remove.
 - Internal remote drag/drop publishes a Windows-local payload and commits through `FileDragDropCoordinator`; file-list and navigation-tree drop targets now both show valid-target hover feedback.
 - Link startup parsing, pending activation, and session matching are isolated in `LinkActivationCoordinator`.
-- Directory loading, current path/share state, and navigation-tree selection are isolated in `DirectoryNavigationCoordinator`.
+- Login, auto-login, credential option persistence, and server settings are isolated in `LoginCoordinator`.
+- Directory loading, virtual share-root display, current path/share state, and navigation-tree selection are isolated in `DirectoryNavigationCoordinator`.
 - File selection preview loading is isolated in `PreviewCoordinator`.
 - Image previews now cache a lightweight local thumbnail; video previews use a Windows Shell poster before playback; oversized images/videos skip automatic preview caching.
 - File drag-out and local drop upload coordination are isolated in `FileDragDropCoordinator`.
+- Explorer/Desktop drag-out advertises a preferred local copy effect while internal remote drag/drop keeps its existing move/copy rules.
 - Preview and drag caches now have age/size cleanup with stale `.part` removal; oversized media no longer auto-caches for inline preview.
 
 ## Remaining Work
@@ -78,5 +82,5 @@ Follow-up quality work:
 
 - Observe video poster quality across common codecs; image previews now use lightweight thumbnails and oversized media avoids automatic inline caching.
 - Observe preview/drag cache cleanup behavior during Windows real-use testing.
-- Keep `ShellViewModel` focused on composition and command routing; continue extracting login/server-setting coordination only if it starts to grow.
+- Keep `ShellViewModel` focused on composition and command routing; login/server-setting workflow now stays behind `LoginCoordinator`.
 - Keep broadening smoke checks when new Windows activation or Shell integration paths are added.

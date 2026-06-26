@@ -24,15 +24,13 @@ namespace Rynat.WindowsClient.UI.Shell;
 public sealed class ShellViewModel : ObservableObject
 {
     private readonly IBootstrapService _bootstrapService;
-    private readonly ISmbSessionService _sessionService;
     private readonly IFileOperationService _fileOperationService;
     private readonly IRemoteCopyMoveService _remoteCopyMoveService;
     private readonly IQuickLinkService _quickLinkService;
-    private readonly IServerProfileService _serverProfileService;
     private readonly IClipboardService _clipboardService;
     private readonly IUserDialogService _userDialogService;
-    private readonly IServerSettingsDialogService _serverSettingsDialogService;
     private ServerSession? _session;
+    private readonly LoginCoordinator _loginCoordinator;
     private readonly DirectoryNavigationCoordinator _directoryNavigationCoordinator;
     private readonly FileDragDropCoordinator _fileDragDropCoordinator;
     private readonly LinkActivationCoordinator _linkActivationCoordinator;
@@ -58,14 +56,21 @@ public sealed class ShellViewModel : ObservableObject
     )
     {
         _bootstrapService = bootstrapService;
-        _sessionService = sessionService;
         _fileOperationService = fileOperationService;
         _remoteCopyMoveService = remoteCopyMoveService;
         _quickLinkService = quickLinkService;
-        _serverProfileService = serverProfileService;
         _clipboardService = clipboardService;
         _userDialogService = userDialogService;
-        _serverSettingsDialogService = serverSettingsDialogService;
+        _loginCoordinator = new LoginCoordinator(
+            sessionService,
+            serverProfileService,
+            serverSettingsDialogService,
+            Login,
+            Status,
+            CompleteLoginAsync,
+            UserFacingError,
+            () => IsLoggedIn
+        );
         _directoryNavigationCoordinator = new DirectoryNavigationCoordinator(
             directoryService,
             FileList,
@@ -92,14 +97,15 @@ public sealed class ShellViewModel : ObservableObject
             names => _userDialogService.ConfirmOverwrite(names)
         );
 
-        Login.LoginCommand = new AsyncRelayCommand(LoginAsync, CanLogin);
-        Login.ServerSettingsCommand = new AsyncRelayCommand(OpenServerSettingsAsync, () => !Login.IsBusy);
+        Login.LoginCommand = new AsyncRelayCommand(_loginCoordinator.LoginAsync, _loginCoordinator.CanLogin);
+        Login.ServerSettingsCommand = new AsyncRelayCommand(_loginCoordinator.OpenServerSettingsAsync, () => !Login.IsBusy);
         FileList.OpenItemCommand = new AsyncRelayCommand(OpenSelectedItemAsync, () => FileList.HasSingleSelection);
         FileList.CopyLinkCommand = new AsyncRelayCommand(CopySelectedFileLinkAsync, () => FileList.HasSingleSelection && _session is not null);
         FileList.CutCommand = new RelayCommand(CutSelectedItems, () => FileList.HasWritableSelection && _session is not null);
         FileList.CopyFileCommand = new RelayCommand(CopySelectedItems, () => FileList.HasWritableSelection && _session is not null);
         FileList.PasteCommand = new AsyncRelayCommand(PasteRemoteClipboardAsync, CanPasteRemoteClipboard);
         FileList.RefreshCommand = new AsyncRelayCommand(RefreshCurrentDirectoryAsync, CanRefreshCurrentView);
+        FileList.GoUpCommand = new AsyncRelayCommand(GoUpDirectoryAsync, CanGoUpDirectory);
         FileList.CreateFolderCommand = new AsyncRelayCommand(CreateFolderAsync, CanUseCurrentDirectory);
         FileList.DeleteCommand = new AsyncRelayCommand(DeleteSelectedItemAsync, () => FileList.HasSingleWritableSelection && _session is not null);
         FileList.RenameCommand = new AsyncRelayCommand(RenameSelectedItemAsync, () => FileList.HasSingleWritableSelection && _session is not null);
@@ -144,7 +150,7 @@ public sealed class ShellViewModel : ObservableObject
                 ? "未找到已保存服务器，已填入默认服务器地址。"
                 : $"已加载 {state.ServerProfiles.Count} 个服务器配置。";
 
-            await TryAutoLoginAsync();
+            await _loginCoordinator.TryAutoLoginAsync();
             await ActivateStartupLinkAsync(startupArguments);
         }
         catch (Exception ex)
@@ -279,188 +285,21 @@ public sealed class ShellViewModel : ObservableObject
             : "收藏打开失败。";
     }
 
-    private async Task LoginAsync()
-    {
-        if (!CanLogin())
-        {
-            return;
-        }
-
-        Login.IsBusy = true;
-        Login.Message = "正在连接...";
-        Status.Message = "正在连接服务器...";
-
-        try
-        {
-            var storedProfile = StoredCredentialProfileForLogin();
-            var useStoredCredential = storedProfile is not null && string.IsNullOrEmpty(Login.Password);
-            var result = useStoredCredential && storedProfile is not null
-                ? await _sessionService.ConnectStoredCredentialAsync(storedProfile)
-                : await _sessionService.ConnectAsync(Login.ServerHost, Login.Username, Login.Password);
-
-            if (!result.Succeeded || result.Session is null)
-            {
-                Login.Message = result.Summary;
-                Status.Message = result.Summary;
-                return;
-            }
-
-            if (useStoredCredential && storedProfile is not null)
-            {
-                await UpdateStoredCredentialOptionsAsync(storedProfile);
-            }
-            else
-            {
-                await SaveLoginProfileAsync();
-            }
-
-            await CompleteLoginAsync(result.Session);
-        }
-        catch (Exception ex)
-        {
-            Login.Message = UserFacingError(ex, "登录失败");
-            Status.Message = Login.Message;
-        }
-        finally
-        {
-            Login.IsBusy = false;
-        }
-    }
-
-    private async Task TryAutoLoginAsync()
-    {
-        var profile = StoredCredentialProfileForLogin();
-        if (IsLoggedIn || profile is null || !profile.AutoLogin)
-        {
-            return;
-        }
-
-        Login.IsBusy = true;
-        Login.Message = "正在自动登录...";
-        Status.Message = $"正在自动连接 {profile.DisplayName}...";
-
-        try
-        {
-            var result = await _sessionService.ConnectStoredCredentialAsync(profile);
-            if (!result.Succeeded || result.Session is null)
-            {
-                Login.Message = "自动登录失败，请手动登录。";
-                Status.Message = result.Summary;
-                return;
-            }
-
-            await CompleteLoginAsync(result.Session);
-        }
-        catch (Exception ex)
-        {
-            Login.Message = "自动登录失败，请手动登录。";
-            Status.Message = UserFacingError(ex, "自动登录失败");
-        }
-        finally
-        {
-            Login.IsBusy = false;
-        }
-    }
-
     private async Task CompleteLoginAsync(ServerSession session)
     {
         _session = session;
         _remoteClipboardCoordinator.Clear();
-        _directoryNavigationCoordinator.Clear();
         Navigation.LoadShares(_session.Shares);
         IsLoggedIn = true;
         Login.Password = "";
-        FileList.ShowShareRoot(_session);
+        _directoryNavigationCoordinator.ShowShareRoot(
+            _session,
+            $"已显示 {_session.Shares.Count} 个共享。",
+            RefreshFileCommands
+        );
         await LoadFavoritesAsync();
-        Preview.ShowSelection(null);
-        RefreshFileCommands();
         Status.Message = $"已连接 {_session.Host}。";
         await ConsumePendingLinkIfPossibleAsync();
-    }
-
-    private async Task OpenServerSettingsAsync()
-    {
-        var activeProfile = Login.SelectedProfile;
-        var result = await _serverSettingsDialogService.ShowAsync(Login.ServerProfiles.ToArray(), activeProfile);
-        if (result is null)
-        {
-            return;
-        }
-
-        Login.ReplaceServerProfiles(result.Profiles, result.ActiveProfile);
-        Status.Message = "服务器设置已更新。";
-    }
-
-    private async Task SaveLoginProfileAsync()
-    {
-        var saveResult = await _serverProfileService.SaveLoginAsync(
-            MatchingSelectedProfile(),
-            Login.ServerHost,
-            Login.Username,
-            Login.Password,
-            Login.RememberPassword,
-            Login.AutoLogin
-        );
-
-        if (saveResult.Succeeded && saveResult.Profile is not null)
-        {
-            Login.UpsertProfile(saveResult.Profile);
-            return;
-        }
-
-        Status.Message = saveResult.Summary;
-    }
-
-    private async Task UpdateStoredCredentialOptionsAsync(ServerProfile profile)
-    {
-        var saveResult = await _serverProfileService.UpdateCredentialOptionsAsync(
-            profile,
-            Login.RememberPassword,
-            Login.AutoLogin
-        );
-
-        if (saveResult.Succeeded && saveResult.Profile is not null)
-        {
-            Login.UpsertProfile(saveResult.Profile);
-            return;
-        }
-
-        Status.Message = saveResult.Summary;
-    }
-
-    private ServerProfile? MatchingSelectedProfile()
-    {
-        var selected = Login.SelectedProfile;
-        if (selected is null)
-        {
-            return null;
-        }
-
-        return selected.Host.Equals(Login.ServerHost.Trim(), StringComparison.OrdinalIgnoreCase)
-            ? selected
-            : null;
-    }
-
-    private ServerProfile? StoredCredentialProfileForLogin()
-    {
-        var profile = MatchingSelectedProfile();
-        if (profile?.HasStoredCredential != true)
-        {
-            return null;
-        }
-
-        var profileUsername = profile.Username?.Trim() ?? string.Empty;
-        return profileUsername.Equals(Login.Username.Trim(), StringComparison.OrdinalIgnoreCase)
-            ? profile
-            : null;
-    }
-
-    private bool CanLogin()
-    {
-        return !Login.IsBusy
-            && !string.IsNullOrWhiteSpace(Login.ServerHost)
-            && !string.IsNullOrWhiteSpace(Login.Username)
-            && (!string.IsNullOrEmpty(Login.Password) || StoredCredentialProfileForLogin() is not null);
     }
 
     private async Task CopySelectedFileLinkAsync()
@@ -609,9 +448,11 @@ public sealed class ShellViewModel : ObservableObject
     {
         if (_session is not null && FileList.IsShareRootView)
         {
-            FileList.ShowShareRoot(_session);
-            Status.Message = $"已刷新，共 {_session.Shares.Count} 个共享。";
-            RefreshFileCommands();
+            _directoryNavigationCoordinator.ShowShareRoot(
+                _session,
+                $"已刷新，共 {_session.Shares.Count} 个共享。",
+                RefreshFileCommands
+            );
             return;
         }
 
@@ -780,6 +621,11 @@ public sealed class ShellViewModel : ObservableObject
             refreshCommand.RaiseCanExecuteChanged();
         }
 
+        if (FileList.GoUpCommand is AsyncRelayCommand goUpCommand)
+        {
+            goUpCommand.RaiseCanExecuteChanged();
+        }
+
         if (FileList.CreateFolderCommand is AsyncRelayCommand createFolderCommand)
         {
             createFolderCommand.RaiseCanExecuteChanged();
@@ -812,6 +658,10 @@ public sealed class ShellViewModel : ObservableObject
     private bool CanUseCurrentDirectory() => _session is not null
         && _directoryNavigationCoordinator.HasCurrentDirectory;
 
+    private bool CanGoUpDirectory() => _session is not null
+        && _directoryNavigationCoordinator.HasCurrentDirectory
+        && !FileList.IsShareRootView;
+
     private bool CanPasteRemoteClipboard() => CanUseCurrentDirectory() && _remoteClipboardCoordinator.CanPaste;
 
     private async Task OpenSelectedItemAsync()
@@ -829,6 +679,29 @@ public sealed class ShellViewModel : ObservableObject
         }
 
         await LoadDirectoryAsync(selected.Share, selected.Path, null, expandNavigationNode: false);
+    }
+
+    private async Task GoUpDirectoryAsync()
+    {
+        if (_session is null || _directoryNavigationCoordinator.CurrentShare is not { } currentShare)
+        {
+            return;
+        }
+
+        var currentPath = DirectoryNavigationCoordinator.NormalizeDirectoryPath(
+            _directoryNavigationCoordinator.CurrentPath
+        );
+        if (currentPath == "/")
+        {
+            _directoryNavigationCoordinator.ShowShareRoot(
+                _session,
+                $"已返回全部共享，共 {_session.Shares.Count} 个共享。",
+                RefreshFileCommands
+            );
+            return;
+        }
+
+        await LoadDirectoryAsync(currentShare, ParentPath(currentPath), null, expandNavigationNode: false);
     }
 
     private async Task<bool> LoadDirectoryAsync(

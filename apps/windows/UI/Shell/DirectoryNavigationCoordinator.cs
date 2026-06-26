@@ -49,6 +49,21 @@ public sealed class DirectoryNavigationCoordinator
         _loadingDirectoryKey = null;
     }
 
+    public void ShowShareRoot(ServerSession session, string statusMessage, Action refreshCommands)
+    {
+        Clear();
+        if (_navigation.SelectedNode is not null)
+        {
+            _navigation.SelectedNode.IsSelected = false;
+        }
+
+        _navigation.SelectedNode = null;
+        _fileList.ShowShareRoot(session);
+        _preview.ShowSelection(null);
+        _status.Message = statusMessage;
+        refreshCommands();
+    }
+
     public async Task<bool> LoadAsync(
         ServerSession? session,
         string share,
@@ -64,6 +79,17 @@ public sealed class DirectoryNavigationCoordinator
         }
 
         var normalizedKey = $"{share}:{NormalizeDirectoryPath(path)}";
+        if (_loadingDirectoryKey == normalizedKey)
+        {
+            if (navigationNode is not null && expandNavigationNode is bool requestedExpansion)
+            {
+                navigationNode.IsExpanded = requestedExpansion;
+            }
+
+            _status.Message = "目录正在加载...";
+            return false;
+        }
+
         await _directoryLoadLock.WaitAsync();
         try
         {
@@ -86,7 +112,7 @@ public sealed class DirectoryNavigationCoordinator
                 var directory = await _directoryService.ListAsync(session, share, path);
                 CurrentShare = directory.Share;
                 CurrentPath = directory.Path;
-                _fileList.ShowDirectory(directory);
+                _fileList.ShowDirectory(directory, session.Host);
                 _preview.ShowSelection(null);
                 refreshCommands();
 

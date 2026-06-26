@@ -31,6 +31,22 @@ assert_file_contains() {
     printf 'OK: %s\n' "$description"
 }
 
+assert_file_not_contains() {
+    local path="$1"
+    local pattern="$2"
+    local description="$3"
+
+    assert_file_exists "$path" "$description" >/dev/null
+    if grep -Eq "$pattern" "$path"; then
+        printf 'Check failed: %s\n' "$description" >&2
+        printf '  file: %s\n' "$path" >&2
+        printf '  forbidden pattern: %s\n' "$pattern" >&2
+        exit 1
+    fi
+
+    printf 'OK: %s\n' "$description"
+}
+
 windows_project="$ROOT_DIR/apps/windows/Rynat.WindowsClient.csproj"
 windows_app="$ROOT_DIR/apps/windows/App.xaml.cs"
 native_methods="$ROOT_DIR/apps/windows/CoreAdapter/NativeMethods.cs"
@@ -38,12 +54,15 @@ core_bridge="$ROOT_DIR/apps/windows/CoreAdapter/RynatCoreBridge.cs"
 json_context="$ROOT_DIR/apps/windows/CoreAdapter/RynatJsonContext.cs"
 core_credential="$ROOT_DIR/crates/rynat-core/src/credential.rs"
 shell_view_model="$ROOT_DIR/apps/windows/UI/Shell/ShellViewModel.cs"
+login_coordinator="$ROOT_DIR/apps/windows/UI/Shell/LoginCoordinator.cs"
 directory_navigation_coordinator="$ROOT_DIR/apps/windows/UI/Shell/DirectoryNavigationCoordinator.cs"
+directory_service="$ROOT_DIR/apps/windows/Services/Directory/DirectoryService.cs"
 file_drag_drop_coordinator="$ROOT_DIR/apps/windows/UI/Shell/FileDragDropCoordinator.cs"
 link_activation_coordinator="$ROOT_DIR/apps/windows/UI/Shell/LinkActivationCoordinator.cs"
 preview_coordinator="$ROOT_DIR/apps/windows/UI/Shell/PreviewCoordinator.cs"
 remote_clipboard_coordinator="$ROOT_DIR/apps/windows/UI/Shell/RemoteClipboardCoordinator.cs"
 main_window="$ROOT_DIR/apps/windows/MainWindow.xaml.cs"
+login_view_model="$ROOT_DIR/apps/windows/UI/Login/LoginViewModel.cs"
 file_item_view_model="$ROOT_DIR/apps/windows/UI/Files/FileItemViewModel.cs"
 file_list_view_model="$ROOT_DIR/apps/windows/UI/Files/FileListViewModel.cs"
 file_list_xaml="$ROOT_DIR/apps/windows/UI/Files/FileListView.xaml"
@@ -112,6 +131,7 @@ required_files=(
     "apps/windows/Platform/Shell/WindowsThumbnailService.cs"
     "apps/windows/Platform/Shell/WindowsWindowForegroundService.cs"
     "apps/windows/UI/Shell/ShellViewModel.cs"
+    "apps/windows/UI/Shell/LoginCoordinator.cs"
     "apps/windows/UI/Shell/DirectoryNavigationCoordinator.cs"
     "apps/windows/UI/Shell/FileDragDropCoordinator.cs"
     "apps/windows/UI/Shell/LinkActivationCoordinator.cs"
@@ -154,6 +174,8 @@ assert_file_contains "$windows_app" 'new LocalLinkRedirectService\(bridge\)' 'lo
 assert_file_contains "$windows_app" 'WindowsSingleInstanceService' 'single-instance service registered'
 assert_file_contains "$windows_app" 'WindowsWindowForegroundService' 'foreground activation adapter registered'
 assert_file_contains "$main_window" 'ShellViewModel' 'MainWindow depends only on shell view model'
+assert_file_contains "$main_window" 'UpdatePreviewColumn' 'MainWindow only owns preview column view sizing'
+assert_file_not_contains "$main_window" 'Services\.|Platform\.|RynatCoreBridge|Smb|DirectoryService|FileOperation' 'MainWindow stays free of service/platform logic'
 
 printf 'Checking bridge coverage...\n'
 
@@ -171,6 +193,16 @@ assert_file_contains "$shell_view_model" 'CopyLinkCommand' 'shell exposes copy-l
 assert_file_contains "$shell_view_model" 'CutCommand' 'shell exposes cut command'
 assert_file_contains "$shell_view_model" 'CopyFileCommand' 'shell exposes remote copy command'
 assert_file_contains "$shell_view_model" 'PasteCommand' 'shell exposes remote paste command'
+assert_file_contains "$shell_view_model" 'GoUpCommand' 'shell exposes parent-directory command'
+assert_file_contains "$shell_view_model" 'LoginCoordinator' 'shell delegates login workflow'
+assert_file_contains "$login_coordinator" 'LoginAsync' 'login coordinator owns manual login workflow'
+assert_file_contains "$login_coordinator" 'TryAutoLoginAsync' 'login coordinator owns auto-login workflow'
+assert_file_contains "$login_coordinator" 'OpenServerSettingsAsync' 'login coordinator owns server settings workflow'
+assert_file_contains "$login_coordinator" 'StoredCredentialProfileForLogin' 'login coordinator owns stored-credential matching'
+assert_file_contains "$login_coordinator" 'SaveLoginProfileAsync' 'login coordinator owns login profile persistence'
+assert_file_contains "$login_coordinator" 'hasTypedPassword' 'login coordinator saves typed passwords instead of only updating options'
+assert_file_not_contains "$shell_view_model" 'private async Task LoginAsync|private async Task TryAutoLoginAsync|private async Task OpenServerSettingsAsync|SaveLoginProfileAsync|StoredCredentialProfileForLogin' 'shell keeps login flow out of ShellViewModel'
+assert_file_contains "$login_view_model" 'value\.HasStoredCredential \|\| RememberPassword' 'login profile selection preserves remember-password choice for new credentials'
 assert_file_contains "$shell_view_model" 'DirectoryNavigationCoordinator' 'shell delegates directory navigation workflow'
 assert_file_contains "$shell_view_model" 'RemoteClipboardCoordinator' 'shell delegates remote clipboard workflow'
 assert_file_contains "$shell_view_model" 'PasteRemoteClipboardAsync' 'shell pastes remote clipboard'
@@ -178,8 +210,12 @@ assert_file_contains "$shell_view_model" 'SelectedRemoteItems' 'shell uses multi
 assert_file_contains "$directory_navigation_coordinator" 'LoadAsync' 'directory navigation coordinator owns directory loading'
 assert_file_contains "$directory_navigation_coordinator" 'CurrentShare' 'directory navigation coordinator tracks current share'
 assert_file_contains "$directory_navigation_coordinator" 'CurrentPath' 'directory navigation coordinator tracks current path'
+assert_file_contains "$directory_navigation_coordinator" 'ShowShareRoot' 'directory navigation coordinator owns virtual share-root display'
+assert_file_contains "$directory_navigation_coordinator" '目录正在加载' 'directory navigation coordinator reports duplicate in-flight loads'
 assert_file_contains "$directory_navigation_coordinator" 'CurrentNavigationNode' 'directory navigation coordinator resolves current tree node'
 assert_file_contains "$directory_navigation_coordinator" 'NormalizeDirectoryPath' 'directory navigation coordinator normalizes directory paths'
+assert_file_contains "$directory_service" 'DirectoryListTimeout' 'directory service bounds SMB list waits'
+assert_file_contains "$directory_service" 'Task\.WhenAny' 'directory service returns on list timeout instead of waiting forever'
 assert_file_contains "$remote_clipboard_coordinator" 'RemoteClipboardItem' 'clipboard coordinator tracks remote clipboard item'
 assert_file_contains "$remote_clipboard_coordinator" 'foreach \(var item in clipboard\.Items\)' 'clipboard coordinator pastes multiple items'
 assert_file_contains "$remote_clipboard_coordinator" 'conflictNames' 'clipboard coordinator batches overwrite conflicts'
@@ -192,11 +228,14 @@ assert_file_contains "$shell_view_model" 'StartFileDragAsync' 'shell starts drag
 assert_file_contains "$shell_view_model" 'GetRemoteDropEffect' 'shell exposes remote drag/drop effect resolution'
 assert_file_contains "$shell_view_model" 'DropRemoteItemsAsync' 'shell exposes remote drag/drop commit workflow'
 assert_file_contains "$shell_view_model" 'FileDragDropCoordinator' 'shell delegates file drag/drop workflow'
-assert_file_contains "$shell_view_model" 'ShowShareRoot\(_session\)' 'shell shows share root directory after login'
+assert_file_contains "$shell_view_model" '_directoryNavigationCoordinator\.ShowShareRoot' 'shell routes virtual share-root display through directory coordinator'
 assert_file_contains "$shell_view_model" 'selected\.IsShareRoot' 'shell opens share-root entries as SMB share roots'
 assert_file_contains "$shell_view_model" 'HasWritableSelection' 'shell excludes share roots from remote cut/copy commands'
 assert_file_contains "$shell_view_model" 'HasSingleWritableSelection' 'shell excludes share roots from rename/delete commands'
 assert_file_contains "$shell_view_model" 'CanRefreshCurrentView' 'shell can refresh the virtual share-root view'
+assert_file_contains "$shell_view_model" 'GoUpDirectoryAsync' 'shell can navigate to the parent directory'
+assert_file_contains "$shell_view_model" 'CanGoUpDirectory' 'shell disables parent navigation outside remote directories'
+assert_file_contains "$shell_view_model" 'ParentPath\(currentPath\)' 'shell parent navigation uses normalized parent paths'
 assert_file_contains "$shell_view_model" 'LoadFavoritesAsync' 'shell loads favorites after login'
 assert_file_contains "$shell_view_model" 'AddSelectedFavoriteAsync' 'shell can add current item to favorites'
 assert_file_contains "$shell_view_model" 'OpenFavoriteAsync' 'shell can open favorite links'
@@ -241,6 +280,12 @@ assert_file_contains "$file_list_xaml" 'RemoteDropState\.ValidTarget' 'file list
 assert_file_contains "$file_list_view" 'DataFormats\.FileDrop' 'file list accepts local file drops'
 assert_file_contains "$file_list_xaml" 'x:Name="FilesListView"' 'file list exposes named list for keyboard focus management'
 assert_file_contains "$file_list_xaml" 'KeyDown="SearchBox_OnKeyDown"' 'search box handles escape key'
+assert_file_contains "$file_list_xaml" 'Content="上级"' 'file list toolbar exposes parent-directory button'
+assert_file_contains "$file_list_xaml" 'Command="\{Binding FileList\.GoUpCommand\}"' 'file list toolbar binds parent-directory command'
+assert_file_contains "$file_list_xaml" 'FileList\.LocationTitle' 'file list toolbar shows full current location'
+assert_file_contains "$file_list_xaml" 'Preview\.ToggleCommand' 'file list toolbar keeps preview toggle visible'
+assert_file_contains "$file_list_xaml" 'FileList\.CopyLinkCommand' 'file list context menu commands bind through shell data context'
+assert_file_contains "$file_list_view_model" 'DirectoryLocationTitle' 'file list builds a macOS-style location title'
 assert_file_contains "$file_list_view" 'Key\.A' 'file list handles select-all shortcut'
 assert_file_contains "$file_list_view" 'SelectAll\(\)' 'file list select-all uses WPF selection'
 assert_file_contains "$file_list_view" 'Key\.Escape' 'file list handles escape key'
@@ -248,12 +293,17 @@ assert_file_contains "$file_list_view" 'ClearSearchOrSelection' 'file list escap
 assert_file_contains "$file_list_view" 'Key\.Delete' 'file list handles delete key'
 assert_file_contains "$file_list_view" 'Key\.F2' 'file list handles rename shortcut'
 assert_file_contains "$file_list_view" 'Key\.F5' 'file list handles refresh shortcut'
+assert_file_contains "$file_list_view" 'Key\.Back' 'file list handles Backspace parent navigation'
+assert_file_contains "$file_list_view" 'ModifierKeys\.Alt' 'file list handles Alt-modified shortcuts'
+assert_file_contains "$file_list_view" 'Key\.Up' 'file list handles Alt+Up parent navigation'
+assert_file_contains "$file_list_view" 'SystemKey' 'file list handles WPF system-key Alt+Up events'
 assert_file_contains "$file_list_view" 'Key\.X' 'file list handles cut shortcut'
 assert_file_contains "$file_list_view" 'Key\.C' 'file list handles remote copy shortcut'
 assert_file_contains "$file_list_view" 'Key\.V' 'file list handles paste shortcut'
 assert_file_contains "$file_list_view_model" 'ShowShareRoot' 'file list can show virtual share root entries'
 assert_file_contains "$file_list_view_model" 'IsShareRootView' 'file list tracks virtual share-root view'
 assert_file_contains "$file_list_view_model" 'IsShareRoot: true' 'file list marks share root entries'
+assert_file_contains "$file_list_view_model" 'GoUpCommand' 'file list exposes parent-directory command'
 assert_file_contains "$file_list_view_model" 'HasWritableSelection' 'file list distinguishes writable selections'
 assert_file_contains "$file_drag_drop_coordinator" 'selectedItems\.Any\(selected => selected\.IsShareRoot\)' 'drag source excludes share-root entries'
 assert_file_contains "$navigation_node_view_model" 'enum NavigationDropState' 'navigation node tracks remote drop hover state'
@@ -264,8 +314,12 @@ assert_file_contains "$navigation_tree_xaml" 'ShowFavoritesCommand' 'navigation 
 assert_file_contains "$navigation_tree_xaml" 'AddFavoriteCommand' 'navigation sidebar exposes add-favorite action'
 assert_file_contains "$navigation_tree_xaml" 'RemoveFavoriteCommand' 'navigation sidebar exposes remove-favorite action'
 assert_file_contains "$navigation_tree_xaml" 'ItemsSource="\{Binding Favorites\}"' 'navigation sidebar lists favorites'
+assert_file_contains "$navigation_tree_xaml" 'KeyDown="FavoritesList_OnKeyDown"' 'favorites list handles keyboard shortcuts'
 assert_file_contains "$navigation_tree_view" 'SetRemoteDropTarget' 'navigation tree updates remote drop hover state'
+assert_file_contains "$navigation_tree_view" 'node\.IsExpanded = !node\.IsExpanded' 'navigation tree double-click toggles expansion locally'
 assert_file_contains "$navigation_tree_view" 'OpenFavoriteAsync' 'navigation tree opens favorite rows'
+assert_file_contains "$navigation_tree_view" 'Key\.Enter' 'favorites list opens selected favorite with Enter'
+assert_file_contains "$navigation_tree_view" 'Key\.Delete' 'favorites list removes selected favorite with Delete'
 assert_file_contains "$navigation_tree_view" 'e\.Effects == DragDropEffects\.None \? null : target' 'navigation tree highlights only valid remote drop targets'
 
 assert_file_contains "$file_operation_interface" 'CreateDirectoryAsync' 'file operation interface supports create folder'
@@ -276,6 +330,7 @@ assert_file_contains "$file_operation_service" 'SmbCreateDirectory' 'file operat
 assert_file_contains "$file_operation_service" 'SmbDelete' 'file operation service calls core delete'
 assert_file_contains "$file_operation_service" 'SmbRename' 'file operation service calls core rename'
 assert_file_contains "$file_operation_service" 'SmbUploadFile' 'file operation service calls core upload'
+assert_file_not_contains "$file_operation_service" 'CopyDirectoryRecursive|DeleteRemotePathRecursive|IRemoteCopyMoveService|FileDragDropCoordinator' 'file operation service stays free of recursive drag/copy workflows'
 assert_file_contains "$remote_copy_move_service" 'SmbCopyFile' 'remote copy/move service calls core copy'
 assert_file_contains "$remote_copy_move_service" 'SmbRename' 'remote copy/move service calls core move'
 assert_file_contains "$remote_copy_move_service" 'CopyDirectoryRecursive' 'remote copy/move service copies directories recursively'
@@ -289,6 +344,7 @@ assert_file_contains "$file_transfer_service" 'CleanupDirectory' 'drag cache cle
 assert_file_contains "$file_transfer_service" '\.part' 'drag-out downloads to partial file before completion'
 assert_file_contains "$shell_drag_drop_service" 'FileGroupDescriptorW' 'drag-out publishes virtual file descriptor'
 assert_file_contains "$shell_drag_drop_service" 'FileContents' 'drag-out publishes virtual file contents'
+assert_file_contains "$shell_drag_drop_service" 'Preferred DropEffect' 'drag-out tells Explorer the preferred local drop effect'
 assert_file_contains "$shell_drag_drop_service" 'RemoteDragPayload\.DataFormat' 'drag service publishes internal remote drag payload'
 
 assert_file_contains "$preview_service" 'PreviewCache' 'preview service uses preview cache'

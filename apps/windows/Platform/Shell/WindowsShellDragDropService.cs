@@ -10,6 +10,7 @@ public sealed class WindowsShellDragDropService : IWindowsShellDragDropService
 {
     private const string FileGroupDescriptorW = "FileGroupDescriptorW";
     private const string FileContents = "FileContents";
+    private const string PreferredDropEffect = "Preferred DropEffect";
     private const uint FdAttributes = 0x00000004;
     private const uint FdWriteTime = 0x00000020;
     private const uint FdFileSize = 0x00000040;
@@ -60,13 +61,16 @@ public sealed class WindowsShellDragDropService : IWindowsShellDragDropService
 
             MemoryStream? descriptor = null;
             Stream? content = null;
+            MemoryStream? preferredDropEffect = null;
             if (file is not null)
             {
                 descriptor = BuildFileGroupDescriptor(file);
                 content = file.OpenReadStream();
+                preferredDropEffect = BuildPreferredDropEffect(DragDropEffects.Copy);
 
                 dataObject.SetData(FileGroupDescriptorW, descriptor, false);
                 dataObject.SetData(FileContents, content, false);
+                dataObject.SetData(PreferredDropEffect, preferredDropEffect, false);
             }
 
             var payload = new VirtualFileDragPayload(dataObject);
@@ -78,6 +82,11 @@ public sealed class WindowsShellDragDropService : IWindowsShellDragDropService
             if (content is not null)
             {
                 payload._disposables.Add(content);
+            }
+
+            if (preferredDropEffect is not null)
+            {
+                payload._disposables.Add(preferredDropEffect);
             }
 
             return payload;
@@ -120,6 +129,11 @@ public sealed class WindowsShellDragDropService : IWindowsShellDragDropService
         }
 
         return new MemoryStream(buffer);
+    }
+
+    private static MemoryStream BuildPreferredDropEffect(DragDropEffects effect)
+    {
+        return new MemoryStream(BitConverter.GetBytes((int)effect));
     }
 
     private static FileTime ToFileTime(DateTimeOffset timestamp)

@@ -34,7 +34,7 @@ public sealed class LoginViewModel : ObservableObject
             {
                 ServerHost = value.Host;
                 Username = value.Username ?? Username;
-                RememberPassword = value.HasStoredCredential;
+                RememberPassword = value.HasStoredCredential || RememberPassword;
                 AutoLogin = value.AutoLogin;
             }
 

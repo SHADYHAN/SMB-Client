@@ -12,6 +12,7 @@ public sealed class FileListViewModel : ObservableObject
     private IReadOnlyList<RemoteFileItem> _selectedRemoteItems = Array.Empty<RemoteFileItem>();
     private FileItemViewModel? _selectedItem;
     private string _pathTitle = "未连接";
+    private string _locationTitle = "未连接";
     private string _searchText = string.Empty;
     private bool _isLoading;
 
@@ -39,6 +40,12 @@ public sealed class FileListViewModel : ObservableObject
     {
         get => _pathTitle;
         set => SetProperty(ref _pathTitle, value);
+    }
+
+    public string LocationTitle
+    {
+        get => _locationTitle;
+        set => SetProperty(ref _locationTitle, value);
     }
 
     public string SearchText
@@ -87,6 +94,8 @@ public sealed class FileListViewModel : ObservableObject
     public ICommand PasteCommand { get; set; } = new RelayCommand(_ => { });
 
     public ICommand RefreshCommand { get; set; } = new RelayCommand(_ => { });
+
+    public ICommand GoUpCommand { get; set; } = new RelayCommand(_ => { });
 
     public ICommand CreateFolderCommand { get; set; } = new RelayCommand(_ => { });
 
@@ -153,12 +162,13 @@ public sealed class FileListViewModel : ObservableObject
         }
     }
 
-    public void ShowDirectory(RemoteDirectory directory)
+    public void ShowDirectory(RemoteDirectory directory, string? serverHost = null)
     {
         IsShareRootView = false;
         PathTitle = directory.Path == "/"
             ? directory.Share
             : $"{directory.Share}{directory.Path}";
+        LocationTitle = DirectoryLocationTitle(serverHost, directory.Share, directory.Path);
         SearchText = string.Empty;
         _allItems.Clear();
 
@@ -176,6 +186,7 @@ public sealed class FileListViewModel : ObservableObject
     {
         IsShareRootView = true;
         PathTitle = "全部共享";
+        LocationTitle = $"{session.Host} > 全部共享";
         SearchText = string.Empty;
         _allItems.Clear();
 
@@ -199,6 +210,7 @@ public sealed class FileListViewModel : ObservableObject
     {
         IsShareRootView = false;
         PathTitle = title;
+        LocationTitle = title;
         SearchText = string.Empty;
         _allItems.Clear();
         Items.Clear();
@@ -232,5 +244,22 @@ public sealed class FileListViewModel : ObservableObject
         }
 
         ReplaceSelectedItems(_selectedItems.Where(Items.Contains).ToArray());
+    }
+
+    private static string DirectoryLocationTitle(string? serverHost, string share, string path)
+    {
+        var parts = new List<string>();
+        if (!string.IsNullOrWhiteSpace(serverHost))
+        {
+            parts.Add(serverHost);
+        }
+
+        parts.Add(share);
+        if (path != "/")
+        {
+            parts.AddRange(path.Split('/', StringSplitOptions.RemoveEmptyEntries));
+        }
+
+        return string.Join(" > ", parts);
     }
 }

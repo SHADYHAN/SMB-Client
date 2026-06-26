@@ -52,8 +52,7 @@
 
             <navigation:NavigationTreeView Grid.Column="0"
                                            DataContext="{Binding Navigation}" />
-            <files:FileListView Grid.Column="1"
-                                DataContext="{Binding FileList}" />
+            <files:FileListView Grid.Column="1" />
             <preview:PreviewPaneView Grid.Column="2"
                                      DataContext="{Binding Preview}">
                 <preview:PreviewPaneView.Style>

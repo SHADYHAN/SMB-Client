@@ -13,12 +13,15 @@ $nativeMethods = Join-Path $root "apps\windows\CoreAdapter\NativeMethods.cs"
 $coreBridge = Join-Path $root "apps\windows\CoreAdapter\RynatCoreBridge.cs"
 $jsonContext = Join-Path $root "apps\windows\CoreAdapter\RynatJsonContext.cs"
 $shellViewModel = Join-Path $root "apps\windows\UI\Shell\ShellViewModel.cs"
+$loginCoordinator = Join-Path $root "apps\windows\UI\Shell\LoginCoordinator.cs"
 $directoryNavigationCoordinator = Join-Path $root "apps\windows\UI\Shell\DirectoryNavigationCoordinator.cs"
+$directoryService = Join-Path $root "apps\windows\Services\Directory\DirectoryService.cs"
 $fileDragDropCoordinator = Join-Path $root "apps\windows\UI\Shell\FileDragDropCoordinator.cs"
 $linkActivationCoordinator = Join-Path $root "apps\windows\UI\Shell\LinkActivationCoordinator.cs"
 $previewCoordinator = Join-Path $root "apps\windows\UI\Shell\PreviewCoordinator.cs"
 $remoteClipboardCoordinator = Join-Path $root "apps\windows\UI\Shell\RemoteClipboardCoordinator.cs"
 $mainWindow = Join-Path $root "apps\windows\MainWindow.xaml.cs"
+$loginViewModel = Join-Path $root "apps\windows\UI\Login\LoginViewModel.cs"
 $fileListViewModel = Join-Path $root "apps\windows\UI\Files\FileListViewModel.cs"
 $fileListXaml = Join-Path $root "apps\windows\UI\Files\FileListView.xaml"
 $fileListView = Join-Path $root "apps\windows\UI\Files\FileListView.xaml.cs"
@@ -71,6 +74,23 @@ function Assert-FileContains {
 
     $content = Get-Content -Raw -Encoding UTF8 $Path
     if ($content -notmatch $Pattern) {
+        throw "Check failed: $Description"
+    }
+
+    Write-Host "OK: $Description"
+}
+
+function Assert-FileNotContains {
+    param(
+        [string]$Path,
+        [string]$Pattern,
+        [string]$Description
+    )
+
+    Assert-FileExists -Path $Path -Description $Description | Out-Null
+
+    $content = Get-Content -Raw -Encoding UTF8 $Path
+    if ($content -match $Pattern) {
         throw "Check failed: $Description"
     }
 
@@ -131,6 +151,7 @@ $requiredFiles = @(
     "apps\windows\Platform\Shell\WindowsThumbnailService.cs",
     "apps\windows\Platform\Shell\WindowsWindowForegroundService.cs",
     "apps\windows\UI\Shell\ShellViewModel.cs",
+    "apps\windows\UI\Shell\LoginCoordinator.cs",
     "apps\windows\UI\Shell\DirectoryNavigationCoordinator.cs",
     "apps\windows\UI\Shell\FileDragDropCoordinator.cs",
     "apps\windows\UI\Shell\LinkActivationCoordinator.cs",
@@ -173,6 +194,8 @@ Assert-FileContains -Path $windowsApp -Pattern "WindowsSingleInstanceService" -D
 Assert-FileContains -Path $windowsApp -Pattern "WindowsWindowForegroundService" -Description "foreground activation adapter registered"
 
 Assert-FileContains -Path $mainWindow -Pattern "ShellViewModel" -Description "MainWindow depends only on shell view model"
+Assert-FileContains -Path $mainWindow -Pattern "UpdatePreviewColumn" -Description "MainWindow only owns preview column view sizing"
+Assert-FileNotContains -Path $mainWindow -Pattern "Services\.|Platform\.|RynatCoreBridge|Smb|DirectoryService|FileOperation" -Description "MainWindow stays free of service/platform logic"
 
 Write-Host "Checking bridge coverage..." -ForegroundColor Cyan
 
@@ -189,6 +212,16 @@ Assert-FileContains -Path $shellViewModel -Pattern "CopyLinkCommand" -Descriptio
 Assert-FileContains -Path $shellViewModel -Pattern "CutCommand" -Description "shell exposes cut command"
 Assert-FileContains -Path $shellViewModel -Pattern "CopyFileCommand" -Description "shell exposes remote copy command"
 Assert-FileContains -Path $shellViewModel -Pattern "PasteCommand" -Description "shell exposes remote paste command"
+Assert-FileContains -Path $shellViewModel -Pattern "GoUpCommand" -Description "shell exposes parent-directory command"
+Assert-FileContains -Path $shellViewModel -Pattern "LoginCoordinator" -Description "shell delegates login workflow"
+Assert-FileContains -Path $loginCoordinator -Pattern "LoginAsync" -Description "login coordinator owns manual login workflow"
+Assert-FileContains -Path $loginCoordinator -Pattern "TryAutoLoginAsync" -Description "login coordinator owns auto-login workflow"
+Assert-FileContains -Path $loginCoordinator -Pattern "OpenServerSettingsAsync" -Description "login coordinator owns server settings workflow"
+Assert-FileContains -Path $loginCoordinator -Pattern "StoredCredentialProfileForLogin" -Description "login coordinator owns stored-credential matching"
+Assert-FileContains -Path $loginCoordinator -Pattern "SaveLoginProfileAsync" -Description "login coordinator owns login profile persistence"
+Assert-FileContains -Path $loginCoordinator -Pattern "hasTypedPassword" -Description "login coordinator saves typed passwords instead of only updating options"
+Assert-FileNotContains -Path $shellViewModel -Pattern "private async Task LoginAsync|private async Task TryAutoLoginAsync|private async Task OpenServerSettingsAsync|SaveLoginProfileAsync|StoredCredentialProfileForLogin" -Description "shell keeps login flow out of ShellViewModel"
+Assert-FileContains -Path $loginViewModel -Pattern "value\.HasStoredCredential \|\| RememberPassword" -Description "login profile selection preserves remember-password choice for new credentials"
 Assert-FileContains -Path $shellViewModel -Pattern "DirectoryNavigationCoordinator" -Description "shell delegates directory navigation workflow"
 Assert-FileContains -Path $shellViewModel -Pattern "RemoteClipboardCoordinator" -Description "shell delegates remote clipboard workflow"
 Assert-FileContains -Path $shellViewModel -Pattern "PasteRemoteClipboardAsync" -Description "shell pastes remote clipboard"
@@ -196,8 +229,12 @@ Assert-FileContains -Path $shellViewModel -Pattern "SelectedRemoteItems" -Descri
 Assert-FileContains -Path $directoryNavigationCoordinator -Pattern "LoadAsync" -Description "directory navigation coordinator owns directory loading"
 Assert-FileContains -Path $directoryNavigationCoordinator -Pattern "CurrentShare" -Description "directory navigation coordinator tracks current share"
 Assert-FileContains -Path $directoryNavigationCoordinator -Pattern "CurrentPath" -Description "directory navigation coordinator tracks current path"
+Assert-FileContains -Path $directoryNavigationCoordinator -Pattern "ShowShareRoot" -Description "directory navigation coordinator owns virtual share-root display"
+Assert-FileContains -Path $directoryNavigationCoordinator -Pattern "目录正在加载" -Description "directory navigation coordinator reports duplicate in-flight loads"
 Assert-FileContains -Path $directoryNavigationCoordinator -Pattern "CurrentNavigationNode" -Description "directory navigation coordinator resolves current tree node"
 Assert-FileContains -Path $directoryNavigationCoordinator -Pattern "NormalizeDirectoryPath" -Description "directory navigation coordinator normalizes directory paths"
+Assert-FileContains -Path $directoryService -Pattern "DirectoryListTimeout" -Description "directory service bounds SMB list waits"
+Assert-FileContains -Path $directoryService -Pattern "Task\.WhenAny" -Description "directory service returns on list timeout instead of waiting forever"
 Assert-FileContains -Path $remoteClipboardCoordinator -Pattern "RemoteClipboardItem" -Description "clipboard coordinator tracks remote clipboard item"
 Assert-FileContains -Path $remoteClipboardCoordinator -Pattern "foreach \(var item in clipboard\.Items\)" -Description "clipboard coordinator pastes multiple items"
 Assert-FileContains -Path $remoteClipboardCoordinator -Pattern "conflictNames" -Description "clipboard coordinator batches overwrite conflicts"
@@ -210,11 +247,14 @@ Assert-FileContains -Path $shellViewModel -Pattern "StartFileDragAsync" -Descrip
 Assert-FileContains -Path $shellViewModel -Pattern "GetRemoteDropEffect" -Description "shell exposes remote drag/drop effect resolution"
 Assert-FileContains -Path $shellViewModel -Pattern "DropRemoteItemsAsync" -Description "shell exposes remote drag/drop commit workflow"
 Assert-FileContains -Path $shellViewModel -Pattern "FileDragDropCoordinator" -Description "shell delegates file drag/drop workflow"
-Assert-FileContains -Path $shellViewModel -Pattern "ShowShareRoot\(_session\)" -Description "shell shows share root directory after login"
+Assert-FileContains -Path $shellViewModel -Pattern "_directoryNavigationCoordinator\.ShowShareRoot" -Description "shell routes virtual share-root display through directory coordinator"
 Assert-FileContains -Path $shellViewModel -Pattern "selected\.IsShareRoot" -Description "shell opens share-root entries as SMB share roots"
 Assert-FileContains -Path $shellViewModel -Pattern "HasWritableSelection" -Description "shell excludes share roots from remote cut/copy commands"
 Assert-FileContains -Path $shellViewModel -Pattern "HasSingleWritableSelection" -Description "shell excludes share roots from rename/delete commands"
 Assert-FileContains -Path $shellViewModel -Pattern "CanRefreshCurrentView" -Description "shell can refresh the virtual share-root view"
+Assert-FileContains -Path $shellViewModel -Pattern "GoUpDirectoryAsync" -Description "shell can navigate to the parent directory"
+Assert-FileContains -Path $shellViewModel -Pattern "CanGoUpDirectory" -Description "shell disables parent navigation outside remote directories"
+Assert-FileContains -Path $shellViewModel -Pattern "ParentPath\(currentPath\)" -Description "shell parent navigation uses normalized parent paths"
 Assert-FileContains -Path $shellViewModel -Pattern "LoadFavoritesAsync" -Description "shell loads favorites after login"
 Assert-FileContains -Path $shellViewModel -Pattern "AddSelectedFavoriteAsync" -Description "shell can add current item to favorites"
 Assert-FileContains -Path $shellViewModel -Pattern "OpenFavoriteAsync" -Description "shell can open favorite links"
@@ -253,6 +293,12 @@ Assert-FileContains -Path $fileListView -Pattern "TryGetDirectoryDropTarget" -De
 Assert-FileContains -Path $fileListView -Pattern "DataFormats\.FileDrop" -Description "file list accepts local file drops"
 Assert-FileContains -Path $fileListXaml -Pattern "x:Name=`"FilesListView`"" -Description "file list exposes named list for keyboard focus management"
 Assert-FileContains -Path $fileListXaml -Pattern "KeyDown=`"SearchBox_OnKeyDown`"" -Description "search box handles escape key"
+Assert-FileContains -Path $fileListXaml -Pattern "Content=`"上级`"" -Description "file list toolbar exposes parent-directory button"
+Assert-FileContains -Path $fileListXaml -Pattern "Command=`"\{Binding FileList\.GoUpCommand\}`"" -Description "file list toolbar binds parent-directory command"
+Assert-FileContains -Path $fileListXaml -Pattern "FileList\.LocationTitle" -Description "file list toolbar shows full current location"
+Assert-FileContains -Path $fileListXaml -Pattern "Preview\.ToggleCommand" -Description "file list toolbar keeps preview toggle visible"
+Assert-FileContains -Path $fileListXaml -Pattern "FileList\.CopyLinkCommand" -Description "file list context menu commands bind through shell data context"
+Assert-FileContains -Path $fileListViewModel -Pattern "DirectoryLocationTitle" -Description "file list builds a macOS-style location title"
 Assert-FileContains -Path $fileListView -Pattern "Key\.A" -Description "file list handles select-all shortcut"
 Assert-FileContains -Path $fileListView -Pattern "SelectAll\(\)" -Description "file list select-all uses WPF selection"
 Assert-FileContains -Path $fileListView -Pattern "Key\.Escape" -Description "file list handles escape key"
@@ -260,12 +306,17 @@ Assert-FileContains -Path $fileListView -Pattern "ClearSearchOrSelection" -Descr
 Assert-FileContains -Path $fileListView -Pattern "Key\.Delete" -Description "file list handles delete key"
 Assert-FileContains -Path $fileListView -Pattern "Key\.F2" -Description "file list handles rename shortcut"
 Assert-FileContains -Path $fileListView -Pattern "Key\.F5" -Description "file list handles refresh shortcut"
+Assert-FileContains -Path $fileListView -Pattern "Key\.Back" -Description "file list handles Backspace parent navigation"
+Assert-FileContains -Path $fileListView -Pattern "ModifierKeys\.Alt" -Description "file list handles Alt-modified shortcuts"
+Assert-FileContains -Path $fileListView -Pattern "Key\.Up" -Description "file list handles Alt+Up parent navigation"
+Assert-FileContains -Path $fileListView -Pattern "SystemKey" -Description "file list handles WPF system-key Alt+Up events"
 Assert-FileContains -Path $fileListView -Pattern "Key\.X" -Description "file list handles cut shortcut"
 Assert-FileContains -Path $fileListView -Pattern "Key\.C" -Description "file list handles remote copy shortcut"
 Assert-FileContains -Path $fileListView -Pattern "Key\.V" -Description "file list handles paste shortcut"
 Assert-FileContains -Path $fileListViewModel -Pattern "ShowShareRoot" -Description "file list can show virtual share root entries"
 Assert-FileContains -Path $fileListViewModel -Pattern "IsShareRootView" -Description "file list tracks virtual share-root view"
 Assert-FileContains -Path $fileListViewModel -Pattern "IsShareRoot: true" -Description "file list marks share root entries"
+Assert-FileContains -Path $fileListViewModel -Pattern "GoUpCommand" -Description "file list exposes parent-directory command"
 Assert-FileContains -Path $fileListViewModel -Pattern "HasWritableSelection" -Description "file list distinguishes writable selections"
 Assert-FileContains -Path $fileDragDropCoordinator -Pattern "selectedItems\.Any\(selected => selected\.IsShareRoot\)" -Description "drag source excludes share-root entries"
 Assert-FileContains -Path $navigationNodeViewModel -Pattern "enum NavigationDropState" -Description "navigation node tracks remote drop hover state"
@@ -276,8 +327,12 @@ Assert-FileContains -Path $navigationTreeXaml -Pattern "ShowFavoritesCommand" -D
 Assert-FileContains -Path $navigationTreeXaml -Pattern "AddFavoriteCommand" -Description "navigation sidebar exposes add-favorite action"
 Assert-FileContains -Path $navigationTreeXaml -Pattern "RemoveFavoriteCommand" -Description "navigation sidebar exposes remove-favorite action"
 Assert-FileContains -Path $navigationTreeXaml -Pattern "ItemsSource=`"{Binding Favorites}`"" -Description "navigation sidebar lists favorites"
+Assert-FileContains -Path $navigationTreeXaml -Pattern "KeyDown=`"FavoritesList_OnKeyDown`"" -Description "favorites list handles keyboard shortcuts"
 Assert-FileContains -Path $navigationTreeView -Pattern "SetRemoteDropTarget" -Description "navigation tree updates remote drop hover state"
+Assert-FileContains -Path $navigationTreeView -Pattern "node\.IsExpanded = !node\.IsExpanded" -Description "navigation tree double-click toggles expansion locally"
 Assert-FileContains -Path $navigationTreeView -Pattern "OpenFavoriteAsync" -Description "navigation tree opens favorite rows"
+Assert-FileContains -Path $navigationTreeView -Pattern "Key\.Enter" -Description "favorites list opens selected favorite with Enter"
+Assert-FileContains -Path $navigationTreeView -Pattern "Key\.Delete" -Description "favorites list removes selected favorite with Delete"
 Assert-FileContains -Path $navigationTreeView -Pattern "e\.Effects == DragDropEffects\.None \? null : target" -Description "navigation tree highlights only valid remote drop targets"
 
 Assert-FileContains -Path $fileOperationInterface -Pattern "CreateDirectoryAsync" -Description "file operation interface supports create folder"
@@ -288,6 +343,7 @@ Assert-FileContains -Path $fileOperationService -Pattern "SmbCreateDirectory" -D
 Assert-FileContains -Path $fileOperationService -Pattern "SmbDelete" -Description "file operation service calls core delete"
 Assert-FileContains -Path $fileOperationService -Pattern "SmbRename" -Description "file operation service calls core rename"
 Assert-FileContains -Path $fileOperationService -Pattern "SmbUploadFile" -Description "file operation service calls core upload"
+Assert-FileNotContains -Path $fileOperationService -Pattern "CopyDirectoryRecursive|DeleteRemotePathRecursive|IRemoteCopyMoveService|FileDragDropCoordinator" -Description "file operation service stays free of recursive drag/copy workflows"
 Assert-FileContains -Path $remoteCopyMoveService -Pattern "SmbCopyFile" -Description "remote copy/move service calls core copy"
 Assert-FileContains -Path $remoteCopyMoveService -Pattern "SmbRename" -Description "remote copy/move service calls core move"
 Assert-FileContains -Path $remoteCopyMoveService -Pattern "CopyDirectoryRecursive" -Description "remote copy/move service copies directories recursively"
@@ -301,6 +357,7 @@ Assert-FileContains -Path $fileTransferService -Pattern "CleanupDirectory" -Desc
 Assert-FileContains -Path $fileTransferService -Pattern "\.part" -Description "drag-out downloads to partial file before completion"
 Assert-FileContains -Path $shellDragDropService -Pattern "FileGroupDescriptorW" -Description "drag-out publishes virtual file descriptor"
 Assert-FileContains -Path $shellDragDropService -Pattern "FileContents" -Description "drag-out publishes virtual file contents"
+Assert-FileContains -Path $shellDragDropService -Pattern "Preferred DropEffect" -Description "drag-out tells Explorer the preferred local drop effect"
 Assert-FileContains -Path $shellDragDropService -Pattern "RemoteDragPayload\.DataFormat" -Description "drag service publishes internal remote drag payload"
 
 Assert-FileContains -Path $previewService -Pattern "PreviewCache" -Description "preview service uses preview cache"

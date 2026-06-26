@@ -32,7 +32,7 @@ public partial class FileListView : UserControl
 
         _dragStartPoint = e.GetPosition(this);
         _dragStartItem = fileItem;
-        _dragStartSelection = DataContext is FileListViewModel viewModel
+        _dragStartSelection = CurrentViewModel() is { } viewModel
             && item.IsSelected
             && viewModel.SelectedRemoteItems.Any(selected =>
                 selected.Share.Equals(fileItem.Item.Share, StringComparison.OrdinalIgnoreCase)
@@ -205,7 +205,7 @@ public partial class FileListView : UserControl
 
     private void ListView_OnKeyDown(object sender, KeyEventArgs e)
     {
-        if (DataContext is not FileListViewModel viewModel)
+        if (CurrentViewModel() is not { } viewModel)
         {
             return;
         }
@@ -245,6 +245,14 @@ public partial class FileListView : UserControl
             e.Handled = true;
             return;
         }
+        else if (Keyboard.Modifiers == ModifierKeys.Alt
+            && IsKey(e, Key.Up)
+            && viewModel.GoUpCommand.CanExecute(null))
+        {
+            viewModel.GoUpCommand.Execute(null);
+            e.Handled = true;
+            return;
+        }
 
         switch (e.Key)
         {
@@ -254,6 +262,10 @@ public partial class FileListView : UserControl
                 break;
             case Key.Enter when viewModel.OpenItemCommand.CanExecute(null):
                 viewModel.OpenItemCommand.Execute(null);
+                e.Handled = true;
+                break;
+            case Key.Back when viewModel.GoUpCommand.CanExecute(null):
+                viewModel.GoUpCommand.Execute(null);
                 e.Handled = true;
                 break;
             case Key.F5 when viewModel.RefreshCommand.CanExecute(null):
@@ -271,9 +283,14 @@ public partial class FileListView : UserControl
         }
     }
 
+    private static bool IsKey(KeyEventArgs e, Key key)
+    {
+        return e.Key == key || e.SystemKey == key;
+    }
+
     private void SearchBox_OnKeyDown(object sender, KeyEventArgs e)
     {
-        if (e.Key != Key.Escape || DataContext is not FileListViewModel viewModel)
+        if (e.Key != Key.Escape || CurrentViewModel() is not { } viewModel)
         {
             return;
         }
@@ -297,7 +314,7 @@ public partial class FileListView : UserControl
 
     private void ListView_OnMouseDoubleClick(object sender, MouseButtonEventArgs e)
     {
-        if (DataContext is FileListViewModel viewModel
+        if (CurrentViewModel() is { } viewModel
             && viewModel.OpenItemCommand.CanExecute(null))
         {
             viewModel.OpenItemCommand.Execute(null);
@@ -327,7 +344,7 @@ public partial class FileListView : UserControl
 
     private async void ListView_OnSelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (DataContext is not FileListViewModel viewModel)
+        if (CurrentViewModel() is not { } viewModel)
         {
             return;
         }
@@ -372,5 +389,15 @@ public partial class FileListView : UserControl
         }
 
         return null;
+    }
+
+    private FileListViewModel? CurrentViewModel()
+    {
+        return DataContext switch
+        {
+            FileListViewModel viewModel => viewModel,
+            ShellViewModel shell => shell.FileList,
+            _ => FindShellViewModel()?.FileList
+        };
     }
 }
