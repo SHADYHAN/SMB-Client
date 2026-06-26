@@ -298,7 +298,7 @@ public sealed class ServerProfileService : IServerProfileService
             : host;
     }
 
-    private static ServerProfile MapProfile(StoredServerProfile profile, StoredServerCredential? credential)
+    private static ServerProfile MapProfile(StoredServerProfile profile, StoredServerCredential? credential = null)
     {
         return new ServerProfile(
             profile.Id,
