@@ -9,10 +9,12 @@
                        Margin="0,0,0,14">
                 <Button DockPanel.Dock="Right"
                         Style="{StaticResource IconButtonStyle}"
-                        Content="+"
                         Margin="8,0,0,0"
                         ToolTip="添加当前项目到收藏"
-                        Command="{Binding AddFavoriteCommand}" />
+                        Command="{Binding AddFavoriteCommand}">
+                    <TextBlock Text="{StaticResource IconAdd}"
+                               Style="{StaticResource HeaderGlyphStyle}" />
+                </Button>
                 <Border Background="{StaticResource SubtleBackgroundBrush}"
                         CornerRadius="9"
                         Padding="3">

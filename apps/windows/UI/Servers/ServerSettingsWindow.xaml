@@ -8,6 +8,11 @@
         MinHeight="360"
         WindowStartupLocation="CenterOwner"
         FontFamily="Segoe UI Variable Text, Segoe UI, Microsoft YaHei UI"
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True"
+        TextOptions.TextFormattingMode="Display"
+        TextOptions.TextRenderingMode="ClearType"
+        RenderOptions.ClearTypeHint="Enabled"
         Background="{StaticResource AppBackgroundBrush}">
     <Border Padding="18">
         <Grid>
@@ -42,10 +47,10 @@
                         <DataTemplate>
                             <StackPanel Orientation="Horizontal"
                                         Margin="4,4">
-                                <TextBlock Text="✓"
+                                <TextBlock Text="{StaticResource IconCheck}"
                                            Width="20">
                                     <TextBlock.Style>
-                                        <Style TargetType="TextBlock">
+                                        <Style TargetType="TextBlock" BasedOn="{StaticResource HeaderGlyphStyle}">
                                             <Setter Property="Visibility" Value="Hidden" />
                                             <Style.Triggers>
                                                 <DataTrigger Binding="{Binding IsActive}" Value="True">
