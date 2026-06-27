@@ -4,6 +4,7 @@ pub mod context_request;
 pub mod explorer;
 pub mod local_redirect;
 pub mod registration;
+#[cfg(feature = "smb-session")]
 pub mod smb_session;
 pub mod unc_path;
 
@@ -25,6 +26,7 @@ pub use registration::{
     ContextMenuRegistration, ProtocolRegistration, RegistrationError,
     windows_context_menu_reg_file, windows_protocol_reg_file,
 };
+#[cfg(feature = "smb-session")]
 pub use smb_session::{
     SmbSessionConnectRequest, SmbSessionConnector, SmbSessionError, SmbSessionResult,
     UnsupportedSmbSessionConnector,

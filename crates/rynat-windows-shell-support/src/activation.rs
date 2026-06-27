@@ -1,7 +1,7 @@
 use rynat_core::{QuickLinkTarget, parse_quick_link};
 use thiserror::Error;
 
-use crate::ExplorerTarget;
+use crate::{DEFAULT_LOCAL_REDIRECT_PORT, ExplorerTarget};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LinkActivationTarget {
@@ -24,6 +24,18 @@ pub enum ActivationRequestError {
 pub fn deep_link_from_local_request_line(
     request_line: &str,
 ) -> Result<String, ActivationRequestError> {
+    let path_and_query = short_link_path_from_request_line(request_line)?;
+    Ok(format!("rynat://{path_and_query}"))
+}
+
+pub fn local_link_from_request_line(request_line: &str) -> Result<String, ActivationRequestError> {
+    let path_and_query = short_link_path_from_request_line(request_line)?;
+    Ok(format!(
+        "http://127.0.0.1:{DEFAULT_LOCAL_REDIRECT_PORT}/{path_and_query}"
+    ))
+}
+
+fn short_link_path_from_request_line(request_line: &str) -> Result<&str, ActivationRequestError> {
     let parts = request_line.split_whitespace().collect::<Vec<_>>();
     if parts.first().copied() != Some("GET") {
         return Err(ActivationRequestError::NotGet);
@@ -35,7 +47,7 @@ pub fn deep_link_from_local_request_line(
         return Err(ActivationRequestError::NotShortLink);
     }
 
-    Ok(format!("rynat://{path_and_query}"))
+    Ok(path_and_query)
 }
 
 pub fn explorer_target_from_link(
@@ -67,6 +79,23 @@ mod tests {
             deep_link_from_local_request_line(&format!("GET /s/{payload} HTTP/1.1")).unwrap();
 
         assert_eq!(deep_link, format!("rynat://s/{payload}"));
+    }
+
+    #[test]
+    fn converts_local_short_request_to_local_http_link() {
+        let target = QuickLinkTarget::new(
+            "nas.local",
+            "Media",
+            "/Movies/demo.mp4",
+            None,
+            LinkKind::File,
+        );
+        let http_url = build_http_link(19527, &target).unwrap();
+        let payload = http_url.rsplit('/').next().unwrap();
+        let local_link =
+            local_link_from_request_line(&format!("GET /s/{payload} HTTP/1.1")).unwrap();
+
+        assert_eq!(local_link, format!("http://127.0.0.1:19527/s/{payload}"));
     }
 
     #[test]

@@ -24,7 +24,7 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 rynat-core = { path = "../../../crates/rynat-core" }
-rynat-windows-shell-support = { path = "../../../crates/rynat-windows-shell-support" }
+rynat-windows-shell-support = { path = "../../../crates/rynat-windows-shell-support", features = ["smb-session"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tauri = { version = "2", features = [] }

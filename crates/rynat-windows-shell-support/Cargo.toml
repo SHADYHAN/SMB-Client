@@ -3,6 +3,10 @@ name = "rynat-windows-shell-support"
 version = "0.1.0"
 edition = "2024"
 
+[features]
+default = []
+smb-session = []
+
 [dependencies]
 rynat-core = { path = "../rynat-core" }
 serde.workspace = true

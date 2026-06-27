@@ -215,7 +215,7 @@ impl From<ExplorerTarget> for ExplorerTargetDto {
 pub fn run() {
     let _context_ipc = start_context_ipc_server(DEFAULT_CONTEXT_IPC_PORT, handle_context_request);
     let _local_redirect =
-        start_local_redirect_server(DEFAULT_LOCAL_REDIRECT_PORT, handle_deep_link_activation);
+        start_local_redirect_server(DEFAULT_LOCAL_REDIRECT_PORT, handle_link_activation);
 
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
@@ -231,8 +231,8 @@ pub fn run() {
         .expect("error while running RYNAT Windows shell");
 }
 
-fn handle_deep_link_activation(deep_link: String) {
-    if let Ok(activation) = explorer_target_from_link(&deep_link) {
+fn handle_link_activation(raw_link: String) {
+    if let Ok(activation) = explorer_target_from_link(&raw_link) {
         #[cfg(windows)]
         {
             let mut command = std::process::Command::new("explorer.exe");
@@ -288,7 +288,7 @@ mod tests {
     }
 
     #[test]
-    fn deep_link_activation_calculates_explorer_target() {
+    fn http_link_activation_calculates_explorer_target() {
         let http_url = build_link_for_unc_path(
             r"\\192.168.102.136\共享资料\123\demo.txt",
             LinkKind::File,

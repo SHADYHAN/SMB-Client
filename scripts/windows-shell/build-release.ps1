@@ -10,7 +10,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$scriptVersion = "2026-06-27.8"
+$scriptVersion = "2026-06-27.9"
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 $windowsShellDir = Join-Path $repoRoot "apps\windows-shell"
 $windowsShellDistDir = Join-Path $windowsShellDir "dist"
@@ -19,6 +19,7 @@ $windowsShellNodeModulesDir = Join-Path $windowsShellDir "node_modules"
 $workspaceTargetDir = Join-Path $repoRoot "target"
 $buildCheckScript = Join-Path $PSScriptRoot "build-check.ps1"
 $registrationScript = Join-Path $PSScriptRoot "write-registration-preview.ps1"
+$script:tauriBuildProfile = "release"
 
 function Invoke-NativeCommand {
     param(
@@ -71,17 +72,20 @@ function Invoke-NpmBuildWithRetry {
         Write-Host "Using stable Cargo release settings: CARGO_BUILD_JOBS=1, CARGO_INCREMENTAL=0, CARGO_PROFILE_RELEASE_OPT_LEVEL=0" -ForegroundColor DarkGray
         & npm run build
         if ($LASTEXITCODE -eq 0) {
+            $script:tauriBuildProfile = "release"
             return
         }
 
         $firstExitCode = $LASTEXITCODE
-        Write-Warning ("npm run build failed with exit code {0}. Cleaning Tauri target and retrying once with single-job cargo..." -f $firstExitCode)
+        Write-Warning ("tauri release build failed with exit code {0}. Cleaning Tauri target and retrying once as debug bundle..." -f $firstExitCode)
         Remove-PathIfExists -Path $windowsShellTargetDir
 
-        & npm run build
+        & npm run build:debug
         if ($LASTEXITCODE -ne 0) {
-            throw ("npm failed with exit code {0}: npm run build" -f $LASTEXITCODE)
+            throw ("npm failed with exit code {0}: npm run build:debug" -f $LASTEXITCODE)
         }
+
+        $script:tauriBuildProfile = "debug"
     }
     finally {
         if ($null -eq $previousCargoBuildJobs) {
@@ -264,7 +268,7 @@ try {
     New-Item -ItemType Directory -Force -Path $installersDir | Out-Null
     New-Item -ItemType Directory -Force -Path $binDir | Out-Null
 
-    $bundleDir = Join-Path $windowsShellDir "src-tauri\target\release\bundle"
+    $bundleDir = Join-Path $windowsShellDir "src-tauri\target\$script:tauriBuildProfile\bundle"
     $copiedInstallers = @()
     if (Test-Path $bundleDir) {
         Get-ChildItem -Path $bundleDir -Recurse -File |
@@ -279,7 +283,7 @@ try {
     $helperExe = Join-Path $repoRoot "target\release\rynat-windows-context-helper.exe"
     $copiedHelper = Copy-IfExists -SourcePath $helperExe -DestinationDirectory $binDir
 
-    $tauriReleaseDir = Join-Path $windowsShellDir "src-tauri\target\release"
+    $tauriReleaseDir = Join-Path $windowsShellDir "src-tauri\target\$script:tauriBuildProfile"
     $appExeCandidates = @(
         (Join-Path $tauriReleaseDir "rynat-windows-shell.exe"),
         (Join-Path $tauriReleaseDir "RYNAT.exe")

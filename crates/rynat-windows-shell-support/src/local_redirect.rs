@@ -4,10 +4,9 @@ use std::sync::Arc;
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
-use rynat_core::redirect_page::{RedirectPageOptions, build_local_activation_close_page_for_url};
 use thiserror::Error;
 
-use crate::activation::deep_link_from_local_request_line;
+use crate::activation::local_link_from_request_line;
 
 pub const DEFAULT_LOCAL_REDIRECT_PORT: u16 = rynat_core::link::DEFAULT_REDIRECT_PORT;
 const MAX_REQUEST_BYTES: usize = 8192;
@@ -50,19 +49,18 @@ where
 
     let raw = read_http_request(&mut stream)?;
 
-    let response =
-        match request_line(&raw).and_then(|line| deep_link_from_local_request_line(line).ok()) {
-            Some(deep_link) => {
-                handler(deep_link.clone());
-                let body = build_local_activation_close_page_for_url(
-                    &deep_link,
-                    &RedirectPageOptions::default(),
-                )
-                .unwrap_or_else(|_| fallback_close_page());
-                http_response("200 OK", "text/html; charset=utf-8", &body)
-            }
-            None => http_response("404 Not Found", "text/plain; charset=utf-8", "Not Found"),
-        };
+    let response = match request_line(&raw).and_then(|line| local_link_from_request_line(line).ok())
+    {
+        Some(local_link) => {
+            handler(local_link);
+            http_response(
+                "200 OK",
+                "text/html; charset=utf-8",
+                &local_activation_close_page(),
+            )
+        }
+        None => http_response("404 Not Found", "text/plain; charset=utf-8", "Not Found"),
+    };
 
     stream.write_all(response.as_bytes())?;
     Ok(())
@@ -97,8 +95,8 @@ fn http_response(status: &str, content_type: &str, body: &str) -> String {
     )
 }
 
-fn fallback_close_page() -> String {
-    "<!doctype html><html lang=\"zh-CN\"><head><meta charset=\"utf-8\"><title>RYNAT</title></head><body>已打开 RYNAT，可以关闭此标签页。</body></html>".to_string()
+fn local_activation_close_page() -> String {
+    r#"<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>RYNAT</title><script>setTimeout(function(){try{window.open("","_self");window.close();}catch(_){}},40);</script></head><body>已请求打开 Windows 资源管理器，可以关闭此标签页。</body></html>"#.to_string()
 }
 
 #[cfg(test)]
@@ -114,9 +112,9 @@ mod tests {
             .strip_prefix(&format!("http://127.0.0.1:{DEFAULT_LOCAL_REDIRECT_PORT}"))
             .unwrap();
         let line = format!("GET {path} HTTP/1.1");
-        let deep_link = deep_link_from_local_request_line(&line).unwrap();
+        let local_link = local_link_from_request_line(&line).unwrap();
 
-        assert!(deep_link.starts_with("rynat://s/"));
+        assert!(local_link.starts_with("http://127.0.0.1:19527/s/"));
     }
 
     #[test]
@@ -125,8 +123,8 @@ mod tests {
 
         assert_eq!(request_line(raw), Some("GET /s/demo HTTP/1.1"));
         assert_eq!(
-            deep_link_from_local_request_line(request_line(raw).unwrap()).unwrap(),
-            "rynat://s/demo"
+            local_link_from_request_line(request_line(raw).unwrap()).unwrap(),
+            "http://127.0.0.1:19527/s/demo"
         );
     }
 }
