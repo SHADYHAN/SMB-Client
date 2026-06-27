@@ -22,6 +22,7 @@ Explorer owns:
 ## Current Status
 
 - `src-tauri` compiles and has tested commands for UNC link generation, Explorer target calculation, and registration preview generation.
+- The frontend now uses a login page followed by a persistent two-column control shell for server status, sharing links, activation services, settings, shortcuts, and diagnostics.
 - `../windows-context-helper` can parse `copy-link <path>` and send a local IPC request to the shell.
 - The shell starts local context IPC on `127.0.0.1:19528` and local short-link redirect on `127.0.0.1:19527`.
 - Short-link activation can already resolve to an Explorer open path / selected file target in tests.

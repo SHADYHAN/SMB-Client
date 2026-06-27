@@ -13,9 +13,11 @@
     "windows": [
       {
         "title": "RYNAT",
-        "width": 520,
-        "height": 620,
-        "resizable": false
+        "width": 920,
+        "height": 680,
+        "minWidth": 860,
+        "minHeight": 600,
+        "resizable": true
       }
     ]
   },
