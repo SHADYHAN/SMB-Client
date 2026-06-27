@@ -7,7 +7,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$scriptVersion = "2026-06-27.1"
+$scriptVersion = "2026-06-27.2"
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 $windowsShellDir = Join-Path $repoRoot "apps\windows-shell"
 $buildCheckScript = Join-Path $PSScriptRoot "build-check.ps1"
@@ -24,6 +24,31 @@ function Invoke-NativeCommand {
     & $FilePath @Arguments
     if ($LASTEXITCODE -ne 0) {
         throw ("{0} failed with exit code {1}: {0} {2}" -f $FilePath, $LASTEXITCODE, ($Arguments -join ' '))
+    }
+}
+
+function Invoke-NpmInstallWithRetry {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string[]]$Arguments
+    )
+
+    & npm @Arguments
+    if ($LASTEXITCODE -eq 0) {
+        return
+    }
+
+    $firstExitCode = $LASTEXITCODE
+    Write-Warning ("npm install failed with exit code {0}. Cleaning npm cache and retrying once..." -f $firstExitCode)
+
+    & npm cache clean --force
+    if ($LASTEXITCODE -ne 0) {
+        throw ("npm cache clean failed with exit code {0}" -f $LASTEXITCODE)
+    }
+
+    & npm @Arguments
+    if ($LASTEXITCODE -ne 0) {
+        throw ("npm failed with exit code {0}: npm {1}" -f $LASTEXITCODE, ($Arguments -join ' '))
     }
 }
 
@@ -86,7 +111,7 @@ try {
             }
 
             Write-Host "Installing Windows shell frontend dependencies..." -ForegroundColor Cyan
-            Invoke-NativeCommand -FilePath "npm" -Arguments $npmInstallArgs
+            Invoke-NpmInstallWithRetry -Arguments $npmInstallArgs
         }
 
         Write-Host "Building Tauri Windows shell bundle..." -ForegroundColor Cyan
