@@ -37,6 +37,33 @@ scripts\windows-shell\pull-build-check.bat
 scripts\windows-shell\pull-build-check.bat -Offline
 ```
 
+## Release Build
+
+`build-check.ps1` only validates the Explorer-first code path. It does not produce installers.
+
+Build a local release package on Windows:
+
+```powershell
+scripts\windows-shell\build-release.ps1
+scripts\windows-shell\build-release.ps1 -SkipChecks
+scripts\windows-shell\build-release.bat
+```
+
+The script builds the Tauri shell bundle, builds the Explorer context helper in release mode, and copies the useful outputs into:
+
+```text
+build\windows-shell-release\<yyyyMMdd-HHmmss>\
+  installers\          Tauri .msi / NSIS .exe installers
+  bin\                 app exe and rynat-windows-context-helper.exe
+  registration-preview\ generated .reg preview files
+```
+
+The latest output directory is also written to:
+
+```text
+build\windows-shell-release\latest.txt
+```
+
 Generate registry preview files:
 
 ```powershell

@@ -128,6 +128,9 @@ scripts\windows-shell\build-check.ps1 -FullWorkspace
 # Windows Explorer-first 一键拉取最新代码并检查（可双击 bat）
 scripts\windows-shell\pull-build-check.bat
 
+# Windows Explorer-first 生成本地 release 产物（安装包 + helper exe + 注册表预览）
+scripts\windows-shell\build-release.bat
+
 # 生成协议和 Explorer 右键注册表预览文件（先审查，再导入）
 scripts\windows-shell\write-registration-preview.ps1 `
   -ExecutablePath "C:\Program Files\RYNAT\RYNAT.exe" `
@@ -141,6 +144,8 @@ scripts\pull-build-run-windows.bat
 ```
 
 macOS 构建脚本先 `cargo build -p rynat-core --release`，再把 `librynat_core.dylib` 打包进 `.app`。Windows 工程 `csproj` 内置 cargo 构建目标，编译 Rust Core 并复制 `rynat_core.dll`。
+
+Explorer-first Windows release 脚本会把常用产物复制到 `build\windows-shell-release\<yyyyMMdd-HHmmss>\`，并写入 `build\windows-shell-release\latest.txt`。其中 `installers\` 放 Tauri `.msi` / NSIS `.exe` 安装包，`bin\` 放主程序 exe 和 `rynat-windows-context-helper.exe`，`registration-preview\` 放导入前需要审查的 `.reg` 文件。
 
 桥接一致性校验（防止 C 头文件 / Swift bridge / C# bridge 与 Rust ABI 漂移）：
 
