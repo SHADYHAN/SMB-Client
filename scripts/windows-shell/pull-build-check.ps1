@@ -1,10 +1,11 @@
 param(
     [switch]$SkipPull,
-    [switch]$Offline
+    [switch]$Offline,
+    [switch]$FullWorkspace
 )
 
 $ErrorActionPreference = "Stop"
-$scriptVersion = "2026-06-27.1"
+$scriptVersion = "2026-06-27.2"
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..")
 $buildCheckScript = Join-Path $PSScriptRoot "build-check.ps1"
 
@@ -39,6 +40,9 @@ try {
     $checkArgs = @()
     if ($Offline) {
         $checkArgs += "-Offline"
+    }
+    if ($FullWorkspace) {
+        $checkArgs += "-FullWorkspace"
     }
 
     Write-Host "Running Explorer-first Windows shell checks..." -ForegroundColor Cyan

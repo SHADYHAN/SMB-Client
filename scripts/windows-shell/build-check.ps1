@@ -1,9 +1,10 @@
 param(
-    [switch]$Offline
+    [switch]$Offline,
+    [switch]$FullWorkspace
 )
 
 $ErrorActionPreference = "Stop"
-$scriptVersion = "2026-06-27.2"
+$scriptVersion = "2026-06-27.3"
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..")
 Set-Location $repoRoot
 
@@ -26,13 +27,21 @@ function Invoke-CargoChecked {
 
 Write-Host "Explorer-first check script: $scriptVersion" -ForegroundColor DarkGray
 
-Write-Host "Checking Explorer-first support workspace..."
-Invoke-CargoChecked test --workspace --locked @cargoArgs
+if ($FullWorkspace) {
+    Write-Host "Checking full Rust workspace..." -ForegroundColor Cyan
+    Invoke-CargoChecked test --workspace --locked @cargoArgs
+} else {
+    Write-Host "Checking Explorer-first support crate..." -ForegroundColor Cyan
+    Invoke-CargoChecked test -p rynat-windows-shell-support --locked @cargoArgs
 
-Write-Host "Checking Tauri shell Rust side..."
+    Write-Host "Checking Explorer-first context helper..." -ForegroundColor Cyan
+    Invoke-CargoChecked test -p rynat-windows-context-helper --locked @cargoArgs
+}
+
+Write-Host "Checking Tauri shell Rust side..." -ForegroundColor Cyan
 Invoke-CargoChecked test --manifest-path apps/windows-shell/src-tauri/Cargo.toml @cargoArgs
 
-Write-Host "Checking helper contract..."
+Write-Host "Checking helper contract..." -ForegroundColor Cyan
 Invoke-CargoChecked run -p rynat-windows-context-helper --locked @cargoArgs -- copy-link "\\nas.local\Media\demo.mp4" --kind file
 
 Write-Host "Explorer-first Windows shell checks completed."

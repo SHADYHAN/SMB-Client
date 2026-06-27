@@ -122,6 +122,9 @@ cargo check --manifest-path apps/windows-shell/src-tauri/Cargo.toml --offline
 # Windows Explorer-first 新线检查脚本（在 Windows PowerShell 运行）
 scripts\windows-shell\build-check.ps1
 
+# 如需连同历史 core 全量测试一起跑
+scripts\windows-shell\build-check.ps1 -FullWorkspace
+
 # Windows Explorer-first 一键拉取最新代码并检查（可双击 bat）
 scripts\windows-shell\pull-build-check.bat
 
