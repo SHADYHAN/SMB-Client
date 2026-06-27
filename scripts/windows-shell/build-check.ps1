@@ -3,6 +3,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+$scriptVersion = "2026-06-27.2"
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..")
 Set-Location $repoRoot
 
@@ -19,9 +20,11 @@ function Invoke-CargoChecked {
 
     & cargo @Arguments
     if ($LASTEXITCODE -ne 0) {
-        throw "cargo failed with exit code $LASTEXITCODE: cargo $($Arguments -join ' ')"
+        throw ("cargo failed with exit code {0}: cargo {1}" -f $LASTEXITCODE, ($Arguments -join ' '))
     }
 }
+
+Write-Host "Explorer-first check script: $scriptVersion" -ForegroundColor DarkGray
 
 Write-Host "Checking Explorer-first support workspace..."
 Invoke-CargoChecked test --workspace --locked @cargoArgs
