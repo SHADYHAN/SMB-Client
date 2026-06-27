@@ -9,7 +9,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$scriptVersion = "2026-06-27.5"
+$scriptVersion = "2026-06-27.6"
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 $windowsShellDir = Join-Path $repoRoot "apps\windows-shell"
 $windowsShellDistDir = Join-Path $windowsShellDir "dist"
@@ -61,10 +61,13 @@ function Invoke-NpmInstallWithRetry {
 function Invoke-NpmBuildWithRetry {
     $previousCargoBuildJobs = $env:CARGO_BUILD_JOBS
     $previousCargoIncremental = $env:CARGO_INCREMENTAL
+    $previousCargoProfileReleaseOptLevel = $env:CARGO_PROFILE_RELEASE_OPT_LEVEL
     $env:CARGO_BUILD_JOBS = "1"
     $env:CARGO_INCREMENTAL = "0"
+    $env:CARGO_PROFILE_RELEASE_OPT_LEVEL = "0"
 
     try {
+        Write-Host "Using stable Cargo release settings: CARGO_BUILD_JOBS=1, CARGO_INCREMENTAL=0, CARGO_PROFILE_RELEASE_OPT_LEVEL=0" -ForegroundColor DarkGray
         & npm run build
         if ($LASTEXITCODE -eq 0) {
             return
@@ -90,6 +93,12 @@ function Invoke-NpmBuildWithRetry {
             Remove-Item Env:CARGO_INCREMENTAL -ErrorAction SilentlyContinue
         } else {
             $env:CARGO_INCREMENTAL = $previousCargoIncremental
+        }
+
+        if ($null -eq $previousCargoProfileReleaseOptLevel) {
+            Remove-Item Env:CARGO_PROFILE_RELEASE_OPT_LEVEL -ErrorAction SilentlyContinue
+        } else {
+            $env:CARGO_PROFILE_RELEASE_OPT_LEVEL = $previousCargoProfileReleaseOptLevel
         }
     }
 }
