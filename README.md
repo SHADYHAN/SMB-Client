@@ -131,6 +131,9 @@ scripts\windows-shell\pull-build-check.bat
 # Windows Explorer-first 生成本地 release 产物（安装包 + helper exe + 注册表预览）
 scripts\windows-shell\build-release.bat
 
+# Windows Explorer-first 快速增量构建（默认会清理旧 target/dist/release 输出）
+scripts\windows-shell\build-release.bat -NoClean
+
 # 生成协议和 Explorer 右键注册表预览文件（先审查，再导入）
 scripts\windows-shell\write-registration-preview.ps1 `
   -ExecutablePath "C:\Program Files\RYNAT\RYNAT.exe" `
@@ -146,6 +149,8 @@ scripts\pull-build-run-windows.bat
 macOS 构建脚本先 `cargo build -p rynat-core --release`，再把 `librynat_core.dylib` 打包进 `.app`。Windows 工程 `csproj` 内置 cargo 构建目标，编译 Rust Core 并复制 `rynat_core.dll`。
 
 Explorer-first Windows release 脚本会把常用产物复制到 `build\windows-shell-release\<yyyyMMdd-HHmmss>\`，并写入 `build\windows-shell-release\latest.txt`。其中 `installers\` 放 Tauri `.msi` / NSIS `.exe` 安装包，`bin\` 放主程序 exe 和 `rynat-windows-context-helper.exe`，`registration-preview\` 放导入前需要审查的 `.reg` 文件。
+
+Explorer-first Windows release 脚本默认会先清理 `apps\windows-shell\dist`、`apps\windows-shell\src-tauri\target`、workspace `target` 和旧的 `build\windows-shell-release` 输出，避免旧包 / PDB / 前端缓存影响验证。只有明确要快速增量构建时才加 `-NoClean`。只有 npm 依赖本身疑似损坏时再加 `-CleanNodeModules`，因为它会删除 `apps\windows-shell\node_modules` 并重新安装依赖。
 
 桥接一致性校验（防止 C 头文件 / Swift bridge / C# bridge 与 Rust ABI 漂移）：
 

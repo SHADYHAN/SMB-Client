@@ -46,6 +46,8 @@ Build a local release package on Windows:
 ```powershell
 scripts\windows-shell\build-release.ps1
 scripts\windows-shell\build-release.ps1 -SkipChecks
+scripts\windows-shell\build-release.ps1 -NoClean
+scripts\windows-shell\build-release.ps1 -CleanNodeModules
 scripts\windows-shell\build-release.bat
 ```
 
@@ -63,6 +65,10 @@ The latest output directory is also written to:
 ```text
 build\windows-shell-release\latest.txt
 ```
+
+By default, the script removes the web `dist`, Tauri `src-tauri\target`, workspace `target`, and previous `build\windows-shell-release` outputs before rebuilding. Use `-NoClean` only when you intentionally want a faster incremental build.
+
+Use `-CleanNodeModules` only when npm dependencies look corrupted. It removes `apps\windows-shell\node_modules`, so the next build must reinstall frontend dependencies.
 
 Generate registry preview files:
 

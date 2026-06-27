@@ -3,13 +3,19 @@ param(
     [switch]$SkipChecks,
     [switch]$SkipNpmInstall,
     [switch]$Offline,
+    [switch]$NoClean,
+    [switch]$CleanNodeModules,
     [string]$OutputDirectory = ".\build\windows-shell-release"
 )
 
 $ErrorActionPreference = "Stop"
-$scriptVersion = "2026-06-27.2"
+$scriptVersion = "2026-06-27.4"
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 $windowsShellDir = Join-Path $repoRoot "apps\windows-shell"
+$windowsShellDistDir = Join-Path $windowsShellDir "dist"
+$windowsShellTargetDir = Join-Path $windowsShellDir "src-tauri\target"
+$windowsShellNodeModulesDir = Join-Path $windowsShellDir "node_modules"
+$workspaceTargetDir = Join-Path $repoRoot "target"
 $buildCheckScript = Join-Path $PSScriptRoot "build-check.ps1"
 $registrationScript = Join-Path $PSScriptRoot "write-registration-preview.ps1"
 
@@ -78,10 +84,39 @@ function Copy-IfExists {
     return $destination
 }
 
+function Remove-PathIfExists {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path
+    )
+
+    if (-not (Test-Path $Path)) {
+        return
+    }
+
+    Write-Host "Removing: $Path" -ForegroundColor DarkYellow
+    Remove-Item -Recurse -Force -Path $Path
+}
+
 Push-Location $repoRoot
 try {
     Write-Host "Repository: $repoRoot" -ForegroundColor Cyan
     Write-Host "Explorer-first release script: $scriptVersion" -ForegroundColor DarkGray
+
+    $baseOutputRoot = Get-OutputRoot $OutputDirectory
+
+    if (-not $NoClean) {
+        Write-Host "Cleaning previous Explorer-first build outputs..." -ForegroundColor Cyan
+        Remove-PathIfExists -Path $windowsShellDistDir
+        Remove-PathIfExists -Path $windowsShellTargetDir
+        Remove-PathIfExists -Path $workspaceTargetDir
+        Remove-PathIfExists -Path $baseOutputRoot
+    }
+
+    if ($CleanNodeModules) {
+        Write-Host "Cleaning Windows shell node_modules..." -ForegroundColor Cyan
+        Remove-PathIfExists -Path $windowsShellNodeModulesDir
+    }
 
     if (-not $SkipPull) {
         Write-Host "Pulling latest changes..." -ForegroundColor Cyan
@@ -129,7 +164,6 @@ try {
     Write-Host "Building Explorer context helper release exe..." -ForegroundColor Cyan
     Invoke-NativeCommand -FilePath "cargo" -Arguments $cargoArgs
 
-    $baseOutputRoot = Get-OutputRoot $OutputDirectory
     $stamp = Get-Date -Format "yyyyMMdd-HHmmss"
     $outputRoot = Join-Path $baseOutputRoot $stamp
     $installersDir = Join-Path $outputRoot "installers"
