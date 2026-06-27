@@ -5,6 +5,7 @@ using System.Text.Json;
 using Rynat.Client;
 using Rynat.WindowsClient.Domain;
 using Rynat.WindowsClient.Infrastructure;
+using Rynat.WindowsClient.Services.FileOperations;
 using Rynat.WindowsClient.Services.Cache;
 using Rynat.WindowsClient.Services.Smb;
 
@@ -19,6 +20,70 @@ public sealed class FileTransferService : IFileTransferService
     public FileTransferService(ISmbTaskService taskService)
     {
         _taskService = taskService;
+    }
+
+    public async Task<DragFilePayloadResult> DownloadFilesAsync(
+        ServerSession session,
+        IReadOnlyList<RemoteFileItem> items,
+        IReadOnlyList<string> localPaths,
+        bool replaceExisting,
+        IProgress<FileBatchProgress>? progress = null,
+        CancellationToken cancellationToken = default
+    )
+    {
+        if (items.Count == 0)
+        {
+            return Failure("请先选择文件。", "download.no_selection");
+        }
+
+        if (items.Count != localPaths.Count)
+        {
+            return Failure("下载失败。", "download.path_mismatch");
+        }
+
+        if (items.Any(item => item.IsDirectory))
+        {
+            return Failure("暂不支持下载文件夹。", "download.directory_not_supported");
+        }
+
+        var completed = 0;
+        for (var index = 0; index < items.Count; index++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var item = items[index];
+            var localPath = localPaths[index];
+            if (File.Exists(localPath) && !replaceExisting)
+            {
+                return Failure($"{Path.GetFileName(localPath)} 已存在。", "download.exists");
+            }
+
+            try
+            {
+                var targetDirectory = Path.GetDirectoryName(localPath);
+                if (!string.IsNullOrWhiteSpace(targetDirectory))
+                {
+                    Directory.CreateDirectory(targetDirectory);
+                }
+
+                progress?.Report(new FileBatchProgress(completed, items.Count, item.Name));
+                await DownloadFileAsync(session, item, localPath, cancellationToken);
+                completed++;
+                progress?.Report(new FileBatchProgress(completed, items.Count, item.Name));
+            }
+            catch (Exception ex) when (BridgeExceptionClassifier.IsBridgeFailure(ex) || ex is IOException or UnauthorizedAccessException)
+            {
+                DeleteIfExists(localPath + ".part");
+                return completed == 0
+                    ? Failure("下载失败。", BridgeExceptionClassifier.ErrorCodeFor(ex, "download.failed"))
+                    : Failure($"下载失败，已完成 {completed}/{items.Count} 个文件。", BridgeExceptionClassifier.ErrorCodeFor(ex, "download.failed"));
+            }
+        }
+
+        return new DragFilePayloadResult(
+            true,
+            completed == 1 ? "下载完成。" : $"已下载 {completed} 个文件。",
+            Array.Empty<DragFilePayload>()
+        );
     }
 
     public async Task<DragFilePayloadResult> CreateDragDownloadPayloadAsync(

@@ -4,17 +4,10 @@ using Rynat.WindowsClient.UI.Infrastructure;
 
 namespace Rynat.WindowsClient.UI.Navigation;
 
-public enum NavigationDropState
-{
-    None,
-    ValidTarget
-}
-
 public sealed class NavigationNodeViewModel : ObservableObject
 {
     private bool _isExpanded;
     private bool _isSelected;
-    private NavigationDropState _remoteDropState;
 
     public NavigationNodeViewModel(
         string title,
@@ -53,11 +46,5 @@ public sealed class NavigationNodeViewModel : ObservableObject
     {
         get => _isSelected;
         set => SetProperty(ref _isSelected, value);
-    }
-
-    public NavigationDropState RemoteDropState
-    {
-        get => _remoteDropState;
-        set => SetProperty(ref _remoteDropState, value);
     }
 }

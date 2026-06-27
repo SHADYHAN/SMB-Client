@@ -3,16 +3,8 @@ using Rynat.WindowsClient.UI.Infrastructure;
 
 namespace Rynat.WindowsClient.UI.Files;
 
-public enum RemoteDropState
-{
-    None,
-    ValidTarget
-}
-
 public sealed class FileItemViewModel : ObservableObject
 {
-    private RemoteDropState _remoteDropState;
-
     public FileItemViewModel(RemoteFileItem item)
     {
         Item = item;
@@ -24,15 +16,11 @@ public sealed class FileItemViewModel : ObservableObject
 
     public string Type => Item.IsDirectory ? "文件夹" : "文件";
 
+    public string IconGlyph => Item.IsDirectory ? "\uE8B7" : "\uE7C3";
+
     public string Size => Item.IsDirectory ? "" : FormatSize(Item.Size);
 
     public string ModifiedAt => Item.ModifiedAt?.LocalDateTime.ToString("yyyy-MM-dd HH:mm") ?? "";
-
-    public RemoteDropState RemoteDropState
-    {
-        get => _remoteDropState;
-        set => SetProperty(ref _remoteDropState, value);
-    }
 
     private static string FormatSize(ulong bytes)
     {

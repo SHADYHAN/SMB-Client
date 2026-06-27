@@ -94,11 +94,7 @@ public sealed class FileListViewModel : ObservableObject
 
     public ICommand CopyLinkCommand { get; set; } = new RelayCommand(_ => { });
 
-    public ICommand CutCommand { get; set; } = new RelayCommand(_ => { });
-
-    public ICommand CopyFileCommand { get; set; } = new RelayCommand(_ => { });
-
-    public ICommand PasteCommand { get; set; } = new RelayCommand(_ => { });
+    public ICommand DownloadCommand { get; set; } = new RelayCommand(_ => { });
 
     public ICommand RefreshCommand { get; set; } = new RelayCommand(_ => { });
 
@@ -150,14 +146,9 @@ public sealed class FileListViewModel : ObservableObject
             copyLinkCommand.RaiseCanExecuteChanged();
         }
 
-        if (CutCommand is RelayCommand cutCommand)
+        if (DownloadCommand is AsyncRelayCommand downloadCommand)
         {
-            cutCommand.RaiseCanExecuteChanged();
-        }
-
-        if (CopyFileCommand is RelayCommand copyFileCommand)
-        {
-            copyFileCommand.RaiseCanExecuteChanged();
+            downloadCommand.RaiseCanExecuteChanged();
         }
 
         if (DeleteCommand is AsyncRelayCommand deleteCommand)

@@ -13,7 +13,6 @@ public partial class FileListView : UserControl
     private Point? _dragStartPoint;
     private FileItemViewModel? _dragStartItem;
     private IReadOnlyList<RemoteFileItem>? _dragStartSelection;
-    private FileItemViewModel? _remoteDropTarget;
 
     public FileListView()
     {
@@ -70,22 +69,6 @@ public partial class FileListView : UserControl
 
     private void ListView_OnDragOver(object sender, DragEventArgs e)
     {
-        if (TryGetRemotePayload(e, out var payload)
-            && TryGetDirectoryDropTarget(e, out var target)
-            && FindShellViewModel() is { } shell)
-        {
-            e.Effects = shell.GetRemoteDropEffect(
-                payload,
-                target.Item.Share,
-                target.Item.Path,
-                IsCopyRequested(e)
-            );
-            SetRemoteDropTarget(e.Effects == DragDropEffects.None ? null : target);
-            e.Handled = true;
-            return;
-        }
-
-        SetRemoteDropTarget(null);
         if (e.Data.GetDataPresent(RemoteDragPayload.DataFormat))
         {
             e.Effects = DragDropEffects.None;
@@ -97,32 +80,9 @@ public partial class FileListView : UserControl
         e.Handled = true;
     }
 
-    private void ListView_OnDragLeave(object sender, DragEventArgs e)
-    {
-        if (!IsMouseWithin((FrameworkElement)sender, e))
-        {
-            SetRemoteDropTarget(null);
-        }
-    }
-
     private async void ListView_OnDrop(object sender, DragEventArgs e)
     {
         e.Handled = true;
-        if (TryGetRemotePayload(e, out var payload)
-            && TryGetDirectoryDropTarget(e, out var target)
-            && FindShellViewModel() is { } remoteShell)
-        {
-            SetRemoteDropTarget(null);
-            await remoteShell.DropRemoteItemsAsync(
-                payload,
-                target.Item.Share,
-                target.Item.Path,
-                IsCopyRequested(e)
-            );
-            return;
-        }
-
-        SetRemoteDropTarget(null);
         if (e.Data.GetDataPresent(RemoteDragPayload.DataFormat))
         {
             return;
@@ -141,69 +101,6 @@ public partial class FileListView : UserControl
 
     private static bool HasFileDrop(DragEventArgs e) =>
         e.Data.GetDataPresent(DataFormats.FileDrop);
-
-    private static bool TryGetRemotePayload(DragEventArgs e, out RemoteDragPayload payload)
-    {
-        payload = null!;
-        if (!e.Data.GetDataPresent(RemoteDragPayload.DataFormat)
-            || e.Data.GetData(RemoteDragPayload.DataFormat) is not RemoteDragPayload remotePayload)
-        {
-            return false;
-        }
-
-        payload = remotePayload;
-        return true;
-    }
-
-    private static bool TryGetDirectoryDropTarget(
-        DragEventArgs e,
-        out FileItemViewModel target
-    )
-    {
-        target = null!;
-        var item = FindAncestor<ListViewItem>((DependencyObject)e.OriginalSource);
-        if (item?.DataContext is not FileItemViewModel { Item.IsDirectory: true } fileItem)
-        {
-            return false;
-        }
-
-        target = fileItem;
-        return true;
-    }
-
-    private void SetRemoteDropTarget(FileItemViewModel? target)
-    {
-        if (ReferenceEquals(_remoteDropTarget, target))
-        {
-            return;
-        }
-
-        if (_remoteDropTarget is not null)
-        {
-            _remoteDropTarget.RemoteDropState = RemoteDropState.None;
-        }
-
-        _remoteDropTarget = target;
-
-        if (_remoteDropTarget is not null)
-        {
-            _remoteDropTarget.RemoteDropState = RemoteDropState.ValidTarget;
-        }
-    }
-
-    private static bool IsMouseWithin(FrameworkElement element, DragEventArgs e)
-    {
-        var point = e.GetPosition(element);
-        return point.X >= 0
-            && point.Y >= 0
-            && point.X <= element.ActualWidth
-            && point.Y <= element.ActualHeight;
-    }
-
-    private static bool IsCopyRequested(DragEventArgs e)
-    {
-        return e.KeyStates.HasFlag(DragDropKeyStates.ControlKey);
-    }
 
     private static string NormalizeDirectoryPath(string path)
     {
@@ -231,16 +128,8 @@ public partial class FileListView : UserControl
                     listView.SelectAll();
                     e.Handled = true;
                     return;
-                case Key.X when viewModel.CutCommand.CanExecute(null):
-                    viewModel.CutCommand.Execute(null);
-                    e.Handled = true;
-                    return;
-                case Key.C when viewModel.CopyFileCommand.CanExecute(null):
-                    viewModel.CopyFileCommand.Execute(null);
-                    e.Handled = true;
-                    return;
-                case Key.V when viewModel.PasteCommand.CanExecute(null):
-                    viewModel.PasteCommand.Execute(null);
+                case Key.C when viewModel.CopyLinkCommand.CanExecute(null):
+                    viewModel.CopyLinkCommand.Execute(null);
                     e.Handled = true;
                     return;
                 case Key.F:

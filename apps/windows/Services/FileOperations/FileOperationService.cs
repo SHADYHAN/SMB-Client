@@ -128,6 +128,7 @@ public sealed class FileOperationService : IFileOperationService
         string parentPath,
         IReadOnlyList<string> localPaths,
         bool replaceExisting,
+        IProgress<FileBatchProgress>? progress = null,
         CancellationToken cancellationToken = default
     )
     {
@@ -159,6 +160,7 @@ public sealed class FileOperationService : IFileOperationService
                     return Failure("文件名不可用。", "upload.invalid_name");
                 }
 
+                progress?.Report(new FileBatchProgress(uploaded, localPaths.Count, fileName));
                 await RunWriteTaskAsync(
                     SmbTaskOperation.UploadFile,
                     new SmbUploadFileRequest(
@@ -172,6 +174,7 @@ public sealed class FileOperationService : IFileOperationService
                     cancellationToken
                 );
                 uploaded++;
+                progress?.Report(new FileBatchProgress(uploaded, localPaths.Count, fileName));
             }
 
             return new FileOperationResult(true, uploaded == 1 ? "上传完成。" : $"已上传 {uploaded} 个文件。");

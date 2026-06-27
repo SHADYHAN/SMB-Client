@@ -1,5 +1,11 @@
 # Explorer-first Windows Client Direction
 
+## 当前状态
+
+本文档记录一个独立评估方向，不替代当前 WPF 主线。当前 Windows 主线仍是 `docs/windows-architecture-direction.md` 中定义的 RYNAT 文件工作台：优先打磨链接、预览缩略和上传下载。
+
+只有当 WPF 文件工作台稳定后，用户仍强烈需要系统文件管理器体验时，才进入本文档描述的 Explorer-first 评估。
+
 ## 背景
 
 当前 Windows WPF 客户端已经具备登录、目录树、文件列表、拖拽、预览、复制链接和链接唤醒等能力。但 Windows 端继续自研完整文件管理器，会持续遇到资源管理器级交互细节：

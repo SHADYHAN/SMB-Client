@@ -28,7 +28,7 @@ public sealed class ShellViewModel : ObservableObject
     private readonly IBootstrapService _bootstrapService;
     private readonly ISmbSessionService _sessionService;
     private readonly IFileOperationService _fileOperationService;
-    private readonly IRemoteCopyMoveService _remoteCopyMoveService;
+    private readonly IFileTransferService _fileTransferService;
     private readonly IQuickLinkService _quickLinkService;
     private readonly IClipboardService _clipboardService;
     private readonly IUserDialogService _userDialogService;
@@ -38,7 +38,6 @@ public sealed class ShellViewModel : ObservableObject
     private readonly FileDragDropCoordinator _fileDragDropCoordinator;
     private readonly LinkActivationCoordinator _linkActivationCoordinator;
     private readonly PreviewCoordinator _previewCoordinator;
-    private readonly RemoteClipboardCoordinator _remoteClipboardCoordinator;
     private bool _isLoggedIn;
     private bool _isHandlingSessionDisconnect;
 
@@ -47,7 +46,6 @@ public sealed class ShellViewModel : ObservableObject
         ISmbSessionService sessionService,
         IDirectoryService directoryService,
         IFileOperationService fileOperationService,
-        IRemoteCopyMoveService remoteCopyMoveService,
         IFileTransferService fileTransferService,
         IQuickLinkService quickLinkService,
         ILinkActivationService linkActivationService,
@@ -62,7 +60,7 @@ public sealed class ShellViewModel : ObservableObject
         _bootstrapService = bootstrapService;
         _sessionService = sessionService;
         _fileOperationService = fileOperationService;
-        _remoteCopyMoveService = remoteCopyMoveService;
+        _fileTransferService = fileTransferService;
         _quickLinkService = quickLinkService;
         _clipboardService = clipboardService;
         _userDialogService = userDialogService;
@@ -88,8 +86,6 @@ public sealed class ShellViewModel : ObservableObject
         _fileDragDropCoordinator = new FileDragDropCoordinator(
             fileTransferService,
             _fileOperationService,
-            _remoteCopyMoveService,
-            directoryService,
             shellDragDropService,
             _userDialogService,
             FileList,
@@ -100,18 +96,12 @@ public sealed class ShellViewModel : ObservableObject
         );
         _linkActivationCoordinator = new LinkActivationCoordinator(linkActivationService);
         _previewCoordinator = new PreviewCoordinator(previewService, FileList, Preview, HandleSessionIssueAsync);
-        _remoteClipboardCoordinator = new RemoteClipboardCoordinator(
-            _remoteCopyMoveService,
-            names => _userDialogService.ConfirmOverwrite(names)
-        );
 
         Login.LoginCommand = new AsyncRelayCommand(_loginCoordinator.LoginAsync, _loginCoordinator.CanLogin);
         Login.ServerSettingsCommand = new AsyncRelayCommand(_loginCoordinator.OpenServerSettingsAsync, () => !Login.IsBusy);
         FileList.OpenItemCommand = new AsyncRelayCommand(OpenSelectedItemAsync, () => FileList.HasSingleSelection);
         FileList.CopyLinkCommand = new AsyncRelayCommand(CopySelectedFileLinkAsync, () => FileList.HasSingleSelection && _session is not null);
-        FileList.CutCommand = new RelayCommand(CutSelectedItems, () => FileList.HasWritableSelection && _session is not null);
-        FileList.CopyFileCommand = new RelayCommand(CopySelectedItems, () => FileList.HasWritableSelection && _session is not null);
-        FileList.PasteCommand = new AsyncRelayCommand(PasteRemoteClipboardAsync, CanPasteRemoteClipboard);
+        FileList.DownloadCommand = new AsyncRelayCommand(DownloadSelectedFilesAsync, () => FileList.HasWritableSelection && _session is not null);
         FileList.RefreshCommand = new AsyncRelayCommand(RefreshCurrentDirectoryAsync, CanRefreshCurrentView);
         FileList.GoUpCommand = new AsyncRelayCommand(GoUpDirectoryAsync, CanGoUpDirectory);
         FileList.GoShareRootCommand = new RelayCommand(GoShareRoot, CanGoShareRoot);
@@ -266,43 +256,6 @@ public sealed class ShellViewModel : ObservableObject
         );
     }
 
-    public DragDropEffects GetRemoteDropEffect(
-        RemoteDragPayload? payload,
-        string targetShare,
-        string targetDirectory,
-        bool copyRequested
-    )
-    {
-        return _fileDragDropCoordinator.GetRemoteDropEffect(
-            payload,
-            targetShare,
-            targetDirectory,
-            copyRequested
-        );
-    }
-
-    public async Task DropRemoteItemsAsync(
-        RemoteDragPayload payload,
-        string targetShare,
-        string targetDirectory,
-        bool copyRequested
-    )
-    {
-        if (!await EnsureActiveSessionAsync())
-        {
-            return;
-        }
-
-        await _fileDragDropCoordinator.DropRemoteItemsAsync(
-            _session,
-            payload,
-            targetShare,
-            targetDirectory,
-            copyRequested,
-            RefreshCurrentDirectoryAsync
-        );
-    }
-
     public async Task OpenFavoriteAsync(FavoriteLinkViewModel favorite)
     {
         if (_session is null || !await EnsureActiveSessionAsync())
@@ -335,7 +288,6 @@ public sealed class ShellViewModel : ObservableObject
     private async Task CompleteLoginAsync(ServerSession session)
     {
         _session = session;
-        _remoteClipboardCoordinator.Clear();
         Navigation.LoadShares(_session.Shares);
         IsLoggedIn = true;
         Login.Password = "";
@@ -392,7 +344,6 @@ public sealed class ShellViewModel : ObservableObject
 
     private void ResetSessionUi()
     {
-        _remoteClipboardCoordinator.Clear();
         Navigation.Roots.Clear();
         Navigation.SelectedNode = null;
         Navigation.LoadFavorites(Array.Empty<FavoriteLinkItem>());
@@ -711,76 +662,115 @@ public sealed class ShellViewModel : ObservableObject
         }
     }
 
-    private void CutSelectedItems()
+    private async Task DownloadSelectedFilesAsync()
     {
-        var items = FileList.SelectedRemoteItems;
-        if (items.Count == 0)
+        if (_session is null || !await EnsureActiveSessionAsync())
         {
             return;
         }
 
-        Status.Message = _remoteClipboardCoordinator.Cut(items);
-        RefreshFileCommands();
-    }
-
-    private void CopySelectedItems()
-    {
-        var items = FileList.SelectedRemoteItems;
-        if (items.Count == 0)
+        var items = FileList.SelectedRemoteItems
+            .Where(item => !item.IsShareRoot)
+            .ToArray();
+        if (items.Length == 0)
         {
             return;
         }
 
-        Status.Message = _remoteClipboardCoordinator.Copy(items);
-        RefreshFileCommands();
-    }
-
-    private async Task PasteRemoteClipboardAsync()
-    {
-        var currentShare = _directoryNavigationCoordinator.CurrentShare;
-        if (_session is null || currentShare is null || !await EnsureActiveSessionAsync())
+        if (items.Any(item => item.IsDirectory))
         {
+            Status.Message = "暂不支持下载文件夹。";
+            return;
+        }
+
+        var localPaths = ChooseDownloadPaths(items);
+        if (localPaths is null)
+        {
+            Status.Message = "已取消下载。";
+            return;
+        }
+
+        var conflicts = localPaths
+            .Where(System.IO.File.Exists)
+            .Select(System.IO.Path.GetFileName)
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .Cast<string>()
+            .Distinct(StringComparer.CurrentCultureIgnoreCase)
+            .ToArray();
+        if (conflicts.Length > 0 && !_userDialogService.ConfirmOverwrite(conflicts))
+        {
+            Status.Message = "已取消下载。";
             return;
         }
 
         try
         {
-            Status.Message = "正在粘贴...";
-            var pasteResult = await _remoteClipboardCoordinator.PasteAsync(
-                _session,
-                currentShare,
-                _directoryNavigationCoordinator.CurrentPath,
-                FileList.ContainsName
+            Status.BeginTask("正在下载...", items.Length == 1 ? items[0].Name : $"0/{items.Length}");
+            var progress = new Progress<FileBatchProgress>(item =>
+                Status.ReportTaskProgress(item.Completed, item.Total, item.CurrentName)
             );
-            if (pasteResult is null)
+            var result = await _fileTransferService.DownloadFilesAsync(
+                _session,
+                items,
+                localPaths,
+                replaceExisting: conflicts.Length > 0,
+                progress
+            );
+            if (await HandleTransferResultAsync(result))
             {
                 return;
             }
 
-            if (await HandleOperationResultAsync(pasteResult.OperationResult))
-            {
-                return;
-            }
-
-            Status.Message = pasteResult.OperationResult.Summary;
-            if (pasteResult.ClearClipboard)
-            {
-                _remoteClipboardCoordinator.Clear();
-            }
-
-            if (pasteResult.OperationResult.Succeeded)
-            {
-                await RefreshCurrentDirectoryAsync();
-            }
+            Status.EndTask(result.Summary);
         }
         catch (Exception ex)
         {
-            Status.Message = UserFacingError(ex, "粘贴失败");
+            if (await HandleSessionIssueAsync(ex))
+            {
+                return;
+            }
+
+            Status.EndTask(UserFacingError(ex, "下载失败"));
         }
         finally
         {
-            RefreshFileCommands();
+            if (Status.IsBusy)
+            {
+                Status.ClearTask();
+            }
         }
+    }
+
+    private async Task<bool> HandleTransferResultAsync(DragFilePayloadResult result)
+    {
+        if (result.Succeeded || !BridgeExceptionClassifier.IsReconnectableCode(result.ErrorCode))
+        {
+            return false;
+        }
+
+        await HandleSessionDisconnectedAsync();
+        return true;
+    }
+
+    private IReadOnlyList<string>? ChooseDownloadPaths(IReadOnlyList<RemoteFileItem> items)
+    {
+        if (items.Count == 1)
+        {
+            var path = _userDialogService.PickSaveFilePath("下载到", items[0].Name);
+            return string.IsNullOrWhiteSpace(path)
+                ? null
+                : new[] { path };
+        }
+
+        var folderPath = _userDialogService.PickFolderPath("选择下载位置");
+        if (string.IsNullOrWhiteSpace(folderPath))
+        {
+            return null;
+        }
+
+        return items
+            .Select(item => System.IO.Path.Combine(folderPath, SafeLocalFileName(item.Name)))
+            .ToArray();
     }
 
     private void RefreshFileCommands()
@@ -790,19 +780,9 @@ public sealed class ShellViewModel : ObservableObject
             copyLinkCommand.RaiseCanExecuteChanged();
         }
 
-        if (FileList.CutCommand is RelayCommand cutCommand)
+        if (FileList.DownloadCommand is AsyncRelayCommand downloadCommand)
         {
-            cutCommand.RaiseCanExecuteChanged();
-        }
-
-        if (FileList.CopyFileCommand is RelayCommand copyFileCommand)
-        {
-            copyFileCommand.RaiseCanExecuteChanged();
-        }
-
-        if (FileList.PasteCommand is AsyncRelayCommand pasteCommand)
-        {
-            pasteCommand.RaiseCanExecuteChanged();
+            downloadCommand.RaiseCanExecuteChanged();
         }
 
         if (FileList.RefreshCommand is AsyncRelayCommand refreshCommand)
@@ -865,8 +845,6 @@ public sealed class ShellViewModel : ObservableObject
         && !FileList.IsShareRootView;
 
     private bool CanGoShareRoot() => _session is not null && !FileList.IsShareRootView;
-
-    private bool CanPasteRemoteClipboard() => CanUseCurrentDirectory() && _remoteClipboardCoordinator.CanPaste;
 
     private async Task OpenSelectedItemAsync()
     {
@@ -983,5 +961,12 @@ public sealed class ShellViewModel : ObservableObject
 
         var lastSlash = normalized.LastIndexOf('/');
         return lastSlash <= 0 ? "/" : normalized[..lastSlash];
+    }
+
+    private static string SafeLocalFileName(string name)
+    {
+        var invalid = System.IO.Path.GetInvalidFileNameChars();
+        var safe = string.Concat(name.Select(ch => invalid.Contains(ch) ? '_' : ch));
+        return string.IsNullOrWhiteSpace(safe) ? "download" : safe;
     }
 }

@@ -2,15 +2,12 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
-using Rynat.WindowsClient.Domain;
 using Rynat.WindowsClient.UI.Shell;
 
 namespace Rynat.WindowsClient.UI.Navigation;
 
 public partial class NavigationTreeView : UserControl
 {
-    private NavigationNodeViewModel? _remoteDropTarget;
-
     public NavigationTreeView()
     {
         InitializeComponent();
@@ -54,56 +51,6 @@ public partial class NavigationTreeView : UserControl
         e.Handled = true;
 
         node.IsExpanded = !node.IsExpanded;
-    }
-
-    private void TreeView_OnDragOver(object sender, DragEventArgs e)
-    {
-        if (TryGetRemotePayload(e, out var payload)
-            && TryGetNavigationDropTarget(e, out var target)
-            && FindShellViewModel() is { } shell)
-        {
-            e.Effects = shell.GetRemoteDropEffect(
-                payload,
-                target.Share,
-                target.Path,
-                IsCopyRequested(e)
-            );
-            SetRemoteDropTarget(e.Effects == DragDropEffects.None ? null : target);
-            e.Handled = true;
-            return;
-        }
-
-        SetRemoteDropTarget(null);
-        e.Effects = DragDropEffects.None;
-        e.Handled = true;
-    }
-
-    private void TreeView_OnDragLeave(object sender, DragEventArgs e)
-    {
-        if (!IsMouseWithin((FrameworkElement)sender, e))
-        {
-            SetRemoteDropTarget(null);
-        }
-    }
-
-    private async void TreeView_OnDrop(object sender, DragEventArgs e)
-    {
-        e.Handled = true;
-        if (!TryGetRemotePayload(e, out var payload)
-            || !TryGetNavigationDropTarget(e, out var target)
-            || FindShellViewModel() is not { } shell)
-        {
-            SetRemoteDropTarget(null);
-            return;
-        }
-
-        SetRemoteDropTarget(null);
-        await shell.DropRemoteItemsAsync(
-            payload,
-            target.Share,
-            target.Path,
-            IsCopyRequested(e)
-        );
     }
 
     private async void FavoritesList_OnMouseDoubleClick(object sender, MouseButtonEventArgs e)
@@ -166,35 +113,6 @@ public partial class NavigationTreeView : UserControl
         }
     }
 
-    private void SetRemoteDropTarget(NavigationNodeViewModel? target)
-    {
-        if (ReferenceEquals(_remoteDropTarget, target))
-        {
-            return;
-        }
-
-        if (_remoteDropTarget is not null)
-        {
-            _remoteDropTarget.RemoteDropState = NavigationDropState.None;
-        }
-
-        _remoteDropTarget = target;
-
-        if (_remoteDropTarget is not null)
-        {
-            _remoteDropTarget.RemoteDropState = NavigationDropState.ValidTarget;
-        }
-    }
-
-    private static bool IsMouseWithin(FrameworkElement element, DragEventArgs e)
-    {
-        var point = e.GetPosition(element);
-        return point.X >= 0
-            && point.Y >= 0
-            && point.X <= element.ActualWidth
-            && point.Y <= element.ActualHeight;
-    }
-
     private static T? FindAncestor<T>(DependencyObject? current) where T : DependencyObject
     {
         while (current is not null)
@@ -208,40 +126,6 @@ public partial class NavigationTreeView : UserControl
         }
 
         return null;
-    }
-
-    private static bool TryGetRemotePayload(DragEventArgs e, out RemoteDragPayload payload)
-    {
-        payload = null!;
-        if (!e.Data.GetDataPresent(RemoteDragPayload.DataFormat)
-            || e.Data.GetData(RemoteDragPayload.DataFormat) is not RemoteDragPayload remotePayload)
-        {
-            return false;
-        }
-
-        payload = remotePayload;
-        return true;
-    }
-
-    private static bool TryGetNavigationDropTarget(
-        DragEventArgs e,
-        out NavigationNodeViewModel target
-    )
-    {
-        target = null!;
-        var item = FindAncestor<TreeViewItem>((DependencyObject)e.OriginalSource);
-        if (item?.DataContext is not NavigationNodeViewModel node)
-        {
-            return false;
-        }
-
-        target = node;
-        return true;
-    }
-
-    private static bool IsCopyRequested(DragEventArgs e)
-    {
-        return e.KeyStates.HasFlag(DragDropKeyStates.ControlKey);
     }
 
     private ShellViewModel? FindShellViewModel()

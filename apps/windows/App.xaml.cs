@@ -58,7 +58,6 @@ public partial class App : Application
         var sessionService = new SmbSessionService(bridge);
         var taskService = new SmbTaskService(bridge);
         var directoryService = new DirectoryService(bridge);
-        var remoteCopyMoveService = new RemoteCopyMoveService(bridge);
         var fileOperationService = new FileOperationService(taskService);
         var fileTransferService = new FileTransferService(taskService);
         var quickLinkService = new QuickLinkService(bridge);
@@ -77,7 +76,6 @@ public partial class App : Application
             sessionService,
             directoryService,
             fileOperationService,
-            remoteCopyMoveService,
             fileTransferService,
             quickLinkService,
             linkActivationService,

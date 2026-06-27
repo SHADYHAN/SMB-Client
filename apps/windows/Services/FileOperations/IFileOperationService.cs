@@ -31,6 +31,7 @@ public interface IFileOperationService
         string parentPath,
         IReadOnlyList<string> localPaths,
         bool replaceExisting,
+        IProgress<FileBatchProgress>? progress = null,
         CancellationToken cancellationToken = default
     );
 }

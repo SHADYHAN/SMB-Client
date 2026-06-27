@@ -2,22 +2,15 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:navigation="clr-namespace:Rynat.WindowsClient.UI.Navigation">
-    <Border Background="{StaticResource PanelBackgroundBrush}"
-            Padding="12">
+    <Border Background="{StaticResource PanelBackgroundBrush}">
         <DockPanel>
-            <DockPanel DockPanel.Dock="Top"
-                       Margin="0,0,0,14">
-                <Button DockPanel.Dock="Right"
-                        Style="{StaticResource IconButtonStyle}"
-                        Margin="8,0,0,0"
-                        ToolTip="添加当前项目到收藏"
-                        Command="{Binding AddFavoriteCommand}">
-                    <TextBlock Text="{StaticResource IconAdd}"
-                               Style="{StaticResource HeaderGlyphStyle}" />
-                </Button>
-                <Border Background="{StaticResource SubtleBackgroundBrush}"
-                        CornerRadius="9"
-                        Padding="3">
+            <Grid DockPanel.Dock="Top"
+                  Height="36"
+                  Background="{StaticResource PanelBackgroundBrush}">
+                <Border Background="{StaticResource ControlHoverBrush}"
+                        CornerRadius="7"
+                        Padding="2"
+                        Margin="8,5">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
@@ -53,16 +46,13 @@
                         </Button>
                     </Grid>
                 </Border>
-            </DockPanel>
+            </Grid>
             <TreeView ItemsSource="{Binding Roots}"
                       SelectedItemChanged="TreeView_OnSelectedItemChanged"
                       MouseDoubleClick="TreeView_OnMouseDoubleClick"
-                      AllowDrop="True"
-                      DragOver="TreeView_OnDragOver"
-                      DragLeave="TreeView_OnDragLeave"
-                      Drop="TreeView_OnDrop"
                       BorderThickness="0"
-                      Background="Transparent">
+                      Background="Transparent"
+                      Padding="8,6">
                 <TreeView.Style>
                     <Style TargetType="TreeView">
                         <Setter Property="Visibility" Value="Visible" />
@@ -77,12 +67,6 @@
                     <Style TargetType="TreeViewItem" BasedOn="{StaticResource RynatTreeViewItemStyle}">
                         <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
                         <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}" />
-                        <Style.Triggers>
-                            <DataTrigger Binding="{Binding RemoteDropState}" Value="{x:Static navigation:NavigationDropState.ValidTarget}">
-                                <Setter Property="Background" Value="{StaticResource AccentSoftBrush}" />
-                                <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
-                            </DataTrigger>
-                        </Style.Triggers>
                     </Style>
                 </TreeView.ItemContainerStyle>
                 <TreeView.Resources>
@@ -99,7 +83,8 @@
                       MouseDoubleClick="FavoritesList_OnMouseDoubleClick"
                       KeyDown="FavoritesList_OnKeyDown"
                       BorderThickness="0"
-                      Background="Transparent">
+                      Background="Transparent"
+                      Padding="8,6">
                 <ListView.Style>
                     <Style TargetType="ListView">
                         <Setter Property="Visibility" Value="Collapsed" />
@@ -121,13 +106,13 @@
                 </ListView.ContextMenu>
                 <ListView.ItemTemplate>
                     <DataTemplate DataType="{x:Type navigation:FavoriteLinkViewModel}">
-                        <StackPanel Margin="2,3">
+                        <StackPanel Margin="2,4">
                             <TextBlock Text="{Binding Name}"
                                        FontWeight="SemiBold"
                                        TextTrimming="CharacterEllipsis" />
                             <TextBlock Text="{Binding Location}"
                                        Foreground="{StaticResource TextSecondaryBrush}"
-                                       FontSize="11"
+                                       FontSize="12"
                                        Margin="0,2,0,0"
                                        TextTrimming="CharacterEllipsis" />
                         </StackPanel>

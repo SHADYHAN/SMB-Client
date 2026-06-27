@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using Microsoft.Win32;
 
 namespace Rynat.WindowsClient.Platform.Dialogs;
 
@@ -54,6 +55,33 @@ public sealed class WindowsUserDialogService : IUserDialogService
         };
 
         return window.ShowDialog() == true ? input.Text : null;
+    }
+
+    public string? PickSaveFilePath(string title, string suggestedFileName)
+    {
+        var dialog = new SaveFileDialog
+        {
+            Title = title,
+            FileName = suggestedFileName,
+            OverwritePrompt = false
+        };
+
+        return dialog.ShowDialog(Application.Current.MainWindow) == true
+            ? dialog.FileName
+            : null;
+    }
+
+    public string? PickFolderPath(string title)
+    {
+        using var dialog = new System.Windows.Forms.FolderBrowserDialog
+        {
+            Description = title,
+            UseDescriptionForTitle = true
+        };
+
+        return dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK
+            ? dialog.SelectedPath
+            : null;
     }
 
     public bool Confirm(string title, string message)
