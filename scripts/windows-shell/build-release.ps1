@@ -9,7 +9,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$scriptVersion = "2026-06-27.6"
+$scriptVersion = "2026-06-27.7"
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 $windowsShellDir = Join-Path $repoRoot "apps\windows-shell"
 $windowsShellDistDir = Join-Path $windowsShellDir "dist"
@@ -143,6 +143,34 @@ function Remove-PathIfExists {
     Remove-Item -Recurse -Force -Path $Path
 }
 
+function Assert-CleanTrackedWorktreeForPull {
+    $unstaged = @(& git diff --name-only)
+    if ($LASTEXITCODE -ne 0) {
+        throw ("git diff failed with exit code {0}" -f $LASTEXITCODE)
+    }
+
+    $staged = @(& git diff --cached --name-only)
+    if ($LASTEXITCODE -ne 0) {
+        throw ("git diff --cached failed with exit code {0}" -f $LASTEXITCODE)
+    }
+
+    $changed = @($unstaged + $staged | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique)
+    if ($changed.Count -eq 0) {
+        return
+    }
+
+    Write-Host "Local tracked changes would block git pull:" -ForegroundColor Yellow
+    foreach ($path in $changed) {
+        Write-Host "  $path" -ForegroundColor Yellow
+    }
+    Write-Host ""
+    Write-Host "If these are only local build edits, discard them and rerun:" -ForegroundColor Yellow
+    Write-Host "  git restore -- <path>" -ForegroundColor Yellow
+    Write-Host "Or build the current checkout without pulling:" -ForegroundColor Yellow
+    Write-Host "  scripts\windows-shell\build-release.bat -SkipPull" -ForegroundColor Yellow
+    throw "git pull skipped because local tracked changes are present"
+}
+
 Push-Location $repoRoot
 try {
     Write-Host "Repository: $repoRoot" -ForegroundColor Cyan
@@ -165,6 +193,7 @@ try {
 
     if (-not $SkipPull) {
         Write-Host "Pulling latest changes..." -ForegroundColor Cyan
+        Assert-CleanTrackedWorktreeForPull
         Invoke-NativeCommand -FilePath "git" -Arguments @("pull", "--ff-only")
     }
 
