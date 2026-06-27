@@ -4,7 +4,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$scriptVersion = "2026-06-27.4"
+$scriptVersion = "2026-06-27.5"
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..")
 Set-Location $repoRoot
 
@@ -42,6 +42,6 @@ Write-Host "Checking Tauri shell Rust side..." -ForegroundColor Cyan
 Invoke-CargoChecked -Arguments (@("test", "--manifest-path", "apps/windows-shell/src-tauri/Cargo.toml") + $cargoArgs)
 
 Write-Host "Checking helper contract..." -ForegroundColor Cyan
-Invoke-CargoChecked -Arguments (@("run", "-p", "rynat-windows-context-helper", "--locked") + $cargoArgs + @("--", "copy-link", "\\nas.local\Media\demo.mp4", "--kind", "file"))
+Invoke-CargoChecked -Arguments (@("run", "-p", "rynat-windows-context-helper", "--locked") + $cargoArgs + @("--", "--print-only", "copy-link", "\\nas.local\Media\demo.mp4", "--kind", "file"))
 
 Write-Host "Explorer-first Windows shell checks completed."
