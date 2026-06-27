@@ -5,11 +5,12 @@ param(
     [switch]$Offline,
     [switch]$NoClean,
     [switch]$CleanNodeModules,
+    [switch]$KeepLocalChanges,
     [string]$OutputDirectory = ".\build\windows-shell-release"
 )
 
 $ErrorActionPreference = "Stop"
-$scriptVersion = "2026-06-27.7"
+$scriptVersion = "2026-06-27.8"
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 $windowsShellDir = Join-Path $repoRoot "apps\windows-shell"
 $windowsShellDistDir = Join-Path $windowsShellDir "dist"
@@ -143,7 +144,7 @@ function Remove-PathIfExists {
     Remove-Item -Recurse -Force -Path $Path
 }
 
-function Assert-CleanTrackedWorktreeForPull {
+function Clear-TrackedWorktreeChangesForPull {
     $unstaged = @(& git diff --name-only)
     if ($LASTEXITCODE -ne 0) {
         throw ("git diff failed with exit code {0}" -f $LASTEXITCODE)
@@ -159,16 +160,32 @@ function Assert-CleanTrackedWorktreeForPull {
         return
     }
 
-    Write-Host "Local tracked changes would block git pull:" -ForegroundColor Yellow
+    if ($KeepLocalChanges) {
+        Write-Host "Local tracked changes would block git pull:" -ForegroundColor Yellow
+        foreach ($path in $changed) {
+            Write-Host "  $path" -ForegroundColor Yellow
+        }
+        Write-Host ""
+        Write-Host "Build the current checkout without pulling:" -ForegroundColor Yellow
+        Write-Host "  scripts\windows-shell\build-release.bat -SkipPull" -ForegroundColor Yellow
+        Write-Host "Or allow the release script to discard tracked local changes by omitting -KeepLocalChanges." -ForegroundColor Yellow
+        throw "git pull skipped because local tracked changes are present"
+    }
+
+    Write-Host "Discarding local tracked changes before git pull:" -ForegroundColor Yellow
     foreach ($path in $changed) {
         Write-Host "  $path" -ForegroundColor Yellow
     }
-    Write-Host ""
-    Write-Host "If these are only local build edits, discard them and rerun:" -ForegroundColor Yellow
-    Write-Host "  git restore -- <path>" -ForegroundColor Yellow
-    Write-Host "Or build the current checkout without pulling:" -ForegroundColor Yellow
-    Write-Host "  scripts\windows-shell\build-release.bat -SkipPull" -ForegroundColor Yellow
-    throw "git pull skipped because local tracked changes are present"
+
+    & git restore --staged -- $changed
+    if ($LASTEXITCODE -ne 0) {
+        throw ("git restore --staged failed with exit code {0}" -f $LASTEXITCODE)
+    }
+
+    & git restore --worktree -- $changed
+    if ($LASTEXITCODE -ne 0) {
+        throw ("git restore --worktree failed with exit code {0}" -f $LASTEXITCODE)
+    }
 }
 
 Push-Location $repoRoot
@@ -193,7 +210,7 @@ try {
 
     if (-not $SkipPull) {
         Write-Host "Pulling latest changes..." -ForegroundColor Cyan
-        Assert-CleanTrackedWorktreeForPull
+        Clear-TrackedWorktreeChangesForPull
         Invoke-NativeCommand -FilePath "git" -Arguments @("pull", "--ff-only")
     }
 
