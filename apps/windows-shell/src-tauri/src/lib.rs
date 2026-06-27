@@ -300,6 +300,20 @@ mod tests {
     }
 
     #[test]
+    fn test_share_directory_link_opens_requested_unc_directory() {
+        let http_url =
+            build_link_for_unc_path(r"\\192.168.102.136\临时文件夹\123", LinkKind::Directory)
+                .unwrap();
+        let activation = explorer_target_from_link(&http_url).unwrap();
+
+        assert_eq!(
+            activation.explorer.open_path,
+            r"\\192.168.102.136\临时文件夹\123"
+        );
+        assert_eq!(activation.explorer.selected_path, None);
+    }
+
+    #[test]
     fn login_open_target_defaults_to_server_unc_root() {
         assert_eq!(
             parse_explorer_open_target(" 192.168.102.136 ", None)

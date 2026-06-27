@@ -48,10 +48,7 @@ where
     stream.set_read_timeout(Some(Duration::from_secs(3)))?;
     stream.set_write_timeout(Some(Duration::from_secs(3)))?;
 
-    let mut raw = String::new();
-    Read::by_ref(&mut stream)
-        .take(MAX_REQUEST_BYTES as u64)
-        .read_to_string(&mut raw)?;
+    let raw = read_http_request(&mut stream)?;
 
     let response =
         match request_line(&raw).and_then(|line| deep_link_from_local_request_line(line).ok()) {
@@ -69,6 +66,24 @@ where
 
     stream.write_all(response.as_bytes())?;
     Ok(())
+}
+
+fn read_http_request(stream: &mut TcpStream) -> Result<String, LocalRedirectError> {
+    let mut raw = Vec::new();
+    let mut buffer = [0; 1024];
+    while raw.len() < MAX_REQUEST_BYTES {
+        let bytes_read = stream.read(&mut buffer)?;
+        if bytes_read == 0 {
+            break;
+        }
+
+        raw.extend_from_slice(&buffer[..bytes_read]);
+        if raw.windows(4).any(|window| window == b"\r\n\r\n") {
+            break;
+        }
+    }
+
+    Ok(String::from_utf8_lossy(&raw).into_owned())
 }
 
 fn request_line(raw: &str) -> Option<&str> {
@@ -102,5 +117,16 @@ mod tests {
         let deep_link = deep_link_from_local_request_line(&line).unwrap();
 
         assert!(deep_link.starts_with("rynat://s/"));
+    }
+
+    #[test]
+    fn request_line_is_available_before_connection_close() {
+        let raw = "GET /s/demo HTTP/1.1\r\nHost: 127.0.0.1:19527\r\nConnection: keep-alive\r\n\r\n";
+
+        assert_eq!(request_line(raw), Some("GET /s/demo HTTP/1.1"));
+        assert_eq!(
+            deep_link_from_local_request_line(request_line(raw).unwrap()).unwrap(),
+            "rynat://s/demo"
+        );
     }
 }
