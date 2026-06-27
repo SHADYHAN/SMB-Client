@@ -9,7 +9,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$scriptVersion = "2026-06-27.4"
+$scriptVersion = "2026-06-27.5"
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 $windowsShellDir = Join-Path $repoRoot "apps\windows-shell"
 $windowsShellDistDir = Join-Path $windowsShellDir "dist"
@@ -55,6 +55,42 @@ function Invoke-NpmInstallWithRetry {
     & npm @Arguments
     if ($LASTEXITCODE -ne 0) {
         throw ("npm failed with exit code {0}: npm {1}" -f $LASTEXITCODE, ($Arguments -join ' '))
+    }
+}
+
+function Invoke-NpmBuildWithRetry {
+    $previousCargoBuildJobs = $env:CARGO_BUILD_JOBS
+    $previousCargoIncremental = $env:CARGO_INCREMENTAL
+    $env:CARGO_BUILD_JOBS = "1"
+    $env:CARGO_INCREMENTAL = "0"
+
+    try {
+        & npm run build
+        if ($LASTEXITCODE -eq 0) {
+            return
+        }
+
+        $firstExitCode = $LASTEXITCODE
+        Write-Warning ("npm run build failed with exit code {0}. Cleaning Tauri target and retrying once with single-job cargo..." -f $firstExitCode)
+        Remove-PathIfExists -Path $windowsShellTargetDir
+
+        & npm run build
+        if ($LASTEXITCODE -ne 0) {
+            throw ("npm failed with exit code {0}: npm run build" -f $LASTEXITCODE)
+        }
+    }
+    finally {
+        if ($null -eq $previousCargoBuildJobs) {
+            Remove-Item Env:CARGO_BUILD_JOBS -ErrorAction SilentlyContinue
+        } else {
+            $env:CARGO_BUILD_JOBS = $previousCargoBuildJobs
+        }
+
+        if ($null -eq $previousCargoIncremental) {
+            Remove-Item Env:CARGO_INCREMENTAL -ErrorAction SilentlyContinue
+        } else {
+            $env:CARGO_INCREMENTAL = $previousCargoIncremental
+        }
     }
 }
 
@@ -150,7 +186,7 @@ try {
         }
 
         Write-Host "Building Tauri Windows shell bundle..." -ForegroundColor Cyan
-        Invoke-NativeCommand -FilePath "npm" -Arguments @("run", "build")
+        Invoke-NpmBuildWithRetry
     }
     finally {
         Pop-Location
