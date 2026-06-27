@@ -71,27 +71,66 @@ function render(state: ShellState) {
     const host = String(data.get("host") || "").trim();
     const username = String(data.get("username") || "").trim();
     const password = String(data.get("password") || "");
-    await invoke("connect_profile", { host, username, password });
-    setDiagnostic(`已建立连接请求：\\\\${host}`);
-    render({
-      connected: true,
-      serverName: host,
-      serverHost: `\\\\${host}`,
-      status: "已连接",
-    });
+
+    if (!host) {
+      setDiagnostic("请输入服务器地址");
+      return;
+    }
+
+    setDiagnostic("正在打开资源管理器...");
+
+    try {
+      const opened = await invoke<string>("open_explorer", { host, share: null });
+      let credentialWarning: string | null = null;
+
+      try {
+        await invoke("connect_profile", { host, username, password });
+      } catch (error) {
+        credentialWarning = formatError(error);
+      }
+
+      render({
+        connected: credentialWarning === null,
+        serverName: host,
+        serverHost: `\\\\${host}`,
+        status: credentialWarning ? "需确认凭据" : "已连接",
+      });
+
+      if (credentialWarning) {
+        setDiagnostic(`已打开：${opened}。SMB 凭据接入失败：${credentialWarning}`);
+      } else {
+        setDiagnostic(`已打开：${opened}`);
+      }
+    } catch (error) {
+      setDiagnostic(`打开资源管理器失败：${formatError(error)}`);
+    }
   });
 
   document.querySelector<HTMLButtonElement>("#open-explorer")?.addEventListener("click", async () => {
-    const opened = await invoke<string>("open_explorer", { host: state.serverHost.replace(/^\\\\/, ""), share: null });
-    setDiagnostic(`打开：${opened}`);
+    const host = state.serverHost.replace(/^\\\\/, "");
+    if (!host) {
+      setDiagnostic("请先登录服务器");
+      return;
+    }
+
+    try {
+      const opened = await invoke<string>("open_explorer", { host, share: null });
+      setDiagnostic(`打开：${opened}`);
+    } catch (error) {
+      setDiagnostic(`打开资源管理器失败：${formatError(error)}`);
+    }
   });
 
   document.querySelector<HTMLButtonElement>("#copy-link-demo")?.addEventListener("click", async () => {
-    const link = await invoke<string>("copy_link_for_unc_path", {
-      path: "\\\\192.168.102.136\\共享资料\\123",
-      kind: "dir",
-    });
-    setDiagnostic(`生成链接：${link}`);
+    try {
+      const link = await invoke<string>("copy_link_for_unc_path", {
+        path: "\\\\192.168.102.136\\共享资料\\123",
+        kind: "dir",
+      });
+      setDiagnostic(`生成链接：${link}`);
+    } catch (error) {
+      setDiagnostic(`生成链接失败：${formatError(error)}`);
+    }
   });
 }
 
@@ -101,6 +140,13 @@ function setDiagnostic(message: string) {
     output.value = message;
     output.textContent = message;
   }
+}
+
+function formatError(error: unknown) {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return String(error || "未知错误");
 }
 
 async function boot() {

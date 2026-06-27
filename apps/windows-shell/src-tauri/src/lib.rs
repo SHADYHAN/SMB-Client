@@ -52,22 +52,97 @@ fn connect_profile(host: String, username: String, password: String) -> Result<(
 
 #[tauri::command]
 fn open_explorer(host: String, share: Option<String>) -> Result<String, String> {
-    let open_path = match share.as_deref() {
-        Some(share) if !share.trim().is_empty() => {
-            rynat_windows_shell_support::explorer::unc_path(&host, share, "/")
-        }
-        _ => format!(r"\\{}", host.trim()),
-    };
+    let open_path = explorer_open_path(&host, share.as_deref());
 
     #[cfg(windows)]
     {
-        std::process::Command::new("explorer.exe")
-            .arg(&open_path)
-            .spawn()
-            .map_err(|error| error.to_string())?;
+        open_path_with_shell(&open_path)?;
     }
 
     Ok(open_path)
+}
+
+#[tauri::command]
+fn preview_explorer_path(host: String, share: Option<String>) -> Result<String, String> {
+    Ok(explorer_open_path(&host, share.as_deref()))
+}
+
+fn explorer_open_path(host: &str, share: Option<&str>) -> String {
+    let host = normalize_windows_path_input(host);
+
+    if host.starts_with(r"\\") && share.map(str::trim).filter(|value| !value.is_empty()).is_none()
+    {
+        return host;
+    }
+
+    match share {
+        Some(share) if !share.trim().is_empty() => {
+            rynat_windows_shell_support::explorer::unc_path(&host, share, "/")
+        }
+        _ if host.contains('\\') => format!(r"\\{host}"),
+        _ => format!(r"\\{}", host.trim()),
+    }
+}
+
+fn normalize_windows_path_input(value: &str) -> String {
+    let mut value = value.trim().trim_matches('"').replace('/', "\\");
+    if let Some(rest) = value.strip_prefix("smb:\\\\") {
+        value = format!(r"\\{rest}");
+    }
+
+    while value.ends_with('\\') && value.len() > 2 {
+        value.pop();
+    }
+
+    value
+}
+
+#[cfg(windows)]
+fn open_path_with_shell(path: &str) -> Result<(), String> {
+    use std::ffi::OsStr;
+    use std::iter;
+    use std::os::windows::ffi::OsStrExt;
+    use std::ptr;
+
+    const SW_SHOWNORMAL: i32 = 1;
+
+    #[link(name = "Shell32")]
+    unsafe extern "system" {
+        fn ShellExecuteW(
+            hwnd: *mut core::ffi::c_void,
+            lp_operation: *const u16,
+            lp_file: *const u16,
+            lp_parameters: *const u16,
+            lp_directory: *const u16,
+            n_show_cmd: i32,
+        ) -> *mut core::ffi::c_void;
+    }
+
+    fn wide_null(value: &str) -> Vec<u16> {
+        OsStr::new(value)
+            .encode_wide()
+            .chain(iter::once(0))
+            .collect()
+    }
+
+    let operation = wide_null("open");
+    let file = wide_null(path);
+    let result = unsafe {
+        ShellExecuteW(
+            ptr::null_mut(),
+            operation.as_ptr(),
+            file.as_ptr(),
+            ptr::null::<u16>(),
+            ptr::null::<u16>(),
+            SW_SHOWNORMAL,
+        ) as isize
+    };
+
+    if result > 32 {
+        Ok(())
+    } else {
+        Err(format!("ShellExecuteW failed with code {result} for {path}"))
+    }
 }
 
 #[tauri::command]
@@ -136,6 +211,7 @@ pub fn run() {
             get_bootstrap_state,
             connect_profile,
             open_explorer,
+            preview_explorer_path,
             copy_link_for_unc_path,
             explorer_target_for_link,
             registration_preview
@@ -210,5 +286,34 @@ mod tests {
         let activation = explorer_target_from_link(&http_url).unwrap();
 
         assert_eq!(activation.explorer.open_path, r"\\192.168.102.136\共享资料\123");
+    }
+
+    #[test]
+    fn login_open_target_defaults_to_server_unc_root() {
+        assert_eq!(explorer_open_path(" 192.168.102.136 ", None), r"\\192.168.102.136");
+    }
+
+    #[test]
+    fn login_open_target_can_include_share() {
+        assert_eq!(
+            explorer_open_path("192.168.102.136", Some("共享资料")),
+            r"\\192.168.102.136\共享资料"
+        );
+    }
+
+    #[test]
+    fn login_open_target_keeps_unc_input() {
+        assert_eq!(
+            explorer_open_path(r"\\192.168.102.136\共享资料", None),
+            r"\\192.168.102.136\共享资料"
+        );
+    }
+
+    #[test]
+    fn login_open_target_accepts_smb_url_style_input() {
+        assert_eq!(
+            explorer_open_path("smb://192.168.102.136/共享资料", None),
+            r"\\192.168.102.136\共享资料"
+        );
     }
 }
