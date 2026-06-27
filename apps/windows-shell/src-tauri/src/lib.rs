@@ -17,6 +17,14 @@ struct ShellState {
     status: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ExplorerOpenTarget {
+    host: String,
+    share: Option<String>,
+    open_path: String,
+}
+
 #[tauri::command]
 fn get_bootstrap_state() -> ShellState {
     ShellState {
@@ -29,9 +37,10 @@ fn get_bootstrap_state() -> ShellState {
 
 #[tauri::command]
 fn connect_profile(host: String, username: String, password: String) -> Result<(), String> {
+    let target = parse_explorer_open_target(&host, None)?;
     let request = SmbSessionConnectRequest {
-        host,
-        share: None,
+        host: target.host,
+        share: target.share,
         username: (!username.trim().is_empty()).then_some(username),
         password: (!password.is_empty()).then_some(password),
     };
@@ -52,36 +61,77 @@ fn connect_profile(host: String, username: String, password: String) -> Result<(
 
 #[tauri::command]
 fn open_explorer(host: String, share: Option<String>) -> Result<String, String> {
-    let open_path = explorer_open_path(&host, share.as_deref());
+    let target = parse_explorer_open_target(&host, share.as_deref())?;
 
     #[cfg(windows)]
     {
-        open_path_with_shell(&open_path)?;
+        open_path_with_explorer(&target.open_path)?;
     }
 
-    Ok(open_path)
+    Ok(target.open_path)
 }
 
 #[tauri::command]
-fn preview_explorer_path(host: String, share: Option<String>) -> Result<String, String> {
-    Ok(explorer_open_path(&host, share.as_deref()))
+fn preview_explorer_path(host: String, share: Option<String>) -> Result<ExplorerOpenTarget, String> {
+    parse_explorer_open_target(&host, share.as_deref())
 }
 
-fn explorer_open_path(host: &str, share: Option<&str>) -> String {
-    let host = normalize_windows_path_input(host);
-
-    if host.starts_with(r"\\") && share.map(str::trim).filter(|value| !value.is_empty()).is_none()
-    {
-        return host;
+fn parse_explorer_open_target(
+    input: &str,
+    share: Option<&str>,
+) -> Result<ExplorerOpenTarget, String> {
+    let input = normalize_windows_path_input(input);
+    if input.is_empty() {
+        return Err("服务器地址不能为空".to_string());
     }
 
-    match share {
+    let (host, parsed_share, open_path) = if let Some(unc_tail) = input.strip_prefix(r"\\") {
+        let mut parts = unc_tail.split('\\').filter(|part| !part.trim().is_empty());
+        let host = parts
+            .next()
+            .ok_or_else(|| "UNC 路径缺少服务器地址".to_string())?
+            .trim()
+            .to_string();
+        let parsed_share = parts.next().map(|value| value.trim().to_string());
+        (host, parsed_share, input)
+    } else if let Some((host, rest)) = input.split_once('\\') {
+        let host = host.trim().to_string();
+        let parsed_share = rest
+            .split('\\')
+            .next()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(str::to_string);
+        (host, parsed_share, format!(r"\\{input}"))
+    } else {
+        let explicit_share = share
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(str::to_string);
+        let open_path = match explicit_share.as_deref() {
+            Some(share) => rynat_windows_shell_support::explorer::unc_path(&input, share, "/"),
+            None => format!(r"\\{}", input.trim()),
+        };
+        (input.trim().to_string(), explicit_share, open_path)
+    };
+
+    let share = match share.map(str::trim).filter(|value| !value.is_empty()) {
+        Some(share) => Some(share.to_string()),
+        None => parsed_share,
+    };
+
+    let open_path = match share.as_deref() {
         Some(share) if !share.trim().is_empty() => {
             rynat_windows_shell_support::explorer::unc_path(&host, share, "/")
         }
-        _ if host.contains('\\') => format!(r"\\{host}"),
-        _ => format!(r"\\{}", host.trim()),
-    }
+        _ => open_path,
+    };
+
+    Ok(ExplorerOpenTarget {
+        host,
+        share,
+        open_path,
+    })
 }
 
 fn normalize_windows_path_input(value: &str) -> String {
@@ -98,51 +148,12 @@ fn normalize_windows_path_input(value: &str) -> String {
 }
 
 #[cfg(windows)]
-fn open_path_with_shell(path: &str) -> Result<(), String> {
-    use std::ffi::OsStr;
-    use std::iter;
-    use std::os::windows::ffi::OsStrExt;
-    use std::ptr;
-
-    const SW_SHOWNORMAL: i32 = 1;
-
-    #[link(name = "Shell32")]
-    unsafe extern "system" {
-        fn ShellExecuteW(
-            hwnd: *mut core::ffi::c_void,
-            lp_operation: *const u16,
-            lp_file: *const u16,
-            lp_parameters: *const u16,
-            lp_directory: *const u16,
-            n_show_cmd: i32,
-        ) -> *mut core::ffi::c_void;
-    }
-
-    fn wide_null(value: &str) -> Vec<u16> {
-        OsStr::new(value)
-            .encode_wide()
-            .chain(iter::once(0))
-            .collect()
-    }
-
-    let operation = wide_null("open");
-    let file = wide_null(path);
-    let result = unsafe {
-        ShellExecuteW(
-            ptr::null_mut(),
-            operation.as_ptr(),
-            file.as_ptr(),
-            ptr::null::<u16>(),
-            ptr::null::<u16>(),
-            SW_SHOWNORMAL,
-        ) as isize
-    };
-
-    if result > 32 {
-        Ok(())
-    } else {
-        Err(format!("ShellExecuteW failed with code {result} for {path}"))
-    }
+fn open_path_with_explorer(path: &str) -> Result<(), String> {
+    std::process::Command::new("explorer.exe")
+        .arg(path)
+        .spawn()
+        .map(|_| ())
+        .map_err(|error| format!("failed to start explorer.exe for {path}: {error}"))
 }
 
 #[tauri::command]
@@ -290,13 +301,20 @@ mod tests {
 
     #[test]
     fn login_open_target_defaults_to_server_unc_root() {
-        assert_eq!(explorer_open_path(" 192.168.102.136 ", None), r"\\192.168.102.136");
+        assert_eq!(
+            parse_explorer_open_target(" 192.168.102.136 ", None)
+                .unwrap()
+                .open_path,
+            r"\\192.168.102.136"
+        );
     }
 
     #[test]
     fn login_open_target_can_include_share() {
         assert_eq!(
-            explorer_open_path("192.168.102.136", Some("共享资料")),
+            parse_explorer_open_target("192.168.102.136", Some("共享资料"))
+                .unwrap()
+                .open_path,
             r"\\192.168.102.136\共享资料"
         );
     }
@@ -304,7 +322,9 @@ mod tests {
     #[test]
     fn login_open_target_keeps_unc_input() {
         assert_eq!(
-            explorer_open_path(r"\\192.168.102.136\共享资料", None),
+            parse_explorer_open_target(r"\\192.168.102.136\共享资料", None)
+                .unwrap()
+                .open_path,
             r"\\192.168.102.136\共享资料"
         );
     }
@@ -312,8 +332,19 @@ mod tests {
     #[test]
     fn login_open_target_accepts_smb_url_style_input() {
         assert_eq!(
-            explorer_open_path("smb://192.168.102.136/共享资料", None),
+            parse_explorer_open_target("smb://192.168.102.136/共享资料", None)
+                .unwrap()
+                .open_path,
             r"\\192.168.102.136\共享资料"
         );
+    }
+
+    #[test]
+    fn login_open_target_extracts_host_and_share_from_unc_input() {
+        let target = parse_explorer_open_target(r"\\192.168.102.136\共享资料", None).unwrap();
+
+        assert_eq!(target.host, "192.168.102.136");
+        assert_eq!(target.share, Some("共享资料".to_string()));
+        assert_eq!(target.open_path, r"\\192.168.102.136\共享资料");
     }
 }

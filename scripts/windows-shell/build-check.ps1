@@ -1,6 +1,7 @@
 param(
     [switch]$Offline,
-    [switch]$FullWorkspace
+    [switch]$FullWorkspace,
+    [string]$OpenExplorerPath
 )
 
 $ErrorActionPreference = "Stop"
@@ -78,6 +79,11 @@ Write-Host "Checking Tauri shell Rust side..." -ForegroundColor Cyan
 Invoke-CargoCheckedWithTauriPdbRetry -Arguments (@("test", "--manifest-path", "apps/windows-shell/src-tauri/Cargo.toml") + $cargoArgs)
 
 Write-Host "Checking helper contract..." -ForegroundColor Cyan
-Invoke-CargoChecked -Arguments (@("run", "-p", "rynat-windows-context-helper", "--locked") + $cargoArgs + @("--", "--print-only", "copy-link", "\\nas.local\Media\demo.mp4", "--kind", "file"))
+Invoke-CargoChecked -Arguments (@("run", "-p", "rynat-windows-context-helper", "--locked") + $cargoArgs + @("--", "--print-only", "copy-link", "\\192.168.102.136\临时文件夹\123", "--kind", "dir"))
+
+if (-not [string]::IsNullOrWhiteSpace($OpenExplorerPath)) {
+    Write-Host "Checking Explorer open request..." -ForegroundColor Cyan
+    Invoke-CargoChecked -Arguments (@("run", "-p", "rynat-windows-context-helper", "--bin", "open-explorer-check", "--locked") + $cargoArgs + @("--", $OpenExplorerPath))
+}
 
 Write-Host "Explorer-first Windows shell checks completed."
