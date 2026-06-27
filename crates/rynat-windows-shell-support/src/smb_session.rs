@@ -98,8 +98,8 @@ pub mod windows {
         fn connect(&self, request: &SmbSessionConnectRequest) -> SmbSessionResult<()> {
             let remote_name = format_unc_root(&request.host, request.share.as_deref())?;
             let remote_name_w = wide_null(&remote_name);
-            let username_w = request.username.as_ref().map(wide_null);
-            let password_w = request.password.as_ref().map(wide_null);
+            let username_w = request.username.as_deref().map(wide_null);
+            let password_w = request.password.as_deref().map(wide_null);
 
             let resource = NetResourceW {
                 dw_scope: 0,

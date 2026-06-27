@@ -32,6 +32,8 @@ Explorer owns:
 ```powershell
 scripts\windows-shell\build-check.ps1
 scripts\windows-shell\build-check.ps1 -Offline
+scripts\windows-shell\pull-build-check.bat
+scripts\windows-shell\pull-build-check.bat -Offline
 ```
 
 Generate registry preview files:

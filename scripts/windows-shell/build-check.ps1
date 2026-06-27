@@ -11,13 +11,25 @@ if ($Offline) {
     $cargoArgs += "--offline"
 }
 
+function Invoke-CargoChecked {
+    param(
+        [Parameter(ValueFromRemainingArguments = $true)]
+        [string[]]$Arguments
+    )
+
+    & cargo @Arguments
+    if ($LASTEXITCODE -ne 0) {
+        throw "cargo failed with exit code $LASTEXITCODE: cargo $($Arguments -join ' ')"
+    }
+}
+
 Write-Host "Checking Explorer-first support workspace..."
-cargo test --workspace --locked @cargoArgs
+Invoke-CargoChecked test --workspace --locked @cargoArgs
 
 Write-Host "Checking Tauri shell Rust side..."
-cargo test --manifest-path apps/windows-shell/src-tauri/Cargo.toml @cargoArgs
+Invoke-CargoChecked test --manifest-path apps/windows-shell/src-tauri/Cargo.toml @cargoArgs
 
 Write-Host "Checking helper contract..."
-cargo run -p rynat-windows-context-helper --locked @cargoArgs -- copy-link "\\nas.local\Media\demo.mp4" --kind file
+Invoke-CargoChecked run -p rynat-windows-context-helper --locked @cargoArgs -- copy-link "\\nas.local\Media\demo.mp4" --kind file
 
 Write-Host "Explorer-first Windows shell checks completed."

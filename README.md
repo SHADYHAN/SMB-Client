@@ -122,6 +122,9 @@ cargo check --manifest-path apps/windows-shell/src-tauri/Cargo.toml --offline
 # Windows Explorer-first 新线检查脚本（在 Windows PowerShell 运行）
 scripts\windows-shell\build-check.ps1
 
+# Windows Explorer-first 一键拉取最新代码并检查（可双击 bat）
+scripts\windows-shell\pull-build-check.bat
+
 # 生成协议和 Explorer 右键注册表预览文件（先审查，再导入）
 scripts\windows-shell\write-registration-preview.ps1 `
   -ExecutablePath "C:\Program Files\RYNAT\RYNAT.exe" `
