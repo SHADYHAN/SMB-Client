@@ -73,14 +73,13 @@ public sealed class WindowsUserDialogService : IUserDialogService
 
     public string? PickFolderPath(string title)
     {
-        using var dialog = new System.Windows.Forms.FolderBrowserDialog
+        var dialog = new OpenFolderDialog
         {
-            Description = title,
-            UseDescriptionForTitle = true
+            Title = title
         };
 
-        return dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK
-            ? dialog.SelectedPath
+        return dialog.ShowDialog(Application.Current.MainWindow) == true
+            ? dialog.FolderName
             : null;
     }
 

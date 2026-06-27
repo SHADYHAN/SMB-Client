@@ -62,7 +62,7 @@ public sealed class FileTransferService : IFileTransferService
                 var targetDirectory = Path.GetDirectoryName(localPath);
                 if (!string.IsNullOrWhiteSpace(targetDirectory))
                 {
-                    Directory.CreateDirectory(targetDirectory);
+                    System.IO.Directory.CreateDirectory(targetDirectory);
                 }
 
                 progress?.Report(new FileBatchProgress(completed, items.Count, item.Name));
