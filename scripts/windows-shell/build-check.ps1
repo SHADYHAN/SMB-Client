@@ -4,8 +4,9 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$scriptVersion = "2026-06-27.5"
+$scriptVersion = "2026-06-27.6"
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..")
+$tauriTargetRoot = Join-Path $repoRoot "apps\windows-shell\src-tauri\target"
 Set-Location $repoRoot
 
 $cargoArgs = @()
@@ -18,6 +19,41 @@ function Invoke-CargoChecked {
         [Parameter(Mandatory = $true)]
         [string[]]$Arguments
     )
+
+    & cargo @Arguments
+    if ($LASTEXITCODE -ne 0) {
+        throw ("cargo failed with exit code {0}: cargo {1}" -f $LASTEXITCODE, ($Arguments -join ' '))
+    }
+}
+
+function Clear-TauriDebugSymbols {
+    if (-not (Test-Path $tauriTargetRoot)) {
+        return
+    }
+
+    $staleSymbols = Get-ChildItem -Path $tauriTargetRoot -Recurse -File -Include *.pdb,*.ilk -ErrorAction SilentlyContinue
+    if (-not $staleSymbols) {
+        return
+    }
+
+    Write-Warning ("Clearing {0} stale Tauri debug symbol file(s) before retry..." -f $staleSymbols.Count)
+    $staleSymbols | Remove-Item -Force
+}
+
+function Invoke-CargoCheckedWithTauriPdbRetry {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string[]]$Arguments
+    )
+
+    & cargo @Arguments
+    if ($LASTEXITCODE -eq 0) {
+        return
+    }
+
+    $firstExitCode = $LASTEXITCODE
+    Write-Warning ("cargo failed with exit code {0}. Cleaning Tauri PDB files and retrying once..." -f $firstExitCode)
+    Clear-TauriDebugSymbols
 
     & cargo @Arguments
     if ($LASTEXITCODE -ne 0) {
@@ -39,7 +75,7 @@ if ($FullWorkspace) {
 }
 
 Write-Host "Checking Tauri shell Rust side..." -ForegroundColor Cyan
-Invoke-CargoChecked -Arguments (@("test", "--manifest-path", "apps/windows-shell/src-tauri/Cargo.toml") + $cargoArgs)
+Invoke-CargoCheckedWithTauriPdbRetry -Arguments (@("test", "--manifest-path", "apps/windows-shell/src-tauri/Cargo.toml") + $cargoArgs)
 
 Write-Host "Checking helper contract..." -ForegroundColor Cyan
 Invoke-CargoChecked -Arguments (@("run", "-p", "rynat-windows-context-helper", "--locked") + $cargoArgs + @("--", "--print-only", "copy-link", "\\nas.local\Media\demo.mp4", "--kind", "file"))
