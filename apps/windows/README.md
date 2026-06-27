@@ -1,6 +1,8 @@
-# RYNAT Windows Client
+# RYNAT Windows WPF Fallback Client
 
-This is the active Windows client line.
+This WPF client is now archived as a fallback / reference implementation.
+
+It remains in `apps/windows` so existing build scripts keep working and so the project retains a known-good native Windows implementation for debugging, regression checks, and reuse of login / link / platform-adapter code. New Windows product work should move to the Explorer-first direction documented in `docs/explorer-first-windows-client.md`.
 
 ## Direction
 
@@ -11,7 +13,13 @@ This is the active Windows client line.
 - Windows-specific integration: `Platform`
 - Presentation: small WPF Views and ViewModels under `UI`
 
-The former WinUI 3 implementation is kept under `apps/windows-winui-legacy` as a reference only. New Windows client work should happen here.
+The former WinUI 3 implementation is kept under `apps/windows-winui-legacy` as a historical reference only. This WPF line is the fallback client, not the next primary Windows experience.
+
+Windows primary direction after archive:
+
+- RYNAT handles login, server settings, SMB access setup, share-link generation, protocol activation, tray / diagnostics.
+- Windows Explorer handles browsing, opening, copying, moving, deleting, renaming, thumbnails, drag/drop, and system context menus.
+- The WPF client should receive only blocker fixes, security fixes, and small reuse-oriented adjustments.
 
 ## Architecture Rules
 
@@ -22,9 +30,9 @@ The former WinUI 3 implementation is kept under `apps/windows-winui-legacy` as a
 - Windows Shell behavior belongs under `Platform`.
 - Rust FFI details stay inside `CoreAdapter`.
 
-## Current Stage
+## Archive Stage
 
-This is the active WPF client for the rebuilt Windows line. It currently includes:
+This WPF client reached a usable internal validation point and is now preserved as fallback. It currently includes:
 
 - Login and saved-server bootstrap
 - Server settings dialog
@@ -41,7 +49,7 @@ This is the active WPF client for the rebuilt Windows line. It currently include
 - Fixed HTTP share link generation through Rust core
 - Link activation plumbing: `rynat://`, local HTTP redirect helper, and single-instance forwarding
 
-Remaining feature migration should be added module by module rather than porting the old WinUI main window wholesale.
+No further large UI redesign or Explorer-replication work should be added here. If a future fix is needed, keep it narrow and avoid expanding WPF file-manager responsibilities.
 
 ## Completed Highlights
 
@@ -69,19 +77,22 @@ Remaining feature migration should be added module by module rather than porting
 - Explorer/Desktop drag-out advertises a local copy effect only; remote move/copy should use explicit file operations if it is reintroduced later.
 - Preview and drag caches now have age/size cleanup with stale `.part` removal; oversized media no longer auto-caches for inline preview.
 
-## Remaining Work
+## Archived Scope
 
-Near-term product work:
+Keep only:
 
-- Validate and refine in-app remote copy, move, paste, and drag/drop on real Windows SMB shares.
-- Refine cursor feedback and real-device feel for internal drag/drop; invalid targets already avoid hover highlighting and do not commit.
-- Validate and refine shell drag-out visuals and same-name behavior on the Desktop.
-- Refine favorites sidebar details after Windows real-use testing.
-- Keep the optional browser-extension idea documented: a Chrome/Edge MV3 helper could close `127.0.0.1:19527/s/*` bridge tabs with `chrome.tabs.remove`, but it would only work in browsers where the extension is installed and would not cover DingTalk's embedded WebView.
+- Build blockers.
+- Login / credential safety fixes.
+- Link generation / activation fixes that are reusable by Explorer-first.
+- Platform adapter fixes that can be moved into the Explorer-first client.
+- Documentation updates that prevent this line from being mistaken for the active Windows product direction.
 
-Follow-up quality work:
+Do not continue:
 
-- Observe video poster quality across common codecs; image previews now use lightweight thumbnails and oversized media avoids automatic inline caching.
-- Observe preview/drag cache cleanup behavior during Windows real-use testing.
-- Keep `ShellViewModel` focused on composition and command routing; login/server-setting workflow now stays behind `LoginCoordinator`.
-- Keep broadening smoke checks when new Windows activation or Shell integration paths are added.
+- WPF visual polish as a primary goal.
+- In-app Explorer replication.
+- Internal remote drag/drop expansion.
+- Virtual-file drag-out refinement beyond blocker fixes.
+- Remote copy / move / paste UX expansion.
+
+The next Windows implementation should begin with Explorer-first Phase 1: login, SMB / UNC access setup, open Explorer, Explorer context-menu copy link, protocol activation to Explorer location, and a minimal tray / diagnostic shell. The new shell may use Tauri 2 + Rust backend + Web UI; this WPF line remains fallback / reference only.

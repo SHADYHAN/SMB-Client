@@ -892,6 +892,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "rynat-windows-context-helper"
+version = "0.1.0"
+dependencies = [
+ "rynat-windows-shell-support",
+]
+
+[[package]]
+name = "rynat-windows-shell-support"
+version = "0.1.0"
+dependencies = [
+ "rynat-core",
+ "serde",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
 name = "scopeguard"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

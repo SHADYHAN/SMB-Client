@@ -2,9 +2,17 @@
 
 ## 当前状态
 
-本文档记录一个独立评估方向，不替代当前 WPF 主线。当前 Windows 主线仍是 `docs/windows-architecture-direction.md` 中定义的 RYNAT 文件工作台：优先打磨链接、预览缩略和上传下载。
+本文档现在是 Windows 端新的主方向。
 
-只有当 WPF 文件工作台稳定后，用户仍强烈需要系统文件管理器体验时，才进入本文档描述的 Explorer-first 评估。
+2026-06-27 决策：当前 WPF 文件工作台已完成内部功能验证，归档为可构建后备线；不再继续把 WPF 作为 Windows 主体验投入 UI / 文件管理器精修。新的 Windows 主线进入 Explorer-first：RYNAT 负责登录、服务器设置、凭据接入、Explorer 右键复制分享链接、链接唤醒、托盘和诊断；Windows Explorer 负责文件浏览、打开、复制、移动、删除、重命名、缩略图和系统文件操作。
+
+现有 WPF 代码保留在 `apps/windows`，用途是 fallback、调试和复用登录 / 链接 / platform adapter 代码。旧 WinUI 3 代码保留在 `apps/windows-winui-legacy`，仅作历史参考。
+
+当前新线已开始落地：
+
+- `crates/rynat-windows-shell-support`：共享 Rust 支撑层，负责 UNC 路径解析、Explorer 打开目标、SMB session 接入边界和右键 helper 请求格式。
+- `apps/windows-shell`：Tauri 2 + Rust backend + Web UI 的轻壳入口。
+- `apps/windows-context-helper`：Explorer 右键薄 helper，第一版只接收 `copy-link <UNC path>` 并输出 / 转发结构化请求。
 
 ## 背景
 
@@ -20,7 +28,7 @@
 
 ## 总体结论
 
-推荐新增一个 Windows 端长期方向：
+推荐 Windows 端长期主方向：
 
 ```text
 Explorer-first Windows Client
@@ -78,7 +86,7 @@ RYNAT 主程序留在后台或托盘中，提供：
 - 退出登录。
 - 切换服务器。
 - 重新打开 Explorer。
-- 复制分享链接。
+- Explorer 右键复制分享链接。
 - 链接唤醒处理。
 
 ## 核心功能边界
@@ -121,6 +129,8 @@ Explorer 中选中文件或文件夹后，右键菜单出现：
 复制 RYNAT 分享链接
 ```
 
+这是 Explorer-first MVP 的核心链路，不是后续增强。因为文件浏览交给 Explorer 后，复制分享链接也必须从 Explorer 里发起，否则“打开文件”和“分享文件”会被拆成两个产品体验。
+
 推荐实现原则：
 
 - 右键集成本身保持很薄。
@@ -129,6 +139,44 @@ Explorer 中选中文件或文件夹后，右键菜单出现：
 - 主程序负责识别 profile、解析 share/path、调用 core 生成链接、复制到剪贴板、展示结果通知。
 
 这样可以降低 Explorer 稳定性风险。右键扩展不应该直接连接 SMB、不应该直接调用复杂业务、不应该持有长期状态。
+
+第一版优先打通稳定闭环：
+
+```text
+Explorer 右键
+  -> RYNAT context helper
+  -> 唤醒 / 转发给已运行的 RYNAT 主程序
+  -> 主程序解析 UNC 路径
+  -> core 生成 HTTP 分享链接
+  -> 复制到剪贴板并通知
+```
+
+后续如果需要更贴近 Windows 11 一级菜单体验，再评估更完整的 Explorer command / COM 集成。无论采用哪种 Shell 入口，业务逻辑都不进入 Explorer 进程。
+
+## 技术栈判断
+
+Explorer-first 以后，Windows 端不再是文件管理器 UI，而是登录、设置、托盘、链接和 Shell 集成轻壳。主程序可以优先评估：
+
+```text
+Tauri 2 + Rust backend + Web UI
+```
+
+推荐理由：
+
+- UI 由 Web 技术实现，更容易做出接近 macOS 端的简约精致感。
+- 后端是 Rust，可以更直接复用 `rynat-core`。
+- 登录、设置、连接状态、诊断页都属于轻 UI，不需要 WPF 文件表格和 TreeView 架构。
+- 托盘、深链接、单实例、打开 Explorer 等轻壳能力更符合 Tauri 的职责边界。
+
+备选：
+
+```text
+WinUI 3 / Windows App SDK + C# + Rust FFI
+```
+
+WinUI 3 仍可作为原生 Windows 轻壳备选，但旧 WinUI 3 文件管理器代码不应继承。WPF 不再作为新主架构候选，只保留 fallback / reference。
+
+右键入口无论主程序选 Tauri 还是 WinUI 3，都应按 Windows Shell 集成单独处理：薄 helper / shell verb / Explorer command 只负责取路径和转发，主程序负责生成链接。
 
 ### 4. 分享链接唤醒
 
@@ -221,7 +269,7 @@ Explorer 已经处理：
 
 ## 分阶段建议
 
-### Phase 1：Explorer-first MVP
+### Phase 1：Explorer-first MVP（当前下一步）
 
 目标：
 
@@ -230,24 +278,25 @@ Explorer 已经处理：
 - RYNAT 留在后台 / 托盘。
 - 登出时清理当前连接状态。
 - 链接唤醒后打开 Explorer 到目标目录。
+- Explorer 右键“复制 RYNAT 分享链接”可用，支持文件和文件夹。
+- 右键入口只转发路径，生成链接、复制剪贴板和通知由主程序完成。
 
 暂不要求：
 
-- Explorer 右键菜单。
 - 选中文件定位 100% 成功。
 - 映射盘符支持。
+- Windows 11 一级右键菜单的最终形态。
 
-这一阶段可以先验证核心假设：Explorer 接管文件操作后，用户体验是否明显好于 WPF 自研文件列表。
+这一阶段验证完整核心闭环：登录后进入 Explorer、在 Explorer 中复制分享链接、点击分享链接再唤醒并定位回 Explorer。
 
-### Phase 2：Explorer 右键复制分享链接
+### Phase 2：右键体验与路径覆盖增强
 
 目标：
 
-- 注册 Explorer 右键菜单。
-- 对 RYNAT 管理的 UNC 路径显示“复制 RYNAT 分享链接”。
-- 支持文件和文件夹。
-- 右键入口把路径交给主程序生成链接。
-- 成功后复制 HTTP 分享链接并显示系统通知。
+- 优化 Windows 11 右键菜单显示层级。
+- 对 RYNAT 管理的 UNC 路径更精确地显示 / 隐藏右键入口。
+- 支持更多路径来源：IP、主机名、别名、映射盘符。
+- 优化多选、异常提示和通知文案。
 
 重点：
 
@@ -279,17 +328,17 @@ Explorer 已经处理：
 
 ## 与现有 WPF 客户端的关系
 
-现有 WPF 客户端不需要立刻删除。它可以保留为：
+现有 WPF 客户端不删除，但进入归档 / 后备状态。它可以保留为：
 
 - 登录页基础。
 - 服务器设置基础。
 - 链接生成 / 唤醒逻辑基础。
 - 调试和回退入口。
-- Windows Shell 集成尚未完成前的过渡版本。
+- Windows Shell 集成尚未完成前的回退版本。
 
-但长期主体验可以从“WPF 文件管理器”转为“Explorer 文件管理器 + RYNAT 后台服务”。
+长期主体验从“WPF 文件管理器”转为“Explorer 文件管理器 + RYNAT 后台服务”。
 
-如果该方向被确认，后续 Windows UI 投入应减少在文件列表、预览面板、拖拽模拟上的深度打磨，把精力转到：
+后续 Windows UI 投入不再放在 WPF 文件列表、预览面板、拖拽模拟上的深度打磨，把精力转到：
 
 - SMB 凭据接入。
 - Explorer 打开 / 定位。
@@ -300,14 +349,12 @@ Explorer 已经处理：
 
 ## 决策建议
 
-建议采用这个方向作为 Windows 端长期主线之一：
+当前决策：
 
 ```text
-短期：保留 WPF 客户端可用性
-中期：验证 Explorer-first MVP
-长期：如果体验成立，将 Windows 主体验切到 Explorer-first
+短期：保留 WPF 客户端可构建、可回退
+当前：实现 Explorer-first MVP，包含登录、SMB / UNC 接入、打开 Explorer、右键复制分享链接、链接唤醒和托盘入口
+长期：如果体验成立，WPF 只保留为诊断 / fallback，不再作为主产品界面
 ```
 
-推荐先做 Phase 1，而不是直接投入完整右键 Shell 扩展。Phase 1 成本较低、风险较小，可以快速验证文件操作交给 Explorer 后是否解决当前主要体验问题。
-
-如果 Phase 1 验证成立，再进入 Phase 2 做右键复制分享链接。
+先做 Phase 1 的完整闭环，但右键入口采用薄实现，不追求第一版就完成所有 Windows 11 Shell 细节。这样既不丢掉复制分享链接这个核心能力，也避免把复杂业务放进 Explorer 扩展里。

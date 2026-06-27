@@ -1,8 +1,10 @@
 # Windows WPF Client Rebuild Status
 
+> 2026-06-27 archive note: This WPF rebuild phase is complete. The WPF client under `apps/windows` is now a fallback / reference implementation; new Windows product work moves to `docs/explorer-first-windows-client.md`.
+
 **Goal:** Replace the old WinUI 3 Windows client line with a WPF-based native Windows client while keeping Rust `rynat-core` as the shared business layer.
 
-**Current result:** The WPF client is now the active Windows client under `apps/windows`. The old WinUI 3 implementation is kept under `apps/windows-winui-legacy` for historical reference only.
+**Current result:** The WPF client is archived as the fallback Windows client under `apps/windows`. The old WinUI 3 implementation is kept under `apps/windows-winui-legacy` for historical reference only.
 
 ## Completed
 
