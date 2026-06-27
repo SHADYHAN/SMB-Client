@@ -899,6 +899,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "rynat-windows-shell-lite"
+version = "0.1.0"
+dependencies = [
+ "rynat-core",
+ "rynat-windows-shell-support",
+]
+
+[[package]]
 name = "rynat-windows-shell-support"
 version = "0.1.0"
 dependencies = [

@@ -10,7 +10,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$scriptVersion = "2026-06-27.9"
+$scriptVersion = "2026-06-27.10"
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 $windowsShellDir = Join-Path $repoRoot "apps\windows-shell"
 $windowsShellDistDir = Join-Path $windowsShellDir "dist"
@@ -20,6 +20,7 @@ $workspaceTargetDir = Join-Path $repoRoot "target"
 $buildCheckScript = Join-Path $PSScriptRoot "build-check.ps1"
 $registrationScript = Join-Path $PSScriptRoot "write-registration-preview.ps1"
 $script:tauriBuildProfile = "release"
+$script:useLiteShell = $false
 
 function Invoke-NativeCommand {
     param(
@@ -82,7 +83,9 @@ function Invoke-NpmBuildWithRetry {
 
         & npm run build:debug
         if ($LASTEXITCODE -ne 0) {
-            throw ("npm failed with exit code {0}: npm run build:debug" -f $LASTEXITCODE)
+            Write-Warning ("tauri debug build failed with exit code {0}. Falling back to native lite shell." -f $LASTEXITCODE)
+            $script:useLiteShell = $true
+            return
         }
 
         $script:tauriBuildProfile = "debug"
@@ -259,6 +262,16 @@ try {
     Write-Host "Building Explorer context helper release exe..." -ForegroundColor Cyan
     Invoke-NativeCommand -FilePath "cargo" -Arguments $cargoArgs
 
+    if ($script:useLiteShell) {
+        $liteCargoArgs = @("build", "-p", "rynat-windows-shell-lite", "--release", "--locked")
+        if ($Offline) {
+            $liteCargoArgs += "--offline"
+        }
+
+        Write-Host "Building native lite Windows shell release exe..." -ForegroundColor Cyan
+        Invoke-NativeCommand -FilePath "cargo" -Arguments $liteCargoArgs
+    }
+
     $stamp = Get-Date -Format "yyyyMMdd-HHmmss"
     $outputRoot = Join-Path $baseOutputRoot $stamp
     $installersDir = Join-Path $outputRoot "installers"
@@ -270,7 +283,7 @@ try {
 
     $bundleDir = Join-Path $windowsShellDir "src-tauri\target\$script:tauriBuildProfile\bundle"
     $copiedInstallers = @()
-    if (Test-Path $bundleDir) {
+    if ((-not $script:useLiteShell) -and (Test-Path $bundleDir)) {
         Get-ChildItem -Path $bundleDir -Recurse -File |
             Where-Object { $_.Extension -in @(".msi", ".exe") } |
             ForEach-Object {
@@ -283,11 +296,17 @@ try {
     $helperExe = Join-Path $repoRoot "target\release\rynat-windows-context-helper.exe"
     $copiedHelper = Copy-IfExists -SourcePath $helperExe -DestinationDirectory $binDir
 
-    $tauriReleaseDir = Join-Path $windowsShellDir "src-tauri\target\$script:tauriBuildProfile"
-    $appExeCandidates = @(
-        (Join-Path $tauriReleaseDir "rynat-windows-shell.exe"),
-        (Join-Path $tauriReleaseDir "RYNAT.exe")
-    )
+    if ($script:useLiteShell) {
+        $appExeCandidates = @(
+            (Join-Path $repoRoot "target\release\rynat-windows-shell-lite.exe")
+        )
+    } else {
+        $tauriReleaseDir = Join-Path $windowsShellDir "src-tauri\target\$script:tauriBuildProfile"
+        $appExeCandidates = @(
+            (Join-Path $tauriReleaseDir "rynat-windows-shell.exe"),
+            (Join-Path $tauriReleaseDir "RYNAT.exe")
+        )
+    }
     $copiedApp = $null
     foreach ($candidate in $appExeCandidates) {
         $copiedApp = Copy-IfExists -SourcePath $candidate -DestinationDirectory $binDir
@@ -319,6 +338,10 @@ try {
 
     Write-Host ""
     Write-Host "Explorer-first release build completed." -ForegroundColor Green
+    if ($script:useLiteShell) {
+        Write-Host "Build mode:"
+        Write-Host "  Native lite shell fallback"
+    }
     Write-Host "Output root:"
     Write-Host "  $outputRoot"
     Write-Host "Latest pointer:"
@@ -329,6 +352,9 @@ try {
         foreach ($installer in $copiedInstallers) {
             Write-Host "  $installer"
         }
+    } elseif ($script:useLiteShell) {
+        Write-Host "Installers:"
+        Write-Host "  Not produced in native lite shell fallback mode."
     } else {
         Write-Warning "No Tauri installer was copied. Check $bundleDir"
     }

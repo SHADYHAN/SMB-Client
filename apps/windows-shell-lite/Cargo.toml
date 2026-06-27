@@ -1,0 +1,8 @@
+[package]
+name = "rynat-windows-shell-lite"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+rynat-windows-shell-support = { path = "../../crates/rynat-windows-shell-support" }
+rynat-core = { path = "../../crates/rynat-core" }
