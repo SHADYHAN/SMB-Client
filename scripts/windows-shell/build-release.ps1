@@ -1,3 +1,5 @@
+#requires -Version 7.0
+
 param(
     [switch]$SkipPull,
     [switch]$SkipChecks,
@@ -38,6 +40,20 @@ function Invoke-NativeCommand {
     }
 }
 
+function Get-PowerShellHost {
+    $currentPwsh = Join-Path $PSHOME "pwsh.exe"
+    if (Test-Path $currentPwsh) {
+        return $currentPwsh
+    }
+
+    $pwsh = Get-Command "pwsh" -CommandType Application -ErrorAction SilentlyContinue
+    if ($pwsh) {
+        return $pwsh.Source
+    }
+
+    throw "PowerShell 7 (pwsh) is required. Install it with: winget install --id Microsoft.PowerShell --source winget"
+}
+
 function Invoke-NpmInstallWithRetry {
     param(
         [Parameter(Mandatory = $true)]
@@ -65,7 +81,7 @@ function Invoke-NpmInstallWithRetry {
 
 function Write-RustcCrashHints {
     Write-Warning "Rust compiler process crashed. If the log contains STATUS_ACCESS_VIOLATION / 0xc0000005, check the Windows Rust/MSVC environment:"
-    Write-Warning "  powershell -NoProfile -ExecutionPolicy Bypass -File `"$diagnoseScript`""
+    Write-Warning "  pwsh -NoProfile -ExecutionPolicy Bypass -File `"$diagnoseScript`""
     Write-Warning "  rustc -Vv"
     Write-Warning "  rustup show"
     Write-Warning "  rustup target list --installed"
@@ -251,7 +267,7 @@ try {
         }
 
         Write-Host "Running Explorer-first checks before release..." -ForegroundColor Cyan
-        Invoke-NativeCommand -FilePath "powershell" -Arguments (@("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $buildCheckScript) + $checkArgs)
+        Invoke-NativeCommand -FilePath (Get-PowerShellHost) -Arguments (@("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $buildCheckScript) + $checkArgs)
     }
 
     Push-Location $windowsShellDir
@@ -337,7 +353,7 @@ try {
 
     if ($copiedApp -and $copiedHelper -and (Test-Path $registrationScript)) {
         Write-Host "Writing local registration preview files..." -ForegroundColor Cyan
-        Invoke-NativeCommand -FilePath "powershell" -Arguments @(
+        Invoke-NativeCommand -FilePath (Get-PowerShellHost) -Arguments @(
             "-NoProfile",
             "-ExecutionPolicy",
             "Bypass",

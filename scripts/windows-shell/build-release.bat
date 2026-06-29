@@ -10,7 +10,17 @@ if not exist "%PS_SCRIPT%" (
     exit /b 1
 )
 
-powershell -NoProfile -ExecutionPolicy Bypass -File "%PS_SCRIPT%" %*
+where pwsh >nul 2>nul
+if "%ERRORLEVEL%"=="0" (
+    pwsh -NoProfile -ExecutionPolicy Bypass -File "%PS_SCRIPT%" %*
+) else (
+    echo PowerShell 7 is required for the Explorer-first Windows build scripts.
+    echo Install it with:
+    echo   winget install --id Microsoft.PowerShell --source winget
+    echo.
+    pause
+    exit /b 1
+)
 set "EXIT_CODE=%ERRORLEVEL%"
 
 if not "%EXIT_CODE%"=="0" (

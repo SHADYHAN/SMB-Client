@@ -53,6 +53,8 @@ scripts\windows-shell\build-release.ps1 -AllowLiteFallback
 scripts\windows-shell\build-release.bat
 ```
 
+The `.bat` wrappers require PowerShell 7 (`pwsh`). They intentionally do not fall back to Windows PowerShell 5.1 because some Windows 11 environments crash inside the legacy formatting pipeline with `System.AccessViolationException`.
+
 The script builds the Tauri shell bundle, builds the Explorer context helper in release mode, and copies the useful outputs into:
 
 ```text
@@ -93,7 +95,7 @@ If Tauri reaches the Rust build phase and `rustc.exe` crashes with `STATUS_ACCES
 Collect diagnostics with:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\windows-shell\diagnose-rust-msvc.ps1
+pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\windows-shell\diagnose-rust-msvc.ps1
 ```
 
 The script prints Rust target details, MSVC tool paths, Node/npm versions, Cargo metadata, and small compile checks.

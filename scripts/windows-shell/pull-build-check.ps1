@@ -1,3 +1,5 @@
+#requires -Version 7.0
+
 param(
     [switch]$SkipPull,
     [switch]$Offline,
@@ -22,6 +24,20 @@ function Invoke-NativeCommand {
     if ($LASTEXITCODE -ne 0) {
         throw "$FilePath failed with exit code $LASTEXITCODE"
     }
+}
+
+function Get-PowerShellHost {
+    $currentPwsh = Join-Path $PSHOME "pwsh.exe"
+    if (Test-Path $currentPwsh) {
+        return $currentPwsh
+    }
+
+    $pwsh = Get-Command "pwsh" -CommandType Application -ErrorAction SilentlyContinue
+    if ($pwsh) {
+        return $pwsh.Source
+    }
+
+    throw "PowerShell 7 (pwsh) is required. Install it with: winget install --id Microsoft.PowerShell --source winget"
 }
 
 function Clear-TrackedWorktreeChangesForPull {
@@ -92,7 +108,7 @@ try {
     }
 
     Write-Host "Running Explorer-first Windows shell checks..." -ForegroundColor Cyan
-    & powershell -NoProfile -ExecutionPolicy Bypass -File $buildCheckScript @checkArgs
+    & (Get-PowerShellHost) -NoProfile -ExecutionPolicy Bypass -File $buildCheckScript @checkArgs
     if ($LASTEXITCODE -ne 0) {
         throw "build-check.ps1 failed with exit code $LASTEXITCODE"
     }
