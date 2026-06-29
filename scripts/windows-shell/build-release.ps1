@@ -19,6 +19,7 @@ $windowsShellTargetDir = Join-Path $windowsShellDir "src-tauri\target"
 $windowsShellNodeModulesDir = Join-Path $windowsShellDir "node_modules"
 $workspaceTargetDir = Join-Path $repoRoot "target"
 $buildCheckScript = Join-Path $PSScriptRoot "build-check.ps1"
+$diagnoseScript = Join-Path $PSScriptRoot "diagnose-rust-msvc.ps1"
 $registrationScript = Join-Path $PSScriptRoot "write-registration-preview.ps1"
 $script:tauriBuildProfile = "release"
 $script:useLiteShell = $false
@@ -64,6 +65,7 @@ function Invoke-NpmInstallWithRetry {
 
 function Write-RustcCrashHints {
     Write-Warning "Rust compiler process crashed. If the log contains STATUS_ACCESS_VIOLATION / 0xc0000005, check the Windows Rust/MSVC environment:"
+    Write-Warning "  powershell -NoProfile -ExecutionPolicy Bypass -File `"$diagnoseScript`""
     Write-Warning "  rustc -Vv"
     Write-Warning "  rustup show"
     Write-Warning "  rustup target list --installed"

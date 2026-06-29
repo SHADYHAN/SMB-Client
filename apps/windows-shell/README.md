@@ -85,3 +85,15 @@ scripts\windows-shell\write-registration-preview.ps1 `
 ```
 
 Review generated `.reg` files before importing them.
+
+## Windows Toolchain Diagnostics
+
+If Tauri reaches the Rust build phase and `rustc.exe` crashes with `STATUS_ACCESS_VIOLATION` / `0xc0000005` while compiling crates such as `proc-macro2`, `syn`, or `memchr`, treat it as a Windows Rust/MSVC environment crash rather than an application code error.
+
+Collect diagnostics with:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\windows-shell\diagnose-rust-msvc.ps1
+```
+
+The script prints Rust target details, MSVC tool paths, Node/npm versions, Cargo metadata, and small compile checks.
