@@ -72,6 +72,8 @@ By default, the script removes the web `dist`, Tauri `src-tauri\target`, workspa
 
 Use `-CleanNodeModules` only when npm dependencies look corrupted. It removes `apps\windows-shell\node_modules`, so the next build must reinstall frontend dependencies.
 
+Both Windows shell scripts discard tracked local changes before pulling by default, because local Windows builds can update generated lock/schema files. Use `-KeepLocalChanges` only when you intentionally want to preserve local edits and skip auto-cleaning.
+
 The full Tauri shell is the default product build. Native lite fallback is only for diagnostics and is used only when `-AllowLiteFallback` is passed explicitly.
 
 Generate registry preview files:
