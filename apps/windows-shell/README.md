@@ -49,6 +49,7 @@ scripts\windows-shell\build-release.ps1
 scripts\windows-shell\build-release.ps1 -SkipChecks
 scripts\windows-shell\build-release.ps1 -NoClean
 scripts\windows-shell\build-release.ps1 -CleanNodeModules
+scripts\windows-shell\build-release.ps1 -AllowLiteFallback
 scripts\windows-shell\build-release.bat
 ```
 
@@ -70,6 +71,8 @@ build\windows-shell-release\latest.txt
 By default, the script removes the web `dist`, Tauri `src-tauri\target`, workspace `target`, and previous `build\windows-shell-release` outputs before rebuilding. Use `-NoClean` only when you intentionally want a faster incremental build.
 
 Use `-CleanNodeModules` only when npm dependencies look corrupted. It removes `apps\windows-shell\node_modules`, so the next build must reinstall frontend dependencies.
+
+The full Tauri shell is the default product build. Native lite fallback is only for diagnostics and is used only when `-AllowLiteFallback` is passed explicitly.
 
 Generate registry preview files:
 

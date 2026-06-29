@@ -22,7 +22,7 @@ pub fn start_local_redirect_server<F>(
     handler: F,
 ) -> Result<JoinHandle<()>, LocalRedirectError>
 where
-    F: Fn(String) + Send + Sync + 'static,
+    F: Fn(String) -> Result<(), String> + Send + Sync + 'static,
 {
     let listener = TcpListener::bind(("127.0.0.1", port))?;
     let handler = Arc::new(handler);
@@ -42,7 +42,7 @@ where
 
 fn handle_stream<F>(mut stream: TcpStream, handler: &F) -> Result<(), LocalRedirectError>
 where
-    F: Fn(String),
+    F: Fn(String) -> Result<(), String>,
 {
     stream.set_read_timeout(Some(Duration::from_secs(3)))?;
     stream.set_write_timeout(Some(Duration::from_secs(3)))?;
@@ -51,14 +51,18 @@ where
 
     let response = match request_line(&raw).and_then(|line| local_link_from_request_line(line).ok())
     {
-        Some(local_link) => {
-            handler(local_link);
-            http_response(
+        Some(local_link) => match handler(local_link) {
+            Ok(()) => http_response(
                 "200 OK",
                 "text/html; charset=utf-8",
                 &local_activation_close_page(),
-            )
-        }
+            ),
+            Err(error) => http_response(
+                "500 Internal Server Error",
+                "text/html; charset=utf-8",
+                &local_activation_error_page(&error),
+            ),
+        },
         None => http_response("404 Not Found", "text/plain; charset=utf-8", "Not Found"),
     };
 
@@ -97,6 +101,22 @@ fn http_response(status: &str, content_type: &str, body: &str) -> String {
 
 fn local_activation_close_page() -> String {
     r#"<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>RYNAT</title><script>setTimeout(function(){try{window.open("","_self");window.close();}catch(_){}},40);</script></head><body>已请求打开 Windows 资源管理器，可以关闭此标签页。</body></html>"#.to_string()
+}
+
+fn local_activation_error_page(message: &str) -> String {
+    format!(
+        r#"<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>RYNAT</title></head><body>打开 Windows 资源管理器失败：{}</body></html>"#,
+        escape_html(message)
+    )
+}
+
+fn escape_html(value: &str) -> String {
+    value
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&#39;")
 }
 
 #[cfg(test)]

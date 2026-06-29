@@ -6,6 +6,7 @@ param(
     [switch]$NoClean,
     [switch]$CleanNodeModules,
     [switch]$KeepLocalChanges,
+    [switch]$AllowLiteFallback,
     [string]$OutputDirectory = ".\build\windows-shell-release"
 )
 
@@ -42,7 +43,7 @@ function Invoke-NpmInstallWithRetry {
         [string[]]$Arguments
     )
 
-    & npm @Arguments
+    & npm.cmd @Arguments
     if ($LASTEXITCODE -eq 0) {
         return
     }
@@ -50,12 +51,12 @@ function Invoke-NpmInstallWithRetry {
     $firstExitCode = $LASTEXITCODE
     Write-Warning ("npm install failed with exit code {0}. Cleaning npm cache and retrying once..." -f $firstExitCode)
 
-    & npm cache clean --force
+    & npm.cmd cache clean --force
     if ($LASTEXITCODE -ne 0) {
         throw ("npm cache clean failed with exit code {0}" -f $LASTEXITCODE)
     }
 
-    & npm @Arguments
+    & npm.cmd @Arguments
     if ($LASTEXITCODE -ne 0) {
         throw ("npm failed with exit code {0}: npm {1}" -f $LASTEXITCODE, ($Arguments -join ' '))
     }
@@ -71,7 +72,7 @@ function Invoke-NpmBuildWithRetry {
 
     try {
         Write-Host "Using stable Cargo release settings: CARGO_BUILD_JOBS=1, CARGO_INCREMENTAL=0, CARGO_PROFILE_RELEASE_OPT_LEVEL=0" -ForegroundColor DarkGray
-        & npm run build
+        & npm.cmd run build
         if ($LASTEXITCODE -eq 0) {
             $script:tauriBuildProfile = "release"
             return
@@ -81,11 +82,15 @@ function Invoke-NpmBuildWithRetry {
         Write-Warning ("tauri release build failed with exit code {0}. Cleaning Tauri target and retrying once as debug bundle..." -f $firstExitCode)
         Remove-PathIfExists -Path $windowsShellTargetDir
 
-        & npm run build:debug
+        & npm.cmd run build:debug
         if ($LASTEXITCODE -ne 0) {
-            Write-Warning ("tauri debug build failed with exit code {0}. Falling back to native lite shell." -f $LASTEXITCODE)
-            $script:useLiteShell = $true
-            return
+            if ($AllowLiteFallback) {
+                Write-Warning ("tauri debug build failed with exit code {0}. Falling back to native lite shell because -AllowLiteFallback was set." -f $LASTEXITCODE)
+                $script:useLiteShell = $true
+                return
+            }
+
+            throw ("npm failed with exit code {0}: npm run build:debug" -f $LASTEXITCODE)
         }
 
         $script:tauriBuildProfile = "debug"

@@ -274,6 +274,11 @@ dt {
   box-shadow: 0 0 0 4px rgba(47, 157, 89, 0.12);
 }
 
+.service-dot.is-warning {
+  background: #b7791f;
+  box-shadow: 0 0 0 4px rgba(183, 121, 31, 0.14);
+}
+
 .content {
   min-width: 0;
   padding: 24px;
@@ -310,6 +315,13 @@ dt {
   border-color: #a9d5b7;
   color: #1d6b3a;
   background: #edf8f1;
+}
+
+.status.is-warning,
+.pill.warning {
+  border-color: #e4c78f;
+  color: #8a5a13;
+  background: #fff7e6;
 }
 
 .panel-grid {

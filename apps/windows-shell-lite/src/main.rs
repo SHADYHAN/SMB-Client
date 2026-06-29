@@ -26,14 +26,14 @@ fn main() {
     }
 }
 
-fn handle_link_activation(raw_link: String) {
+fn handle_link_activation(raw_link: String) -> Result<(), String> {
     if let Ok(activation) = explorer_target_from_link(&raw_link) {
         #[cfg(windows)]
         {
             if let Some(argument) = activation.explorer.explorer_select_argument() {
-                let _ = open_explorer_argument(&argument);
+                open_explorer_argument(&argument).map_err(|error| error.to_string())?;
             } else {
-                let _ = open_explorer(&activation.explorer.open_path);
+                open_explorer(&activation.explorer.open_path).map_err(|error| error.to_string())?;
             }
         }
 
@@ -42,6 +42,8 @@ fn handle_link_activation(raw_link: String) {
             let _ = activation;
         }
     }
+
+    Ok(())
 }
 
 fn handle_context_request(request: ContextRequest) -> ContextResponse {

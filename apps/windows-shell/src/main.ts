@@ -6,6 +6,14 @@ type ShellState = {
   serverName: string;
   serverHost: string;
   status: string;
+} & RuntimeStatus;
+
+type RuntimeStatus = {
+  contextIpcRunning: boolean;
+  contextIpcStatus: string;
+  localRedirectRunning: boolean;
+  localRedirectStatus: string;
+  lastActivation: string;
 };
 
 type ExplorerOpenTarget = {
@@ -28,13 +36,17 @@ type AppState = ShellState & {
 const defaultServerHost = "192.168.102.136";
 const defaultCopyLinkTestPath = "\\\\192.168.102.136\\临时文件夹\\123";
 const localRedirectUrl = "http://127.0.0.1:19527";
-const contextIpcUrl = "127.0.0.1:19528";
 
 const initialState: AppState = {
   connected: false,
   serverName: "RYNAT 文件共享",
   serverHost: "",
   status: "未连接",
+  contextIpcRunning: false,
+  contextIpcStatus: "右键 IPC 服务尚未启动",
+  localRedirectRunning: false,
+  localRedirectStatus: "短链唤醒服务尚未启动",
+  lastActivation: "尚未收到链接唤醒请求",
   activeTab: "server",
   username: "",
   diagnostic: "客户端已启动，等待登录。",
@@ -118,8 +130,8 @@ function renderShellView(state: AppState) {
         </nav>
 
         <div class="sidebar-footer">
-          <span class="service-dot"></span>
-          <span>监听服务运行中</span>
+          <span class="service-dot ${state.localRedirectRunning && state.contextIpcRunning ? "" : "is-warning"}"></span>
+          <span>${state.localRedirectRunning && state.contextIpcRunning ? "监听服务运行中" : "监听服务需检查"}</span>
         </div>
       </aside>
 
@@ -129,7 +141,7 @@ function renderShellView(state: AppState) {
             <p class="eyebrow">Windows Explorer-first</p>
             <h1>${escapeHtml(tabTitle(state.activeTab))}</h1>
           </div>
-          <span class="status is-connected">${escapeHtml(state.status)}</span>
+          <span class="status ${state.localRedirectRunning && state.contextIpcRunning ? "is-connected" : "is-warning"}">${escapeHtml(state.status)}</span>
         </header>
 
         ${renderPanel(state)}
@@ -155,7 +167,7 @@ function renderPanel(state: AppState) {
     case "links":
       return renderLinksPanel(state);
     case "activation":
-      return renderActivationPanel();
+      return renderActivationPanel(state);
     case "settings":
       return renderSettingsPanel(state);
     case "shortcuts":
@@ -257,7 +269,7 @@ function renderLinksPanel(state: AppState) {
   `;
 }
 
-function renderActivationPanel() {
+function renderActivationPanel(state: AppState) {
   return `
     <section class="panel-grid">
       <article class="panel-card span-2">
@@ -266,20 +278,20 @@ function renderActivationPanel() {
             <span class="label">唤醒服务</span>
             <h2>客户端保持运行并监听短链</h2>
           </div>
-          <span class="pill success">运行中</span>
+          <span class="pill ${state.localRedirectRunning && state.contextIpcRunning ? "success" : "warning"}">${state.localRedirectRunning && state.contextIpcRunning ? "运行中" : "需检查"}</span>
         </div>
         <dl class="details">
           <div>
             <dt>短链服务</dt>
-            <dd>${localRedirectUrl}/s/...</dd>
+            <dd>${escapeHtml(state.localRedirectStatus)}</dd>
           </div>
           <div>
             <dt>右键 IPC</dt>
-            <dd>${contextIpcUrl}</dd>
+            <dd>${escapeHtml(state.contextIpcStatus)}</dd>
           </div>
           <div>
-            <dt>协议</dt>
-            <dd>rynat://s/... 解析后打开 Explorer</dd>
+            <dt>最近唤醒</dt>
+            <dd>${escapeHtml(state.lastActivation)}</dd>
           </div>
         </dl>
       </article>
@@ -287,7 +299,7 @@ function renderActivationPanel() {
       <article class="panel-card">
         <span class="label">当前限制</span>
         <strong class="metric">需要客户端运行</strong>
-        <p>本地短链依赖 127.0.0.1 服务；客户端未运行时，需要后续接入协议注册或公网中转页。</p>
+        <p>本地短链依赖 ${localRedirectUrl}/s/...；客户端运行时会直接解析为 UNC 并打开 Explorer。</p>
       </article>
 
       <article class="panel-card">
@@ -454,8 +466,7 @@ async function handleLoginSubmit(event: SubmitEvent) {
     const target = await invoke<ExplorerOpenTarget>("preview_explorer_path", { host, share: null });
     let opened = "";
     if (currentState.autoOpenExplorer) {
-      setDiagnostic(`正在打开资源管理器：${target.openPath}`);
-      opened = await invoke<string>("open_explorer", { host, share: null });
+      setDiagnostic(`正在建立 SMB 会话：${target.openPath}`);
     }
 
     let credentialWarning: string | null = null;
@@ -463,6 +474,11 @@ async function handleLoginSubmit(event: SubmitEvent) {
       await invoke("connect_profile", { host: target.openPath, username, password });
     } catch (error) {
       credentialWarning = formatError(error);
+    }
+
+    if (currentState.autoOpenExplorer) {
+      setDiagnostic(`正在打开资源管理器：${target.openPath}`);
+      opened = await invoke<string>("open_explorer", { host, share: null });
     }
 
     const connectedState: AppState = {
@@ -592,7 +608,11 @@ function copyLinkTestPath() {
 
 async function copyTextToClipboard(text: string) {
   try {
-    await navigator.clipboard?.writeText(text);
+    if (!navigator.clipboard) {
+      return copyTextWithTextarea(text);
+    }
+
+    await navigator.clipboard.writeText(text);
     return true;
   } catch {
     return copyTextWithTextarea(text);
@@ -642,6 +662,28 @@ async function boot() {
     render({ ...initialState, ...state });
   } catch {
     render(initialState);
+  }
+  window.setInterval(refreshRuntimeStatus, 2500);
+}
+
+async function refreshRuntimeStatus() {
+  if (!currentState.connected) {
+    return;
+  }
+
+  try {
+    const runtime = await invoke<RuntimeStatus>("get_runtime_status");
+    const changed =
+      runtime.contextIpcRunning !== currentState.contextIpcRunning ||
+      runtime.contextIpcStatus !== currentState.contextIpcStatus ||
+      runtime.localRedirectRunning !== currentState.localRedirectRunning ||
+      runtime.localRedirectStatus !== currentState.localRedirectStatus ||
+      runtime.lastActivation !== currentState.lastActivation;
+    if (changed) {
+      render({ ...currentState, ...runtime });
+    }
+  } catch {
+    // The shell may still be booting or shutting down.
   }
 }
 

@@ -1,3 +1,7 @@
+#![cfg_attr(windows, windows_subsystem = "windows")]
+
+mod clipboard;
+
 use std::env;
 use std::process;
 
@@ -35,6 +39,10 @@ fn main() {
                 println!("{message}");
             }
             if let Some(http_url) = response.http_url {
+                if let Err(error) = clipboard::set_text(&http_url) {
+                    eprintln!("failed to copy share link to clipboard: {error}");
+                    process::exit(1);
+                }
                 println!("{http_url}");
             }
         }

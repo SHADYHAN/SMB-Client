@@ -8,13 +8,78 @@ use rynat_windows_shell_support::{
 #[cfg(windows)]
 use rynat_windows_shell_support::SmbSessionConnector;
 use serde::Serialize;
+use std::sync::{Mutex, OnceLock};
+
+static RUNTIME_STATUS: OnceLock<Mutex<RuntimeStatus>> = OnceLock::new();
+
+#[derive(Debug, Clone)]
+struct RuntimeStatus {
+    context_ipc: ServiceStatus,
+    local_redirect: ServiceStatus,
+    last_activation: String,
+}
+
+#[derive(Debug, Clone)]
+struct ServiceStatus {
+    running: bool,
+    message: String,
+}
+
+impl RuntimeStatus {
+    fn starting() -> Self {
+        Self {
+            context_ipc: ServiceStatus::starting("右键 IPC 服务尚未启动"),
+            local_redirect: ServiceStatus::starting("短链唤醒服务尚未启动"),
+            last_activation: "尚未收到链接唤醒请求".to_string(),
+        }
+    }
+}
+
+impl ServiceStatus {
+    fn starting(message: impl Into<String>) -> Self {
+        Self {
+            running: false,
+            message: message.into(),
+        }
+    }
+
+    fn running(message: impl Into<String>) -> Self {
+        Self {
+            running: true,
+            message: message.into(),
+        }
+    }
+
+    fn failed(message: impl Into<String>) -> Self {
+        Self {
+            running: false,
+            message: message.into(),
+        }
+    }
+}
 
 #[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 struct ShellState {
     connected: bool,
     server_name: String,
     server_host: String,
     status: String,
+    context_ipc_running: bool,
+    context_ipc_status: String,
+    local_redirect_running: bool,
+    local_redirect_status: String,
+    last_activation: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RuntimeStatusDto {
+    context_ipc_running: bool,
+    context_ipc_status: String,
+    local_redirect_running: bool,
+    local_redirect_status: String,
+    last_activation: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -27,12 +92,24 @@ struct ExplorerOpenTarget {
 
 #[tauri::command]
 fn get_bootstrap_state() -> ShellState {
+    let runtime = runtime_snapshot();
+    let runtime = RuntimeStatusDto::from(runtime);
     ShellState {
         connected: false,
         server_name: "RYNAT 文件共享".to_string(),
         server_host: String::new(),
         status: "未连接".to_string(),
+        context_ipc_running: runtime.context_ipc_running,
+        context_ipc_status: runtime.context_ipc_status,
+        local_redirect_running: runtime.local_redirect_running,
+        local_redirect_status: runtime.local_redirect_status,
+        last_activation: runtime.last_activation,
     }
+}
+
+#[tauri::command]
+fn get_runtime_status() -> RuntimeStatusDto {
+    RuntimeStatusDto::from(runtime_snapshot())
 }
 
 #[tauri::command]
@@ -63,10 +140,7 @@ fn connect_profile(host: String, username: String, password: String) -> Result<(
 fn open_explorer(host: String, share: Option<String>) -> Result<String, String> {
     let target = parse_explorer_open_target(&host, share.as_deref())?;
 
-    #[cfg(windows)]
-    {
-        open_path_with_explorer(&target.open_path)?;
-    }
+    open_path_with_explorer(&target.open_path)?;
 
     Ok(target.open_path)
 }
@@ -147,13 +221,43 @@ fn normalize_windows_path_input(value: &str) -> String {
     value
 }
 
-#[cfg(windows)]
 fn open_path_with_explorer(path: &str) -> Result<(), String> {
-    std::process::Command::new("explorer.exe")
-        .arg(path)
-        .spawn()
-        .map(|_| ())
-        .map_err(|error| format!("failed to start explorer.exe for {path}: {error}"))
+    #[cfg(windows)]
+    {
+        return std::process::Command::new("explorer.exe")
+            .arg(path)
+            .spawn()
+            .map(|_| ())
+            .map_err(|error| format!("failed to start explorer.exe for {path}: {error}"));
+    }
+
+    #[cfg(not(windows))]
+    {
+        let _ = path;
+        Ok(())
+    }
+}
+
+fn open_explorer_target(target: &ExplorerTarget) -> Result<(), String> {
+    #[cfg(windows)]
+    {
+        let mut command = std::process::Command::new("explorer.exe");
+        if let Some(argument) = target.explorer_select_argument() {
+            command.arg(argument);
+        } else {
+            command.arg(&target.open_path);
+        }
+        return command
+            .spawn()
+            .map(|_| ())
+            .map_err(|error| format!("failed to start explorer.exe for {}: {error}", target.open_path));
+    }
+
+    #[cfg(not(windows))]
+    {
+        let _ = target;
+        Ok(())
+    }
 }
 
 #[tauri::command]
@@ -212,14 +316,51 @@ impl From<ExplorerTarget> for ExplorerTargetDto {
     }
 }
 
+impl From<RuntimeStatus> for RuntimeStatusDto {
+    fn from(value: RuntimeStatus) -> Self {
+        Self {
+            context_ipc_running: value.context_ipc.running,
+            context_ipc_status: value.context_ipc.message,
+            local_redirect_running: value.local_redirect.running,
+            local_redirect_status: value.local_redirect.message,
+            last_activation: value.last_activation,
+        }
+    }
+}
+
 pub fn run() {
-    let _context_ipc = start_context_ipc_server(DEFAULT_CONTEXT_IPC_PORT, handle_context_request);
-    let _local_redirect =
-        start_local_redirect_server(DEFAULT_LOCAL_REDIRECT_PORT, handle_link_activation);
+    initialize_runtime_status();
+    let _context_ipc_thread =
+        match start_context_ipc_server(DEFAULT_CONTEXT_IPC_PORT, handle_context_request) {
+            Ok(handle) => {
+                set_context_ipc_status(ServiceStatus::running(format!(
+                    "右键 IPC 正在监听 127.0.0.1:{DEFAULT_CONTEXT_IPC_PORT}"
+                )));
+                Some(handle)
+            }
+            Err(error) => {
+                set_context_ipc_status(ServiceStatus::failed(error.to_string()));
+                None
+            }
+        };
+    let _local_redirect_thread =
+        match start_local_redirect_server(DEFAULT_LOCAL_REDIRECT_PORT, handle_link_activation) {
+            Ok(handle) => {
+                set_local_redirect_status(ServiceStatus::running(format!(
+                    "短链唤醒正在监听 127.0.0.1:{DEFAULT_LOCAL_REDIRECT_PORT}"
+                )));
+                Some(handle)
+            }
+            Err(error) => {
+                set_local_redirect_status(ServiceStatus::failed(error.to_string()));
+                None
+            }
+        };
 
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
             get_bootstrap_state,
+            get_runtime_status,
             connect_profile,
             open_explorer,
             preview_explorer_path,
@@ -231,23 +372,60 @@ pub fn run() {
         .expect("error while running RYNAT Windows shell");
 }
 
-fn handle_link_activation(raw_link: String) {
-    if let Ok(activation) = explorer_target_from_link(&raw_link) {
-        #[cfg(windows)]
-        {
-            let mut command = std::process::Command::new("explorer.exe");
-            if let Some(argument) = activation.explorer.explorer_select_argument() {
-                command.arg(argument);
-            } else {
-                command.arg(&activation.explorer.open_path);
-            }
-            let _ = command.spawn();
+fn handle_link_activation(raw_link: String) -> Result<(), String> {
+    let activation = match explorer_target_from_link(&raw_link) {
+        Ok(activation) => activation,
+        Err(error) => {
+            let message = format!("唤醒失败：{error}");
+            set_last_activation(message.clone());
+            return Err(message);
         }
+    };
+    if let Err(error) = open_explorer_target(&activation.explorer) {
+        let message = format!("打开 Explorer 失败：{error}");
+        set_last_activation(message.clone());
+        return Err(message);
+    }
+    let selected = activation
+        .explorer
+        .selected_path
+        .as_deref()
+        .unwrap_or("未选择文件");
+    set_last_activation(format!(
+        "已打开：{}；选中：{}",
+        activation.explorer.open_path, selected
+    ));
+    Ok(())
+}
 
-        #[cfg(not(windows))]
-        {
-            let _ = activation;
-        }
+fn initialize_runtime_status() {
+    let _ = RUNTIME_STATUS.set(Mutex::new(RuntimeStatus::starting()));
+}
+
+fn runtime_snapshot() -> RuntimeStatus {
+    let status = RUNTIME_STATUS.get_or_init(|| Mutex::new(RuntimeStatus::starting()));
+    status
+        .lock()
+        .map(|guard| guard.clone())
+        .unwrap_or_else(|_| RuntimeStatus::starting())
+}
+
+fn set_context_ipc_status(status: ServiceStatus) {
+    update_runtime_status(|runtime| runtime.context_ipc = status);
+}
+
+fn set_local_redirect_status(status: ServiceStatus) {
+    update_runtime_status(|runtime| runtime.local_redirect = status);
+}
+
+fn set_last_activation(message: String) {
+    update_runtime_status(|runtime| runtime.last_activation = message);
+}
+
+fn update_runtime_status(update: impl FnOnce(&mut RuntimeStatus)) {
+    let status = RUNTIME_STATUS.get_or_init(|| Mutex::new(RuntimeStatus::starting()));
+    if let Ok(mut runtime) = status.lock() {
+        update(&mut runtime);
     }
 }
 
