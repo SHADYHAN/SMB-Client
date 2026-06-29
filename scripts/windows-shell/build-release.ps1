@@ -62,6 +62,17 @@ function Invoke-NpmInstallWithRetry {
     }
 }
 
+function Write-RustcCrashHints {
+    Write-Warning "Rust compiler process crashed. If the log contains STATUS_ACCESS_VIOLATION / 0xc0000005, check the Windows Rust/MSVC environment:"
+    Write-Warning "  rustc -Vv"
+    Write-Warning "  rustup show"
+    Write-Warning "  rustup target list --installed"
+    Write-Warning "  where.exe cl"
+    Write-Warning "  where.exe link"
+    Write-Warning "  where.exe rc"
+    Write-Warning "Then retry after cleaning: scripts\windows-shell\build-release.bat -SkipPull"
+}
+
 function Invoke-NpmBuildWithRetry {
     $previousCargoBuildJobs = $env:CARGO_BUILD_JOBS
     $previousCargoIncremental = $env:CARGO_INCREMENTAL
@@ -90,6 +101,7 @@ function Invoke-NpmBuildWithRetry {
                 return
             }
 
+            Write-RustcCrashHints
             throw ("npm failed with exit code {0}: npm run build:debug" -f $LASTEXITCODE)
         }
 
@@ -308,6 +320,7 @@ try {
     } else {
         $tauriReleaseDir = Join-Path $windowsShellDir "src-tauri\target\$script:tauriBuildProfile"
         $appExeCandidates = @(
+            (Join-Path $tauriReleaseDir "rynat-windows-shell-app.exe"),
             (Join-Path $tauriReleaseDir "rynat-windows-shell.exe"),
             (Join-Path $tauriReleaseDir "RYNAT.exe")
         )

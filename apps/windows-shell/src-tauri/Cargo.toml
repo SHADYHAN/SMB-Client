@@ -16,7 +16,7 @@ name = "rynat_windows_shell"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [[bin]]
-name = "rynat-windows-shell"
+name = "rynat-windows-shell-app"
 path = "src/main.rs"
 
 [build-dependencies]
