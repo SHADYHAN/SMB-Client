@@ -9,6 +9,8 @@ namespace Rynat.WindowsContextHelper;
 internal static class Program
 {
     private const int ContextIpcPort = 19528;
+    private const string ContextTokenHeaderName = "X-RYANT-Context-Token";
+    private const string TokenFileName = "context-ipc-token";
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     [STAThread]
@@ -53,8 +55,9 @@ internal static class Program
         client.SendTimeout = 3000;
 
         var body = JsonSerializer.Serialize(request, JsonOptions);
+        var token = GetContextToken();
         var rawRequest =
-            $"POST /context HTTP/1.1\r\nHost: 127.0.0.1:{ContextIpcPort}\r\nContent-Type: application/json\r\nContent-Length: {Encoding.UTF8.GetByteCount(body)}\r\nConnection: close\r\n\r\n{body}";
+            $"POST /context HTTP/1.1\r\nHost: 127.0.0.1:{ContextIpcPort}\r\n{ContextTokenHeaderName}: {token}\r\nContent-Type: application/json\r\nContent-Length: {Encoding.UTF8.GetByteCount(body)}\r\nConnection: close\r\n\r\n{body}";
 
         using var stream = client.GetStream();
         var requestBytes = Encoding.UTF8.GetBytes(rawRequest);
@@ -81,10 +84,30 @@ internal static class Program
             ?? throw new InvalidOperationException("RYANT共享网盘返回了空响应。");
     }
 
+    private static string GetContextToken()
+    {
+        if (File.Exists(TokenPath))
+        {
+            var existing = File.ReadAllText(TokenPath).Trim();
+            if (!string.IsNullOrWhiteSpace(existing))
+            {
+                return existing;
+            }
+        }
+
+        throw new InvalidOperationException("RYANT共享网盘未完成初始化，请重新打开主程序后再试。");
+    }
+
     private static void ShowError(string message)
     {
         MessageBox.Show(message, "RYANT共享网盘", MessageBoxButtons.OK, MessageBoxIcon.Warning);
     }
+
+    private static string AppDataDirectory => Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+        "RYNAT");
+
+    private static string TokenPath => Path.Combine(AppDataDirectory, TokenFileName);
 }
 
 internal sealed class ContextRequest

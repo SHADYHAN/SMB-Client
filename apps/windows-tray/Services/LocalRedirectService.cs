@@ -96,7 +96,7 @@ internal sealed class LocalRedirectService : IDisposable
                 return;
             }
 
-            if (!IsPathUnderCurrentServer(payload.Path))
+            if (!UncPathPolicy.IsPathUnderServer(payload.Path, _state.ServerHost))
             {
                 await WriteHtmlAsync(context.Response, 403, "无法打开链接", "该链接不属于当前登录的服务器。");
                 return;
@@ -121,19 +121,6 @@ internal sealed class LocalRedirectService : IDisposable
         {
             await WriteHtmlAsync(context.Response, 500, "打开失败", ex.Message);
         }
-    }
-
-    private bool IsPathUnderCurrentServer(string path)
-    {
-        if (string.IsNullOrWhiteSpace(_state.ServerHost))
-        {
-            return false;
-        }
-
-        var normalizedPath = path.Trim().Replace('/', '\\');
-        var serverRoot = $@"\\{_state.ServerHost.Trim().Trim('\\')}";
-        return normalizedPath.Equals(serverRoot, StringComparison.OrdinalIgnoreCase)
-            || normalizedPath.StartsWith(serverRoot + @"\", StringComparison.OrdinalIgnoreCase);
     }
 
     private static async Task WriteHtmlAsync(HttpListenerResponse response, int statusCode, string title, string body, bool close = false)

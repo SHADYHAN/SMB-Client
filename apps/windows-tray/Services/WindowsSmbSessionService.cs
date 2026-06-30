@@ -74,13 +74,12 @@ internal sealed class WindowsSmbSessionService
 
     private void Connect(string host, string username, string password)
     {
-        if (!string.IsNullOrWhiteSpace(_connectedHost))
+        if (!string.IsNullOrWhiteSpace(_connectedHost)
+            && !string.Equals(_connectedHost, host, StringComparison.OrdinalIgnoreCase))
         {
             DisconnectHost(_connectedHost);
             _connectedHost = null;
         }
-
-        DisconnectHost(host);
 
         var remoteName = IpcRemoteName(host);
         var result = AddConnection(remoteName, username, password);

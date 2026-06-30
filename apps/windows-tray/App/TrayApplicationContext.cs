@@ -398,7 +398,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
                 return;
             }
 
-            if (!IsPathUnderCurrentServer(selection.Path))
+            if (!UncPathPolicy.IsPathUnderServer(selection.Path, _state.ServerHost))
             {
                 ShowBalloonTip("只能复制当前登录服务器下的文件链接。", ToolTipIcon.Warning);
                 return;
@@ -416,19 +416,6 @@ internal sealed class TrayApplicationContext : ApplicationContext
             NotifyStateChanged();
             ShowBalloonTip(ex.Message, ToolTipIcon.Warning);
         }
-    }
-
-    private bool IsPathUnderCurrentServer(string path)
-    {
-        if (string.IsNullOrWhiteSpace(_state.ServerHost))
-        {
-            return false;
-        }
-
-        var normalizedPath = path.Trim().Replace('/', '\\');
-        var serverRoot = $@"\\{_state.ServerHost.Trim().Trim('\\')}";
-        return normalizedPath.Equals(serverRoot, StringComparison.OrdinalIgnoreCase)
-            || normalizedPath.StartsWith(serverRoot + @"\", StringComparison.OrdinalIgnoreCase);
     }
 
     private void ShowBalloonTip(string message, ToolTipIcon icon)
