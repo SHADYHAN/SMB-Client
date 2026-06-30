@@ -23,6 +23,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
     private CancellationTokenSource? _activationPipeCts;
     private ShellSettings _settings;
     private ShellWindow? _window;
+    private Task? _autoLoginTask;
 
     public TrayApplicationContext(string[] args, string activationPipeName)
     {
@@ -46,14 +47,13 @@ internal sealed class TrayApplicationContext : ApplicationContext
         _ = _uiDispatcher.Handle;
         StartServices();
         StartActivationPipe();
+        _autoLoginTask = TryAutoLoginAsync();
         HandleActivationArgs(args, showWindowWhenIdle: true);
 
         if (args.Length > 0)
         {
             _state.LastActivation = string.Join(" ", args);
         }
-
-        _ = TryAutoLoginAsync();
     }
 
     public ShellState GetState()
@@ -282,22 +282,36 @@ internal sealed class TrayApplicationContext : ApplicationContext
     {
         if (args.Any(arg => string.Equals(arg, "--open-share", StringComparison.OrdinalIgnoreCase)))
         {
-            if (_state.Connected)
-            {
-                _ = OpenExplorerAsync();
-            }
-            else
-            {
-                ShowWindow();
-            }
-
+            _ = OpenShareOrLoginAsync();
             return;
         }
 
         if (showWindowWhenIdle)
         {
-            ShowWindow();
+            _ = OpenShareOrLoginAsync();
         }
+    }
+
+    private async Task OpenShareOrLoginAsync()
+    {
+        var waitingForAutoLogin = !_state.Connected && _autoLoginTask is { IsCompleted: false };
+        if (!_state.Connected && _autoLoginTask is not null)
+        {
+            await _autoLoginTask;
+        }
+
+        if (waitingForAutoLogin && _state.Connected)
+        {
+            return;
+        }
+
+        if (_state.Connected)
+        {
+            await OpenExplorerAsync();
+            return;
+        }
+
+        ShowWindow();
     }
 
     private ContextMenuStrip BuildTrayMenu()

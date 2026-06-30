@@ -34,9 +34,7 @@ Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs 
 
 [Icons]
 Name: "{commonprograms}\RYNAT"; Filename: "{app}\Rynat.WindowsTray.exe"
-Name: "{commonprograms}\打开共享网盘"; Filename: "{app}\Rynat.WindowsTray.exe"; Parameters: "--open-share"
 Name: "{commondesktop}\RYNAT"; Filename: "{app}\Rynat.WindowsTray.exe"; Tasks: desktopicon
-Name: "{commondesktop}\打开共享网盘"; Filename: "{app}\Rynat.WindowsTray.exe"; Parameters: "--open-share"; Tasks: shareicon
 
 [Registry]
 Root: HKCU; Subkey: "Software\Classes\*\shell\RynatCopyLink"; Flags: deletekey noerror
@@ -49,8 +47,7 @@ Root: HKLM; Subkey: "Software\Classes\Directory\shell\RynatCopyLink"; ValueType:
 Root: HKLM; Subkey: "Software\Classes\Directory\shell\RynatCopyLink\command"; ValueType: string; ValueName: ""; ValueData: """{app}\Rynat.WindowsContextHelper.exe"" copy-link ""%1"" --kind directory"; Flags: uninsdeletekey
 
 [Tasks]
-Name: "desktopicon"; Description: "创建 RYNAT 桌面快捷方式"; GroupDescription: "快捷方式："; Flags: unchecked
-Name: "shareicon"; Description: "创建“打开共享网盘”桌面快捷方式"; GroupDescription: "快捷方式："; Flags: checkedonce
+Name: "desktopicon"; Description: "创建 RYNAT 桌面快捷方式"; GroupDescription: "快捷方式："; Flags: checkedonce
 
 [Run]
 Filename: "{app}\Rynat.WindowsTray.exe"; Description: "启动 RYNAT"; Flags: nowait postinstall skipifsilent
