@@ -66,7 +66,6 @@ private final class SidebarOutlineView: NSOutlineView {
 }
 
 /// 侧栏：共享/收藏分段 + 真 NSOutlineView 目录树。
-/// 见 docs/ui-redesign.md §3.3、§6.2。砍掉「最近」tab。
 final class SidebarView: NSView, NSOutlineViewDataSource, NSOutlineViewDelegate {
     static let defaultWidth: CGFloat = 220
     static let minimumWidth: CGFloat = 180

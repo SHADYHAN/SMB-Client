@@ -1,7 +1,6 @@
 import AppKit
 
 /// 自绘极简 toast：窗口顶部下滑，2 秒自动消失。
-/// 见 docs/ui-redesign.md §5.6。用于复制链接/路径成功、已收藏等轻提示。
 final class ToastPresenter {
     static let shared = ToastPresenter()
 

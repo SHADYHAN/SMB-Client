@@ -1,8 +1,7 @@
 import AppKit
 
 /// 品牌配色：保留登录页与品牌视觉使用，主界面另走 RynatUI 语义色。
-/// 见 docs/ui-redesign.md §4.1.1。仅用于 logo、侧栏头部小标、空状态图标、主按钮点缀；
-/// 大面积背景与文本走 RynatUI 的系统语义色。
+/// 仅用于 logo、侧栏头部小标、空状态图标、主按钮点缀；大面积背景与文本走 RynatUI 的系统语义色。
 enum RynatBrand {
     static let accent = dynamicColor(light: NSColor(srgbRed: 0x2E/255, green: 0x6B/255, blue: 0xE6/255, alpha: 1),
                                      dark: NSColor(srgbRed: 0x6B/255, green: 0x9C/255, blue: 0xF5/255, alpha: 1))
