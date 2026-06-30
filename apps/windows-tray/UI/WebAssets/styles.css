@@ -197,8 +197,9 @@ input:focus {
 
 .brand span {
   margin-top: 2px;
-  color: var(--faint);
-  font-size: 11px;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .nav {

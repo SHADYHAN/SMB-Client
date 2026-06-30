@@ -17,7 +17,7 @@ internal sealed class ShellWindow : Form
     {
         _context = context;
 
-        Text = "RYNAT";
+        Text = "RYANT共享网盘";
         StartPosition = FormStartPosition.CenterScreen;
         MinimumSize = new Size(1060, 680);
         Size = new Size(1080, 720);

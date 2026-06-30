@@ -46,12 +46,12 @@ internal static class Program
         {
             if (!connectTask.Wait(TimeSpan.FromMilliseconds(700)))
             {
-                throw new InvalidOperationException("RYNAT 未运行，请先打开并登录 RYNAT。");
+                throw new InvalidOperationException("RYANT共享网盘未运行，请先打开并登录。");
             }
         }
         catch
         {
-            throw new InvalidOperationException("RYNAT 未运行，请先打开并登录 RYNAT。");
+            throw new InvalidOperationException("RYANT共享网盘未运行，请先打开并登录。");
         }
 
         client.ReceiveTimeout = 3000;
@@ -71,24 +71,24 @@ internal static class Program
         var bodyIndex = rawResponse.IndexOf("\r\n\r\n", StringComparison.Ordinal);
         if (bodyIndex < 0)
         {
-            throw new InvalidOperationException("RYNAT 返回了无效响应。");
+            throw new InvalidOperationException("RYANT共享网盘返回了无效响应。");
         }
 
         var statusLineEnd = rawResponse.IndexOf("\r\n", StringComparison.Ordinal);
         var statusLine = statusLineEnd < 0 ? rawResponse : rawResponse[..statusLineEnd];
         if (!statusLine.StartsWith("HTTP/1.1 2", StringComparison.OrdinalIgnoreCase))
         {
-            throw new InvalidOperationException("RYNAT 复制链接请求失败。");
+            throw new InvalidOperationException("RYANT共享网盘复制链接请求失败。");
         }
 
         var responseBody = rawResponse[(bodyIndex + 4)..];
         return JsonSerializer.Deserialize<ContextResponse>(responseBody, JsonOptions)
-            ?? throw new InvalidOperationException("RYNAT 返回了空响应。");
+            ?? throw new InvalidOperationException("RYANT共享网盘返回了空响应。");
     }
 
     private static void ShowError(string message)
     {
-        MessageBox.Show(message, "RYNAT", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        MessageBox.Show(message, "RYANT共享网盘", MessageBoxButtons.OK, MessageBoxIcon.Warning);
     }
 }
 

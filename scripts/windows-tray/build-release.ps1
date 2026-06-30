@@ -69,14 +69,14 @@ function Write-ContextMenuScripts([string]$PublishRoot) {
     $iconPath = Join-Path $PublishRoot "Assets\RynatApp.ico"
     $escapedHelper = Convert-ToRegValue $helperPath
     $escapedIcon = Convert-ToRegValue $iconPath
-    $menuText = "复制 RYNAT 分享链接"
+    $menuText = "复制分享链接"
 
     $installPs1 = @"
 `$ErrorActionPreference = "Stop"
 `$helperPath = Join-Path `$PSScriptRoot "Rynat.WindowsContextHelper.exe"
 `$iconPath = Join-Path `$PSScriptRoot "Assets\RynatApp.ico"
 if (-not (Test-Path `$helperPath)) {
-    throw "Cannot find RYNAT context helper: `$helperPath"
+    throw "Cannot find RYANT context helper: `$helperPath"
 }
 
 `$entries = @(
@@ -95,14 +95,14 @@ foreach (`$entry in `$entries) {
     `$commandKey.Close()
 }
 
-Write-Host "RYNAT Explorer context menu installed." -ForegroundColor Green
+Write-Host "RYANT Explorer context menu installed." -ForegroundColor Green
 "@
 
     $uninstallPs1 = @"
 `$ErrorActionPreference = "Stop"
 Remove-Item -Recurse -Force -ErrorAction SilentlyContinue -Path "HKCU:\Software\Classes\*\shell\RynatCopyLink"
 Remove-Item -Recurse -Force -ErrorAction SilentlyContinue -Path "HKCU:\Software\Classes\Directory\shell\RynatCopyLink"
-Write-Host "RYNAT Explorer context menu removed." -ForegroundColor Green
+Write-Host "RYANT Explorer context menu removed." -ForegroundColor Green
 "@
 
     $installBat = @"

@@ -69,7 +69,7 @@ New-Item -ItemType Directory -Force -Path $outputRoot | Out-Null
 $iscc = Find-InnoCompiler
 $env:RYNAT_PUBLISH_DIR = $publishRoot
 
-Write-Host "Building RYNAT Windows installer..." -ForegroundColor Cyan
+Write-Host "Building RYANT Windows installer..." -ForegroundColor Cyan
 Write-Host "Publish input: $publishRoot"
 Write-Host "Installer output: $outputRoot"
 
@@ -78,4 +78,4 @@ if ($LASTEXITCODE -ne 0) {
     throw "Inno Setup failed with exit code $LASTEXITCODE"
 }
 
-Write-Host "RYNAT Windows installer completed." -ForegroundColor Green
+Write-Host "RYANT Windows installer completed." -ForegroundColor Green

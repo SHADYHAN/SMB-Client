@@ -12,7 +12,7 @@ if not exist "%PS_SCRIPT%" (
 
 where pwsh >nul 2>nul
 if not "%ERRORLEVEL%"=="0" (
-    echo PowerShell 7 is required for the RYNAT Windows installer scripts.
+    echo PowerShell 7 is required for the RYANT Windows installer scripts.
     echo Install it with:
     echo   winget install --id Microsoft.PowerShell --source winget
     echo.
@@ -25,12 +25,12 @@ set "EXIT_CODE=%ERRORLEVEL%"
 
 if not "%EXIT_CODE%"=="0" (
     echo.
-    echo RYNAT Windows installer build failed. Exit code: %EXIT_CODE%
+    echo RYANT Windows installer build failed. Exit code: %EXIT_CODE%
     pause
     exit /b %EXIT_CODE%
 )
 
 echo.
-echo RYNAT Windows installer build completed.
+echo RYANT Windows installer build completed.
 pause
 exit /b 0

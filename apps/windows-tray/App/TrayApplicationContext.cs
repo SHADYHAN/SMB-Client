@@ -37,7 +37,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
         _notifyIcon = new NotifyIcon
         {
             Icon = LoadAppIcon(),
-            Text = "RYNAT",
+            Text = "RYANT共享网盘",
             Visible = true,
             ContextMenuStrip = BuildTrayMenu()
         };
@@ -317,7 +317,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
     private ContextMenuStrip BuildTrayMenu()
     {
         var menu = new ContextMenuStrip();
-        menu.Items.Add("打开 RYNAT", null, (_, _) => ShowWindow());
+        menu.Items.Add("打开 RYANT共享网盘", null, (_, _) => ShowWindow());
         menu.Items.Add("打开共享网盘", null, async (_, _) => await OpenExplorerAsync());
         menu.Items.Add("退出登录", null, (_, _) => Disconnect());
         menu.Items.Add(new ToolStripSeparator());

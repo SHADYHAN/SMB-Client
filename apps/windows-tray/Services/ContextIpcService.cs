@@ -95,7 +95,7 @@ internal sealed class ContextIpcService : IDisposable
 
             if (!_state.Connected)
             {
-                await WriteJsonAsync(context.Response, 400, ContextResponse.Failed("请先登录 RYNAT。"));
+                await WriteJsonAsync(context.Response, 400, ContextResponse.Failed("请先登录 RYANT共享网盘。"));
                 return;
             }
 
