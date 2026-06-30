@@ -12,6 +12,8 @@ $ErrorActionPreference = "Stop"
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 $projectPath = Join-Path $repoRoot "apps\windows-tray\Rynat.WindowsTray.csproj"
 $projectDir = Split-Path -Parent $projectPath
+$helperProjectPath = Join-Path $repoRoot "apps\windows-context-helper\Rynat.WindowsContextHelper.csproj"
+$helperProjectDir = Split-Path -Parent $helperProjectPath
 $script:LastNativeExitCode = 0
 
 function Invoke-NativeCommand {
@@ -58,6 +60,87 @@ function Remove-PathIfExists([string]$Path) {
     }
 }
 
+function Convert-ToRegValue([string]$Value) {
+    return $Value.Replace("\", "\\").Replace('"', '\"')
+}
+
+function Write-ContextMenuScripts([string]$PublishRoot) {
+    $helperPath = Join-Path $PublishRoot "Rynat.WindowsContextHelper.exe"
+    $escapedHelper = Convert-ToRegValue $helperPath
+    $menuText = "复制 RYNAT 分享链接"
+
+    $installPs1 = @"
+`$ErrorActionPreference = "Stop"
+`$helperPath = "$helperPath"
+if (-not (Test-Path `$helperPath)) {
+    throw "Cannot find RYNAT context helper: `$helperPath"
+}
+
+`$entries = @(
+    @{ Key = "Software\Classes\*\shell\RynatCopyLink"; Kind = "file" },
+    @{ Key = "Software\Classes\Directory\shell\RynatCopyLink"; Kind = "directory" }
+)
+
+foreach (`$entry in `$entries) {
+    `$key = [Microsoft.Win32.Registry]::CurrentUser.CreateSubKey(`$entry.Key)
+    `$key.SetValue("", "$menuText")
+    `$key.SetValue("Icon", "`"`$helperPath`",0")
+    `$key.Close()
+
+    `$commandKey = [Microsoft.Win32.Registry]::CurrentUser.CreateSubKey(`$entry.Key + "\command")
+    `$commandKey.SetValue("", "`"`$helperPath`" copy-link `"%1`" --kind `$(`$entry.Kind)")
+    `$commandKey.Close()
+}
+
+Write-Host "RYNAT Explorer context menu installed." -ForegroundColor Green
+"@
+
+    $uninstallPs1 = @"
+`$ErrorActionPreference = "Stop"
+Remove-Item -Recurse -Force -ErrorAction SilentlyContinue -Path "HKCU:\Software\Classes\*\shell\RynatCopyLink"
+Remove-Item -Recurse -Force -ErrorAction SilentlyContinue -Path "HKCU:\Software\Classes\Directory\shell\RynatCopyLink"
+Write-Host "RYNAT Explorer context menu removed." -ForegroundColor Green
+"@
+
+    $installBat = @"
+@echo off
+setlocal
+pwsh -NoProfile -ExecutionPolicy Bypass -File "%~dp0install-context-menu.ps1"
+if not "%ERRORLEVEL%"=="0" pause
+"@
+
+    $uninstallBat = @"
+@echo off
+setlocal
+pwsh -NoProfile -ExecutionPolicy Bypass -File "%~dp0uninstall-context-menu.ps1"
+if not "%ERRORLEVEL%"=="0" pause
+"@
+
+    $reg = @"
+Windows Registry Editor Version 5.00
+
+[HKEY_CURRENT_USER\Software\Classes\*\shell\RynatCopyLink]
+@="$menuText"
+"Icon"="\"$escapedHelper\",0"
+
+[HKEY_CURRENT_USER\Software\Classes\*\shell\RynatCopyLink\command]
+@="\"$escapedHelper\" copy-link \"%1\" --kind file"
+
+[HKEY_CURRENT_USER\Software\Classes\Directory\shell\RynatCopyLink]
+@="$menuText"
+"Icon"="\"$escapedHelper\",0"
+
+[HKEY_CURRENT_USER\Software\Classes\Directory\shell\RynatCopyLink\command]
+@="\"$escapedHelper\" copy-link \"%1\" --kind directory"
+"@
+
+    Set-Content -Encoding UTF8 -Path (Join-Path $PublishRoot "install-context-menu.ps1") -Value $installPs1
+    Set-Content -Encoding ASCII -Path (Join-Path $PublishRoot "install-context-menu.bat") -Value $installBat
+    Set-Content -Encoding UTF8 -Path (Join-Path $PublishRoot "uninstall-context-menu.ps1") -Value $uninstallPs1
+    Set-Content -Encoding ASCII -Path (Join-Path $PublishRoot "uninstall-context-menu.bat") -Value $uninstallBat
+    Set-Content -Encoding Unicode -Path (Join-Path $PublishRoot "install-context-menu.reg") -Value $reg
+}
+
 Push-Location $repoRoot
 try {
     Write-Host "Repository: $repoRoot" -ForegroundColor Cyan
@@ -67,12 +150,18 @@ try {
         throw "Cannot find project: $projectPath"
     }
 
+    if (-not (Test-Path $helperProjectPath)) {
+        throw "Cannot find helper project: $helperProjectPath"
+    }
+
     $baseOutputRoot = Get-OutputRoot $OutputDirectory
     if (-not $NoClean) {
         Remove-PathIfExists $baseOutputRoot
         Remove-PathIfExists (Join-Path $projectDir "bin")
+        Remove-PathIfExists (Join-Path $helperProjectDir "bin")
         if (-not $SkipRestore) {
             Remove-PathIfExists (Join-Path $projectDir "obj")
+            Remove-PathIfExists (Join-Path $helperProjectDir "obj")
         }
     }
 
@@ -123,6 +212,33 @@ try {
         }
         Invoke-NativeCommand -FilePath "dotnet" -Arguments $publishArgs
     }
+
+    $helperPublishArgs = @(
+        "publish",
+        $helperProjectPath,
+        "-c",
+        "Release",
+        "-p:PublishSingleFile=false",
+        "-p:SelfContained=$isSelfContained",
+        "-p:UseSharedCompilation=false",
+        "-p:BuildInParallel=false",
+        "-p:RunAnalyzers=false",
+        "-maxcpucount:1",
+        "-nodeReuse:false",
+        "-o",
+        $publishRoot
+    )
+
+    if (-not [string]::IsNullOrWhiteSpace($RuntimeIdentifier)) {
+        $helperPublishArgs += @("-r", $RuntimeIdentifier)
+    }
+
+    if ($SkipRestore) {
+        $helperPublishArgs += "--no-restore"
+    }
+
+    Invoke-NativeCommand -FilePath "dotnet" -Arguments $helperPublishArgs
+    Write-ContextMenuScripts $publishRoot
 
     $latestPath = Join-Path $baseOutputRoot "latest.txt"
     New-Item -ItemType Directory -Force -Path $baseOutputRoot | Out-Null

@@ -93,6 +93,18 @@ internal sealed class ContextIpcService : IDisposable
                 return;
             }
 
+            if (!_state.Connected)
+            {
+                await WriteJsonAsync(context.Response, 400, ContextResponse.Failed("请先登录 RYNAT。"));
+                return;
+            }
+
+            if (!IsPathUnderCurrentServer(request.Path))
+            {
+                await WriteJsonAsync(context.Response, 400, ContextResponse.Failed("只能为当前登录服务器下的 UNC 路径复制分享链接。"));
+                return;
+            }
+
             var link = _shareLinkService.CreateShareLink(request.Path, request.Kind);
             await ClipboardService.SetTextAsync(link);
             _state.LastActivation = $"右键复制链接: {request.Path}";
@@ -112,6 +124,19 @@ internal sealed class ContextIpcService : IDisposable
         response.ContentLength64 = bytes.Length;
         await response.OutputStream.WriteAsync(bytes);
         response.Close();
+    }
+
+    private bool IsPathUnderCurrentServer(string path)
+    {
+        if (string.IsNullOrWhiteSpace(_state.ServerHost))
+        {
+            return false;
+        }
+
+        var normalizedPath = path.Trim().Replace('/', '\\');
+        var serverRoot = $@"\\{_state.ServerHost.Trim().Trim('\\')}";
+        return normalizedPath.Equals(serverRoot, StringComparison.OrdinalIgnoreCase)
+            || normalizedPath.StartsWith(serverRoot + @"\", StringComparison.OrdinalIgnoreCase);
     }
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
