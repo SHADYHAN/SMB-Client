@@ -81,6 +81,13 @@
               </button>
             </div>
             <div id="server-list" class="server-list"></div>
+            <form id="new-server-form" class="new-server-form hidden">
+              <input id="new-server-host" autocomplete="off" placeholder="服务器地址" />
+              <div class="inline-action-row">
+                <button class="primary-button compact" type="submit">保存</button>
+                <button id="cancel-new-server" class="ghost-button compact" type="button">取消</button>
+              </div>
+            </form>
           </section>
 
           <section class="panel server-editor-panel">

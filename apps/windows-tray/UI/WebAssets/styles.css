@@ -294,8 +294,8 @@ h2 {
 
 .page-grid {
   display: grid;
-  grid-template-columns: 288px minmax(0, 1fr);
-  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) 304px;
+  grid-template-rows: minmax(0, 1fr) 86px;
   gap: 14px;
   min-height: 0;
 }
@@ -317,12 +317,15 @@ h2 {
   min-height: 0;
 }
 
-.server-editor-panel {
-  padding: 18px 20px;
+.panel.server-list-panel {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  background: var(--surface);
 }
 
-.panel.server-list-panel {
-  background: #f9fafb;
+.server-editor-panel {
+  align-self: start;
+  padding: 18px 18px;
 }
 
 .panel-heading {
@@ -331,13 +334,33 @@ h2 {
   margin-bottom: 14px;
 }
 
+.panel-heading.row-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .server-list {
   display: grid;
   gap: 8px;
   align-content: start;
-  height: calc(100% - 42px);
   min-height: 0;
   overflow: auto;
+}
+
+.new-server-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.inline-action-row {
+  display: flex;
+  gap: 6px;
 }
 
 .server-list::-webkit-scrollbar {
@@ -423,6 +446,12 @@ h2 {
   transition: background 140ms ease, border-color 140ms ease, color 140ms ease, transform 120ms ease;
 }
 
+.primary-button.compact,
+.ghost-button.compact {
+  min-height: 34px;
+  padding: 0 11px;
+}
+
 .icon-button {
   display: inline-grid;
   width: 30px;
@@ -504,15 +533,17 @@ button:disabled {
 
 .compact-status {
   grid-template-columns: repeat(6, minmax(96px, 1fr));
-  gap: 0;
+  gap: 8px;
   margin: 0;
 }
 
 .connection-panel {
   align-self: end;
-  padding: 9px 4px 0;
-  border-top: 1px solid #dce3eb;
-  background: transparent;
+  padding: 14px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: 0 10px 24px rgba(38, 51, 72, 0.055);
 }
 
 .status-grid div {
@@ -524,18 +555,16 @@ button:disabled {
 }
 
 .compact-status div {
-  min-height: 38px;
-  padding: 2px 12px;
+  min-height: 54px;
+  padding: 9px 10px;
   border: 0;
-  border-left: 1px solid #e6ebf1;
-  border-radius: 0;
-  background: transparent;
+  border-radius: var(--radius-sm);
+  background: #f6f8fb;
   overflow: hidden;
 }
 
 .compact-status div:first-child {
-  border-left: 0;
-  padding-left: 0;
+  padding-left: 10px;
 }
 
 dt {

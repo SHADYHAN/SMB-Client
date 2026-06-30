@@ -1,5 +1,4 @@
 const storedPasswordPlaceholder = "********";
-const newServerId = "__new_server__";
 
 const state = {
   connected: false,
@@ -26,6 +25,7 @@ const state = {
 
 let activePage = "server";
 let editingServerId = "";
+let addingServer = false;
 let nextId = 1;
 const pending = new Map();
 
@@ -128,12 +128,14 @@ function renderServerPage() {
   });
 
   const selected = selectedServer();
-  document.querySelector("#server-form-title").textContent = selected?.id ? "编辑服务器" : "新增服务器";
+  document.querySelector("#server-form-title").textContent = "编辑服务器";
   document.querySelector("#server-id").value = selected?.id || "";
   document.querySelector("#server-name").value = selected?.name || "";
   document.querySelector("#server-host").value = selected?.host || "";
-  document.querySelector("#server-set-default").checked = !selected?.id || selected?.id === state.defaultServerId;
+  document.querySelector("#server-set-default").checked = selected?.id === state.defaultServerId;
   document.querySelector("#delete-server").disabled = !selected?.id || state.servers.length <= 1;
+  document.querySelector("#server-form").classList.toggle("inactive", !selected?.id);
+  document.querySelector("#new-server-form").classList.toggle("hidden", !addingServer);
 }
 
 function renderGeneralPage() {
@@ -148,10 +150,6 @@ function renderServiceStatus() {
 }
 
 function selectedServer() {
-  if (editingServerId === newServerId) {
-    return null;
-  }
-
   return state.servers.find((server) => server.id === editingServerId)
     || state.servers.find((server) => server.id === state.defaultServerId)
     || state.servers[0]
@@ -210,9 +208,42 @@ document.querySelector("#login-form").addEventListener("submit", async (event) =
 });
 
 document.querySelector("#add-server").addEventListener("click", () => {
-  editingServerId = newServerId;
+  addingServer = true;
   renderServerPage();
-  document.querySelector("#server-name").focus();
+  document.querySelector("#new-server-host").focus();
+});
+
+document.querySelector("#cancel-new-server").addEventListener("click", () => {
+  addingServer = false;
+  document.querySelector("#new-server-host").value = "";
+  renderServerPage();
+});
+
+document.querySelector("#new-server-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  try {
+    const host = document.querySelector("#new-server-host").value.trim();
+    if (!host) {
+      document.querySelector("#new-server-host").focus();
+      return;
+    }
+
+    const result = await send("saveServer", {
+      setDefault: false,
+      server: {
+        id: "",
+        name: host,
+        host
+      }
+    });
+    document.querySelector("#new-server-host").value = "";
+    addingServer = false;
+    applyState(result);
+    editingServerId = result.savedServerId || state.defaultServerId || state.servers[0]?.id || "";
+    render();
+  } catch (error) {
+    showError(error);
+  }
 });
 
 document.querySelector("#server-form").addEventListener("submit", async (event) => {
