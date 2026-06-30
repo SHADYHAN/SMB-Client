@@ -90,9 +90,20 @@ internal sealed class LocalRedirectService : IDisposable
 
         try
         {
-            _explorerService.OpenTarget(payload.Path, payload.Kind);
             _state.LastActivation = $"链接唤醒: {payload.Path}";
-            await WriteHtmlAsync(context.Response, 200, "RYNAT activated", "已唤醒 RYNAT，可关闭此页面。", close: true);
+            await WriteHtmlAsync(context.Response, 200, "RYNAT activated", "正在唤醒 Windows Explorer。", close: true);
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(280);
+                try
+                {
+                    _explorerService.OpenTarget(payload.Path, payload.Kind);
+                }
+                catch (Exception ex)
+                {
+                    _state.LastActivation = $"链接唤醒失败: {ex.Message}";
+                }
+            });
         }
         catch (Exception ex)
         {
