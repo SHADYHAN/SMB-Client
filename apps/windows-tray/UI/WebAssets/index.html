@@ -74,12 +74,16 @@
           <section class="panel server-list-panel">
             <div class="panel-heading row-heading">
               <h2>服务器列表</h2>
-              <button id="add-server" class="secondary-button" type="button">新增服务器</button>
+              <button id="add-server" class="icon-button" type="button" aria-label="新增服务器" title="新增服务器">
+                <svg viewBox="0 0 16 16" aria-hidden="true">
+                  <path d="M8 3.25v9.5M3.25 8h9.5" />
+                </svg>
+              </button>
             </div>
             <div id="server-list" class="server-list"></div>
           </section>
 
-          <section class="panel">
+          <section class="panel server-editor-panel">
             <div class="panel-heading">
               <h2 id="server-form-title">编辑服务器</h2>
             </div>
@@ -104,7 +108,7 @@
             </form>
           </section>
 
-          <section class="panel span-2 connection-panel">
+          <section class="span-2 connection-panel">
             <dl class="status-grid compact-status">
               <div>
                 <dt>服务器</dt>
