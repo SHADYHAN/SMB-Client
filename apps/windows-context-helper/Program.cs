@@ -24,11 +24,6 @@ internal static class Program
                 return 1;
             }
 
-            if (!string.IsNullOrWhiteSpace(response.HttpUrl))
-            {
-                Clipboard.SetText(response.HttpUrl);
-            }
-
             return 0;
         }
         catch (Exception ex)
