@@ -3,6 +3,7 @@
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>
     <UseWindowsForms>true</UseWindowsForms>
+    <UseWPF>false</UseWPF>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>Rynat.WindowsTray</RootNamespace>
@@ -19,4 +20,11 @@
     <Content Include="Assets\RynatApp.ico" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="UI\WebAssets\**\*.*" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
+
+  <Target Name="RemoveWebView2WpfReference" BeforeTargets="ResolveAssemblyReferences">
+    <ItemGroup>
+      <_WebView2WpfReference Include="@(Reference)" Condition="'%(Reference.Filename)' == 'Microsoft.Web.WebView2.Wpf'" />
+      <Reference Remove="@(_WebView2WpfReference)" />
+    </ItemGroup>
+  </Target>
 </Project>
