@@ -157,7 +157,7 @@ Windows Registry Editor Version 5.00
 Push-Location $repoRoot
 try {
     Write-Host "Repository: $repoRoot" -ForegroundColor Cyan
-    Write-Host "Publishing Windows tray WebView shell..." -ForegroundColor Cyan
+    Write-Host "Publishing RYNAT Windows client..." -ForegroundColor Cyan
 
     if (-not (Test-Path $projectPath)) {
         throw "Cannot find project: $projectPath"
@@ -258,7 +258,7 @@ try {
     Set-Content -Encoding UTF8 -Path $latestPath -Value $publishRoot
 
     Write-Host ""
-    Write-Host "Windows tray WebView shell release completed." -ForegroundColor Green
+    Write-Host "RYNAT Windows client release completed." -ForegroundColor Green
     Write-Host "Output:"
     Write-Host "  $publishRoot"
     Write-Host "Latest pointer:"

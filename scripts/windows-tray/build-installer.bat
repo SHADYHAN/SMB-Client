@@ -2,7 +2,7 @@
 setlocal
 
 set "SCRIPT_DIR=%~dp0"
-set "PS_SCRIPT=%SCRIPT_DIR%build-check.ps1"
+set "PS_SCRIPT=%SCRIPT_DIR%build-installer.ps1"
 
 if not exist "%PS_SCRIPT%" (
     echo Cannot find PowerShell script: %PS_SCRIPT%
@@ -12,7 +12,7 @@ if not exist "%PS_SCRIPT%" (
 
 where pwsh >nul 2>nul
 if not "%ERRORLEVEL%"=="0" (
-    echo PowerShell 7 is required for the RYNAT Windows client build scripts.
+    echo PowerShell 7 is required for the RYNAT Windows installer scripts.
     echo Install it with:
     echo   winget install --id Microsoft.PowerShell --source winget
     echo.
@@ -25,12 +25,12 @@ set "EXIT_CODE=%ERRORLEVEL%"
 
 if not "%EXIT_CODE%"=="0" (
     echo.
-    echo RYNAT Windows client build check failed. Exit code: %EXIT_CODE%
+    echo RYNAT Windows installer build failed. Exit code: %EXIT_CODE%
     pause
     exit /b %EXIT_CODE%
 )
 
 echo.
-echo RYNAT Windows client build check completed.
+echo RYNAT Windows installer build completed.
 pause
 exit /b 0

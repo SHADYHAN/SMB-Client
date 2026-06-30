@@ -1,4 +1,7 @@
 using System.Drawing;
+using System.IO.Pipes;
+using System.Text;
+using System.Text.Json;
 using System.Windows.Forms;
 using Rynat.WindowsTray.Services;
 using Rynat.WindowsTray.UI;
@@ -15,11 +18,15 @@ internal sealed class TrayApplicationContext : ApplicationContext
     private readonly LocalRedirectService _localRedirectService;
     private readonly ContextIpcService _contextIpcService;
     private readonly NotifyIcon _notifyIcon;
+    private readonly string _activationPipeName;
+    private readonly Control _uiDispatcher = new();
+    private CancellationTokenSource? _activationPipeCts;
     private ShellSettings _settings;
     private ShellWindow? _window;
 
-    public TrayApplicationContext(string[] args)
+    public TrayApplicationContext(string[] args, string activationPipeName)
     {
+        _activationPipeName = activationPipeName;
         _settings = _settingsService.Load();
         ApplySettingsToState();
 
@@ -35,8 +42,11 @@ internal sealed class TrayApplicationContext : ApplicationContext
         };
         _notifyIcon.DoubleClick += (_, _) => ShowWindow();
 
+        _uiDispatcher.CreateControl();
+        _ = _uiDispatcher.Handle;
         StartServices();
-        ShowWindow();
+        StartActivationPipe();
+        HandleActivationArgs(args, showWindowWhenIdle: true);
 
         if (args.Length > 0)
         {
@@ -59,7 +69,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
         var normalizedUsername = username.Trim();
         var resolvedPassword = ResolvePassword(server, normalizedUsername, password);
 
-        _state.Status = "正在用输入的账号连接 Windows SMB 会话。";
+        _state.Status = "正在用输入的账号连接共享网盘。";
         await _smbSessionService.ConnectAsync(normalizedHost, normalizedUsername, resolvedPassword);
 
         server.Host = normalizedHost;
@@ -78,7 +88,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
         _state.HasStoredPassword = !string.IsNullOrWhiteSpace(server.ProtectedPassword);
         _state.Connected = true;
         SaveSettings();
-        _state.Status = "已登录 Windows SMB 会话，正在打开 Windows Explorer。";
+        _state.Status = "已登录共享网盘，正在打开资源管理器。";
 
         await OpenExplorerAsync();
         NotifyStateChanged();
@@ -186,7 +196,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
     public Task OpenExplorerAsync()
     {
         _explorerService.OpenDirectory(_state.ExplorerRoot);
-        _state.LastActivation = $"打开 Explorer: {_state.ExplorerRoot}";
+        _state.LastActivation = $"打开资源管理器: {_state.ExplorerRoot}";
         NotifyStateChanged();
         return Task.CompletedTask;
     }
@@ -207,6 +217,9 @@ internal sealed class TrayApplicationContext : ApplicationContext
     {
         if (disposing)
         {
+            _activationPipeCts?.Cancel();
+            _activationPipeCts?.Dispose();
+            _uiDispatcher.Dispose();
             _notifyIcon.Visible = false;
             _notifyIcon.Dispose();
             _smbSessionService.DisconnectCurrent();
@@ -222,6 +235,69 @@ internal sealed class TrayApplicationContext : ApplicationContext
     {
         _localRedirectService.Start();
         _contextIpcService.Start();
+    }
+
+    private void StartActivationPipe()
+    {
+        _activationPipeCts = new CancellationTokenSource();
+        _ = Task.Run(() => RunActivationPipeAsync(_activationPipeCts.Token));
+    }
+
+    private async Task RunActivationPipeAsync(CancellationToken cancellationToken)
+    {
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            try
+            {
+                using var server = new NamedPipeServerStream(
+                    _activationPipeName,
+                    PipeDirection.In,
+                    1,
+                    PipeTransmissionMode.Byte,
+                    PipeOptions.Asynchronous);
+
+                await server.WaitForConnectionAsync(cancellationToken);
+                using var reader = new StreamReader(server, Encoding.UTF8);
+                var json = await reader.ReadToEndAsync(cancellationToken);
+                var args = JsonSerializer.Deserialize<string[]>(json) ?? Array.Empty<string>();
+                BeginInvokeOnUi(() => HandleActivationArgs(args, showWindowWhenIdle: true));
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+            catch
+            {
+                await Task.Delay(250, cancellationToken);
+            }
+        }
+    }
+
+    private void BeginInvokeOnUi(Action action)
+    {
+        _uiDispatcher.BeginInvoke((MethodInvoker)(() => action()));
+    }
+
+    private void HandleActivationArgs(string[] args, bool showWindowWhenIdle)
+    {
+        if (args.Any(arg => string.Equals(arg, "--open-share", StringComparison.OrdinalIgnoreCase)))
+        {
+            if (_state.Connected)
+            {
+                _ = OpenExplorerAsync();
+            }
+            else
+            {
+                ShowWindow();
+            }
+
+            return;
+        }
+
+        if (showWindowWhenIdle)
+        {
+            ShowWindow();
+        }
     }
 
     private ContextMenuStrip BuildTrayMenu()

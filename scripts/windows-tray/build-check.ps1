@@ -50,7 +50,7 @@ function Remove-PathIfExists([string]$Path) {
 Push-Location $repoRoot
 try {
     Write-Host "Repository: $repoRoot" -ForegroundColor Cyan
-    Write-Host "Checking Windows tray WebView shell..." -ForegroundColor Cyan
+    Write-Host "Checking RYNAT Windows client..." -ForegroundColor Cyan
 
     if (-not (Test-Path $projectPath)) {
         throw "Cannot find project: $projectPath"
@@ -103,7 +103,7 @@ try {
         "--no-restore"
     )
 
-    Write-Host "Windows tray WebView shell check completed." -ForegroundColor Green
+    Write-Host "RYNAT Windows client check completed." -ForegroundColor Green
 }
 finally {
     Pop-Location

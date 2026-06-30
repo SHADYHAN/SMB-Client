@@ -35,7 +35,7 @@ internal sealed class ShellWindow : Form
     {
         await _webView.EnsureCoreWebView2Async();
         _webView.CoreWebView2.Settings.AreDefaultContextMenusEnabled = false;
-        _webView.CoreWebView2.Settings.AreDevToolsEnabled = true;
+        _webView.CoreWebView2.Settings.AreDevToolsEnabled = false;
         _webView.CoreWebView2.WebMessageReceived += OnWebMessageReceived;
         _webView.CoreWebView2.Navigate(GetIndexPath());
     }

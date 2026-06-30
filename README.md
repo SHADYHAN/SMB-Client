@@ -107,11 +107,11 @@ scripts\windows-tray\build-check.bat
 # Windows Explorer-first WinForms + WebView2 主线发布
 scripts\windows-tray\build-release.bat
 
+# Windows 安装包构建（先运行 build-release.bat）
+scripts\windows-tray\build-installer.bat
+
 # Windows Explorer-first 支撑逻辑测试（右键 helper / 路径映射参考线）
 cargo test -p rynat-windows-shell-support --locked --offline
-
-# Windows Explorer 右键 helper 契约测试
-cargo run -p rynat-windows-context-helper --locked --offline -- copy-link "\\\\nas.local\\Media\\demo.mp4"
 
 ```
 
@@ -119,6 +119,7 @@ macOS 构建脚本先 `cargo build -p rynat-core --release`，再把 `librynat_c
 
 Windows Tray 主线 release 脚本会把发布产物复制到 `build\windows-tray-release\<yyyyMMdd-HHmmss>\`，并写入 `build\windows-tray-release\latest.txt`。
 默认发布为不指定 RID 的 framework-dependent 产物，依赖目标机器已安装 .NET 10 Windows Desktop Runtime / SDK；如需固定架构或自包含产物，可运行 `scripts\windows-tray\build-release.bat -RuntimeIdentifier win-x64` 或 `scripts\windows-tray\build-release.bat -RuntimeIdentifier win-x64 -SelfContained`。
+安装包脚本使用 Inno Setup 6，会读取 `latest.txt` 指向的发布目录，生成安装程序并注册右键 helper、开始菜单和桌面快捷方式。
 
 FFI 冒烟测试：
 
@@ -133,17 +134,16 @@ scripts/ffi-smoke-test-windows.ps1
 
 - Rust Core 是共享业务底座，链接、SMB、存储、凭据、任务、错误码、预览计划等能力已形成双平台共用边界。
 - macOS AppKit 客户端作为当前 macOS 主线继续演进，后续重点是拆薄 `WorkspaceController` 和 `RynatCore.swift`。
-- Windows 下一阶段主方向切到 Explorer-first：RYNAT 提供登录、服务器设置、凭据接入、Explorer 右键复制分享链接、链接唤醒、托盘 / 诊断，文件浏览和文件操作交给 Windows Explorer。
+- Windows 主方向已经切到 Explorer-first：RYNAT 提供登录、服务器设置、凭据接入、Explorer 右键复制分享链接、链接唤醒和托盘常驻，文件浏览和文件操作交给 Windows Explorer。
 - 旧 WinUI 3、WPF 和 Tauri Windows 线已移除，避免继续维护多条 Windows 主程序路线。
 - 快速链接已切换为紧凑 `/s/<短码>` 格式；Windows UI 默认复制文档 / 聊天工具友好的 HTTP 短链接，避免钉钉文档把 `rynat://` 富文本 href 改写成坏链接。本地中转命中已运行客户端后返回已激活关闭页，尽量让浏览器标签页自动关闭，失败时显示可手动关闭提示。
 
 ## 后续重点
 
-- Windows：进入 Explorer-first Phase 1，验证登录后接入 Windows SMB / UNC 并打开 Explorer 到目标共享或目录。
-- Windows：在 Phase 1 内完成薄 Explorer 右键入口，把“复制 RYNAT 分享链接”委托给 RYNAT 主程序处理。
-- Windows：验证链接唤醒后打开 Explorer 到父目录并尽量选中文件；未登录时先登录再继续消费待处理链接。
-- Windows：主程序技术栈切换为 `.NET 10 WinForms Tray Host + WebView2 Local UI`；右键入口仍按 Windows Shell 原生薄集成独立处理。
-- Windows：`apps/windows-tray` 是 Explorer-first 主线。
+- Windows：完善正式安装包，安装主程序、右键 helper、桌面快捷方式和卸载清理。
+- Windows：优化 Windows 11 一级右键入口；当前传统右键入口已由 `Rynat.WindowsContextHelper.exe` 转发给主程序处理。
+- Windows：继续打磨登录后设置界面、托盘入口、链接唤醒和资源管理器前台定位体验。
+- Windows：`apps/windows-tray` 与 `apps/windows-context-helper` 是 Explorer-first 主线。
 - macOS：按 `docs/macos-architecture-evolution-plan.md` 渐进拆分桥接、服务和状态。
 - 双平台：保持 `include/rynat_core.h`、Swift bridge、C# bridge 与 Rust ABI 同步。
 

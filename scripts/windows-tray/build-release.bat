@@ -12,7 +12,7 @@ if not exist "%PS_SCRIPT%" (
 
 where pwsh >nul 2>nul
 if not "%ERRORLEVEL%"=="0" (
-    echo PowerShell 7 is required for the Windows tray build scripts.
+    echo PowerShell 7 is required for the RYNAT Windows client build scripts.
     echo Install it with:
     echo   winget install --id Microsoft.PowerShell --source winget
     echo.
@@ -25,12 +25,12 @@ set "EXIT_CODE=%ERRORLEVEL%"
 
 if not "%EXIT_CODE%"=="0" (
     echo.
-    echo Windows tray release build failed. Exit code: %EXIT_CODE%
+    echo RYNAT Windows client release build failed. Exit code: %EXIT_CODE%
     pause
     exit /b %EXIT_CODE%
 )
 
 echo.
-echo Windows tray release build completed.
+echo RYNAT Windows client release build completed.
 pause
 exit /b 0

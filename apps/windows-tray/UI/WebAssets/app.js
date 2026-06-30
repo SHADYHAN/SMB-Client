@@ -15,7 +15,7 @@ const state = {
     copyLinkHotkey: "未设置"
   },
   status: "加载中",
-  smbSessionStatus: "尚未连接 Windows SMB 会话",
+  smbSessionStatus: "尚未连接共享网盘会话",
   localRedirectRunning: false,
   localRedirectStatus: "本地短链服务尚未启动",
   contextIpcRunning: false,

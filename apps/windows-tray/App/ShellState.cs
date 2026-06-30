@@ -22,11 +22,11 @@ internal sealed class ShellState
 
     public bool Connected { get; set; }
 
-    public string Status { get; set; } = "请登录以打开 Windows Explorer。";
+    public string Status { get; set; } = "请登录以打开共享网盘。";
 
     public string SmbSessionStatus => Connected
-        ? $"已用 {Username} 连接 Windows SMB 会话"
-        : "尚未连接 Windows SMB 会话";
+        ? $"已用 {Username} 连接共享网盘会话"
+        : "尚未连接共享网盘会话";
 
     public bool LocalRedirectRunning { get; set; }
 

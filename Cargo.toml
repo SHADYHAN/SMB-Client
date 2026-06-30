@@ -2,7 +2,6 @@
 members = [
     "crates/rynat-core",
     "crates/rynat-windows-shell-support",
-    "apps/windows-context-helper",
 ]
 resolver = "3"
 
