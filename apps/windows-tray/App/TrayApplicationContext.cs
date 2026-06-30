@@ -87,6 +87,11 @@ internal sealed class TrayApplicationContext : ApplicationContext
         return await CopyDirectoryLinkAsync("Pro素材", "B-热门品种");
     }
 
+    public async Task<string> CopySecondMaterialTestLinkAsync()
+    {
+        return await CopyDirectoryLinkAsync("Pro素材", "E-新方向");
+    }
+
     public void HideWindow()
     {
         _window?.Hide();
@@ -130,8 +135,9 @@ internal sealed class TrayApplicationContext : ApplicationContext
         var menu = new ContextMenuStrip();
         menu.Items.Add("打开 RYNAT", null, (_, _) => ShowWindow());
         menu.Items.Add("打开资源管理器", null, async (_, _) => await OpenExplorerAsync());
-        menu.Items.Add("复制临时文件夹测试链接", null, async (_, _) => await CopyTestLinkAsync());
-        menu.Items.Add("复制 Pro 素材测试链接", null, async (_, _) => await CopyMaterialTestLinkAsync());
+        menu.Items.Add("复制临时文件夹 123 测试链接", null, async (_, _) => await CopyTestLinkAsync());
+        menu.Items.Add("复制 Pro 素材 B 测试链接", null, async (_, _) => await CopyMaterialTestLinkAsync());
+        menu.Items.Add("复制 Pro 素材 E 测试链接", null, async (_, _) => await CopySecondMaterialTestLinkAsync());
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("退出", null, (_, _) => ExitThread());
         return menu;

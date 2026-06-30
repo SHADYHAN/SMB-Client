@@ -25,7 +25,7 @@ internal sealed class ExplorerService
             return;
         }
 
-        if (TryActivateExistingDirectory(directory))
+        if (TryReuseExistingDirectoryWindow(directory))
         {
             return;
         }
@@ -73,7 +73,7 @@ internal sealed class ExplorerService
         for (var attempt = 0; attempt < ActivationAttempts; attempt++)
         {
             Thread.Sleep(ActivationDelay);
-            if (TryActivateExistingDirectory(directory))
+            if (TryActivateExactDirectory(directory))
             {
                 return true;
             }
@@ -82,7 +82,18 @@ internal sealed class ExplorerService
         return false;
     }
 
-    private static bool TryActivateExistingDirectory(string directory)
+    private static bool TryReuseExistingDirectoryWindow(string directory)
+    {
+        if (!TryFindReusableExplorerWindow(directory, out var windowHandle))
+        {
+            return false;
+        }
+
+        BringWindowToForeground(windowHandle);
+        return true;
+    }
+
+    private static bool TryActivateExactDirectory(string directory)
     {
         if (!TryFindExplorerWindow(directory, out var windowHandle))
         {
@@ -91,6 +102,110 @@ internal sealed class ExplorerService
 
         BringWindowToForeground(windowHandle);
         return true;
+    }
+
+    private static bool TryFindReusableExplorerWindow(string directory, out IntPtr windowHandle)
+    {
+        if (Thread.CurrentThread.GetApartmentState() == ApartmentState.STA)
+        {
+            return TryFindReusableExplorerWindowCore(directory, out windowHandle);
+        }
+
+        var found = false;
+        var handle = IntPtr.Zero;
+        var thread = new Thread(() => found = TryFindReusableExplorerWindowCore(directory, out handle));
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+
+        windowHandle = handle;
+        return found;
+    }
+
+    private static bool TryFindReusableExplorerWindowCore(string directory, out IntPtr windowHandle)
+    {
+        windowHandle = IntPtr.Zero;
+        var targetPath = NormalizePathForComparison(directory);
+        if (string.IsNullOrWhiteSpace(targetPath))
+        {
+            return false;
+        }
+
+        object? shell = null;
+        object? windows = null;
+        try
+        {
+            var shellType = Type.GetTypeFromProgID("Shell.Application");
+            if (shellType is null)
+            {
+                return false;
+            }
+
+            shell = Activator.CreateInstance(shellType);
+            if (shell is null)
+            {
+                return false;
+            }
+
+            windows = shellType.InvokeMember(
+                "Windows",
+                BindingFlags.InvokeMethod,
+                binder: null,
+                target: shell,
+                args: null,
+                culture: CultureInfo.InvariantCulture);
+
+            foreach (var window in EnumerateComCollection(windows))
+            {
+                if (!IsExplorerWindow(window))
+                {
+                    ReleaseComObject(window);
+                    continue;
+                }
+
+                var locationUrl = GetComString(window, "LocationURL");
+                if (!TryConvertLocationUrlToPath(locationUrl, out var locationPath))
+                {
+                    ReleaseComObject(window);
+                    continue;
+                }
+
+                var normalizedLocationPath = NormalizePathForComparison(locationPath);
+                if (!ShouldReuseWindowForDirectory(targetPath, normalizedLocationPath))
+                {
+                    ReleaseComObject(window);
+                    continue;
+                }
+
+                var matchedWindowHandle = GetComIntPtr(window, "HWND");
+                if (matchedWindowHandle == IntPtr.Zero)
+                {
+                    ReleaseComObject(window);
+                    continue;
+                }
+
+                if (!PathsEqual(targetPath, normalizedLocationPath) && !TryNavigateExplorerWindow(window, targetPath))
+                {
+                    ReleaseComObject(window);
+                    continue;
+                }
+
+                ReleaseComObject(window);
+                windowHandle = matchedWindowHandle;
+                return true;
+            }
+        }
+        catch
+        {
+            return false;
+        }
+        finally
+        {
+            ReleaseComObject(windows);
+            ReleaseComObject(shell);
+        }
+
+        return false;
     }
 
     private static bool TryFindExplorerWindow(string directory, out IntPtr windowHandle)
@@ -220,6 +335,27 @@ internal sealed class ExplorerService
         return fullName.EndsWith("explorer.exe", StringComparison.OrdinalIgnoreCase);
     }
 
+    private static bool TryNavigateExplorerWindow(object window, string directory)
+    {
+        try
+        {
+            InvokeComMethod(window, "Navigate2", directory);
+            return true;
+        }
+        catch
+        {
+            try
+            {
+                InvokeComMethod(window, "Navigate", directory);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+    }
+
     private static bool TryConvertLocationUrlToPath(string locationUrl, out string path)
     {
         path = string.Empty;
@@ -303,6 +439,40 @@ internal sealed class ExplorerService
     private static bool PathsEqual(string left, string right)
     {
         return string.Equals(left, right, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool ShouldReuseWindowForDirectory(string targetPath, string windowPath)
+    {
+        if (PathsEqual(targetPath, windowPath))
+        {
+            return true;
+        }
+
+        var targetShareRoot = GetUncShareRoot(targetPath);
+        if (string.IsNullOrWhiteSpace(targetShareRoot))
+        {
+            return false;
+        }
+
+        var windowShareRoot = GetUncShareRoot(windowPath);
+        return PathsEqual(targetShareRoot, windowShareRoot);
+    }
+
+    private static string GetUncShareRoot(string path)
+    {
+        var normalized = NormalizePathForComparison(path);
+        if (!normalized.StartsWith(@"\\", StringComparison.Ordinal))
+        {
+            return string.Empty;
+        }
+
+        var parts = normalized[2..].Split('\\', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length < 2)
+        {
+            return normalized;
+        }
+
+        return $@"\\{parts[0]}\{parts[1]}";
     }
 
     private static string QuoteArgument(string value)

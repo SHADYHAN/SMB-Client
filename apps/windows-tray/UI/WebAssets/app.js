@@ -122,6 +122,15 @@ document.querySelector("#copy-material-test-link").addEventListener("click", asy
   }
 });
 
+document.querySelector("#copy-second-material-test-link").addEventListener("click", async () => {
+  try {
+    const result = await send("copySecondMaterialTestLink");
+    applyState(result);
+  } catch (error) {
+    showError(error);
+  }
+});
+
 document.querySelector("#disconnect").addEventListener("click", async () => {
   try {
     applyState(await send("disconnect"));
