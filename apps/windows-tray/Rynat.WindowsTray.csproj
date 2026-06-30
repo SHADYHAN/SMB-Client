@@ -7,7 +7,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>Rynat.WindowsTray</RootNamespace>
     <AssemblyName>Rynat.WindowsTray</AssemblyName>
-    <ApplicationIcon>..\windows\Assets\RynatApp.ico</ApplicationIcon>
+    <ApplicationIcon>Assets\RynatApp.ico</ApplicationIcon>
     <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == ''">win-x64</RuntimeIdentifier>
     <RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
   </PropertyGroup>
@@ -17,7 +17,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="..\windows\Assets\RynatApp.ico" Link="Assets\RynatApp.ico" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Assets\RynatApp.ico" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="UI\WebAssets\**\*.*" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

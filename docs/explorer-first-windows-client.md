@@ -4,20 +4,19 @@
 
 本文档现在是 Windows 端新的主方向。
 
-2026-06-27 决策：当前 WPF 文件工作台已完成内部功能验证，归档为可构建后备线；不再继续把 WPF 作为 Windows 主体验投入 UI / 文件管理器精修。新的 Windows 主线进入 Explorer-first：RYNAT 负责登录、服务器设置、凭据接入、Explorer 右键复制分享链接、链接唤醒、托盘和诊断；Windows Explorer 负责文件浏览、打开、复制、移动、删除、重命名、缩略图和系统文件操作。
+2026-06-27 决策：Windows 主线进入 Explorer-first：RYNAT 负责登录、服务器设置、凭据接入、Explorer 右键复制分享链接、链接唤醒、托盘和诊断；Windows Explorer 负责文件浏览、打开、复制、移动、删除、重命名、缩略图和系统文件操作。
 
-现有 WPF 代码保留在 `apps/windows`，用途是 fallback、调试和复用登录 / 链接 / platform adapter 代码。旧 WinUI 3 代码保留在 `apps/windows-winui-legacy`，仅作历史参考。
+2026-06-30 决策：旧 WPF 和 Tauri Windows 主程序线已移除，避免继续维护多条路线。旧 WinUI 3 代码保留在 `apps/windows-winui-legacy`，仅作历史参考。
 
 当前新线技术栈已在 2026-06-30 调整为更轻的 Windows 托盘主程序：
 
 - `apps/windows-tray`：.NET 10 WinForms 托盘宿主 + WebView2 本地 UI，作为新的 Windows 主线。它负责登录窗口、托盘常驻、本地短链监听、Explorer 唤醒和右键 helper IPC。
 - `crates/rynat-windows-shell-support`：共享 Rust 支撑层，负责 UNC 路径解析、Explorer 打开目标、SMB session 接入边界和右键 helper 请求格式。
-- `apps/windows-shell`：Tauri 2 + Rust backend + Web UI 的实验线 / 参考线，不再作为当前主产品主线。
 - `apps/windows-context-helper`：Explorer 右键薄 helper，第一版只接收 `copy-link <UNC path>` 并输出 / 转发结构化请求。
 
 ## 背景
 
-当前 Windows WPF 客户端已经具备登录、目录树、文件列表、拖拽、预览、复制链接和链接唤醒等能力。但 Windows 端继续自研完整文件管理器，会持续遇到资源管理器级交互细节：
+旧 Windows 自研文件管理器已经验证过登录、目录树、文件列表、拖拽、预览、复制链接和链接唤醒等能力。但 Windows 端继续自研完整文件管理器，会持续遇到资源管理器级交互细节：
 
 - 拖入 / 拖出和同名覆盖行为。
 - 多选、右键、键盘快捷键、焦点状态。
@@ -170,16 +169,7 @@ Explorer-first 以后，Windows 端不再是文件管理器 UI，而是登录、
 - 构建环境压缩到 .NET 10 SDK + WebView2 Runtime，不再要求 Node/npm/Tauri/Rust/MSVC 参与主程序构建。
 - 右键 helper 和链接监听仍保持薄集成，业务逻辑留在主程序。
 
-备选：
-
-```text
-Tauri 2 + Rust backend + Web UI
-WinUI 3 / Windows App SDK + C# + Rust FFI
-```
-
-Tauri 保留为实验线 / 参考线。它适合跨平台现代 UI，但对当前轻客户端而言构建链路偏重。WinUI 3 仍可作为原生 Windows 轻壳备选，但旧 WinUI 3 文件管理器代码不应继承。WPF 不再作为新主架构候选，只保留 fallback / reference。
-
-右键入口无论主程序选 WinForms + WebView2、Tauri 还是 WinUI 3，都应按 Windows Shell 集成单独处理：薄 helper / shell verb / Explorer command 只负责取路径和转发，主程序负责生成链接。
+Tauri、WPF 和旧 WinUI 文件管理器路线不再作为当前主程序路线。右键入口应按 Windows Shell 集成单独处理：薄 helper / shell verb / Explorer command 只负责取路径和转发，主程序负责生成链接。
 
 ### 4. 分享链接唤醒
 
@@ -249,7 +239,7 @@ Explorer 已经处理：
 - 多选和键盘操作。
 - 与其他 Windows 软件之间的 Shell 互操作。
 
-因此 RYNAT 不再需要在 WPF 内复刻这些复杂行为。
+因此 RYNAT 不再需要在自研 Windows 文件管理器内复刻这些复杂行为。
 
 ### 主要风险
 
@@ -329,17 +319,9 @@ Explorer 已经处理：
 
 如果未来产品需要这些能力，应另开 Cloud Files 方向评估，不和 Explorer-first 轻客户端混在同一阶段推进。
 
-## 与现有 WPF 客户端的关系
+## 与旧 Windows 客户端的关系
 
-现有 WPF 客户端不删除，但进入归档 / 后备状态。它可以保留为：
-
-- 登录页基础。
-- 服务器设置基础。
-- 链接生成 / 唤醒逻辑基础。
-- 调试和回退入口。
-- Windows Shell 集成尚未完成前的回退版本。
-
-长期主体验从“WPF 文件管理器”转为“Explorer 文件管理器 + RYNAT 后台服务”。
+旧 WPF 文件工作台和 Tauri 轻壳已从代码树移除。长期主体验从“RYNAT 自研文件管理器”转为“Windows Explorer 文件管理器 + RYNAT 后台服务”。
 
 后续 Windows UI 投入不再放在 WPF 文件列表、预览面板、拖拽模拟上的深度打磨，把精力转到：
 
@@ -355,9 +337,8 @@ Explorer 已经处理：
 当前决策：
 
 ```text
-短期：保留 WPF 客户端可构建、可回退
 当前：用 .NET 10 WinForms + WebView2 实现 Explorer-first MVP，包含登录、SMB / UNC 接入、打开 Explorer、右键复制分享链接、链接唤醒和托盘入口
-长期：如果体验成立，WPF 只保留为诊断 / fallback，不再作为主产品界面
+长期：保持单一 Windows 主程序路线，避免 WPF / Tauri / WinUI 多线并行
 ```
 
 先做 Phase 1 的完整闭环，但右键入口采用薄实现，不追求第一版就完成所有 Windows 11 Shell 细节。这样既不丢掉复制分享链接这个核心能力，也避免把复杂业务放进 Explorer 扩展里。

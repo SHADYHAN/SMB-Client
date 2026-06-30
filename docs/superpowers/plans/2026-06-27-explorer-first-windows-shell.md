@@ -1,22 +1,24 @@
 # Explorer-first Windows Shell Implementation Plan
 
+> 2026-06-30 archive note: This Tauri shell plan was superseded by the .NET tray host plan. `apps/windows-shell` and `apps/windows-shell-lite` have been removed from the active code tree. The active Windows mainline is `apps/windows-tray`; see `docs/superpowers/plans/2026-06-30-windows-tray-webview-shell.md`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build the new Windows Explorer-first client line without extending the archived WPF file manager.
+**Historical goal:** Build the Windows Explorer-first client line without extending the archived WPF file manager.
 
-**Architecture:** Add a small Rust support crate for Windows Shell path handling, SMB session setup contracts, Explorer launch targets, and context-menu request parsing. Use a Tauri 2 shell for login/status/settings UI and a thin native context helper for Explorer right-click copy-link entry; business logic remains in the main app and `rynat-core`.
+**Historical architecture:** Add a small Rust support crate for Windows Shell path handling, SMB session setup contracts, Explorer launch targets, and context-menu request parsing. Use a Tauri 2 shell for login/status/settings UI and a thin native context helper for Explorer right-click copy-link entry; business logic remains in the main app and `rynat-core`.
 
-**Tech Stack:** Rust 2024 workspace, `rynat-core`, Tauri 2 shell, Web UI, Windows Win32 networking APIs for SMB sessions, Windows Shell context entry/helper for right-click activation.
+**Historical tech stack:** Rust 2024 workspace, `rynat-core`, Tauri 2 shell, Web UI, Windows Win32 networking APIs for SMB sessions, Windows Shell context entry/helper for right-click activation.
 
 ---
 
-## File Structure
+## Historical File Structure
 
 - `crates/rynat-windows-shell-support/` — reusable Rust support library shared by the Tauri shell and context helper.
-- `apps/windows-shell/` — new Tauri 2 main app for login, connected state, tray, protocol activation, and Explorer launch.
+- `apps/windows-shell/` — removed Tauri 2 main app experiment for login, connected state, tray, protocol activation, and Explorer launch.
 - `apps/windows-context-helper/` — thin helper executable invoked by Explorer context-menu registration.
 - `docs/explorer-first-windows-client.md` — active product and architecture direction.
-- `README.md` and `apps/windows/README.md` — route contributors away from WPF UI work.
+- `README.md` and `docs/explorer-first-windows-client.md` — route contributors to the active `apps/windows-tray` line.
 
 ## Task 1: Support Crate Skeleton And UNC Mapping
 
@@ -88,7 +90,7 @@ Run: `cargo test -p rynat-windows-shell-support smb_session`
 
 Expected: UNC roots are formatted without needing Windows APIs.
 
-## Task 4: Tauri Shell Scaffold
+## Task 4: Tauri Shell Scaffold（历史，已移除）
 
 **Files:**
 - Create: `apps/windows-shell/package.json`
@@ -112,7 +114,7 @@ Build a simple login/connected layout using Web UI: one focused window, calm neu
 
 Commands can return mocked data at first, but path parsing and Explorer target generation must use `rynat-windows-shell-support`.
 
-## Task 5: Docs And Verification
+## Task 5: Docs And Verification（历史）
 
 **Files:**
 - Modify: `README.md`

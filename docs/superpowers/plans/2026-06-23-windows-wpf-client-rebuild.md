@@ -1,10 +1,10 @@
 # Windows WPF Client Rebuild Status
 
-> 2026-06-27 archive note: This WPF rebuild phase is complete. The WPF client under `apps/windows` is now a fallback / reference implementation; new Windows product work moves to `docs/explorer-first-windows-client.md`.
+> 2026-06-30 archive note: This WPF rebuild phase is complete and the WPF client under `apps/windows` has been removed from the active code tree. New Windows product work moves to `apps/windows-tray` and `docs/explorer-first-windows-client.md`.
 
 **Goal:** Replace the old WinUI 3 Windows client line with a WPF-based native Windows client while keeping Rust `rynat-core` as the shared business layer.
 
-**Current result:** The WPF client is archived as the fallback Windows client under `apps/windows`. The old WinUI 3 implementation is kept under `apps/windows-winui-legacy` for historical reference only.
+**Current result:** The WPF client validated the file-workbench direction, then was removed when Windows moved to Explorer-first. The old WinUI 3 implementation is kept under `apps/windows-winui-legacy` for historical reference only.
 
 ## Completed
 
@@ -45,7 +45,7 @@
 - Windows login preserves the remember-password choice when selecting a profile without an existing stored credential, and typed passwords are saved instead of only updating options.
 - Windows favorites can be added from the current item, opened from the sidebar, and removed through stored quick links; the favorites list also supports Enter to open and Delete to remove.
 - Local short-link browser requests now return an already-activated close page after activation instead of reopening `rynat://`.
-- Current macOS-side validation also covers `scripts/check-bridge-surface.sh`, `scripts/ffi-smoke-test.sh`, and `scripts/windows-app-service-smoke.sh`.
+- Current macOS-side validation covers `scripts/ffi-smoke-test.sh`; the old WPF bridge-surface and Windows app-service smoke scripts were removed with the WPF line.
 - Windows WPF has multi-select remote copy / move / paste plumbing with same-name confirmation, pending Windows SMB validation.
 - Windows image previews now generate lightweight local thumbnails; video previews use Windows Shell poster thumbnails before playback; oversized media skips automatic preview caching.
 - Remote copy/move implementation is isolated in `RemoteCopyMoveService`; paste state and conflict flow are isolated in `RemoteClipboardCoordinator`.
@@ -63,7 +63,7 @@
 - Large videos no longer auto-cache for inline preview; smaller cached videos show a Shell-generated poster before playback.
 - Cross-platform WPF static smoke checks cover startup arguments, local redirect, protocol registration, and single-instance forwarding.
 
-## Remaining Product Work
+## Historical Remaining Product Work
 
 - [ ] Validate and refine remote copy / move / paste / drag/drop on real Windows SMB shares.
 - [ ] Validate and refine in-app drag/drop hover visuals on real Windows, especially cursor feedback and perceived timing.
@@ -73,7 +73,7 @@
 - [ ] Refine favorites sidebar details after Windows real-use testing.
 - [ ] Continue broader keyboard shortcuts and selection polish after real-user testing, especially shortcuts beyond Ctrl+A / Esc / Alt+Up / Backspace.
 
-## Remaining Architecture Work
+## Historical Remaining Architecture Work
 
 - [x] Keep `UI/Shell/ShellViewModel.cs` focused on composition and command routing; login/server-setting coordination now lives in `LoginCoordinator`.
 - [x] Keep heavier recursive/long-running file workflows out of `FileOperationService`; smoke checks guard recursive copy/move and drag/drop workflows in dedicated coordinators/services.
@@ -83,7 +83,7 @@
 
 ## Reference Boundaries
 
-The old WinUI 3 code can be used to understand previous behavior, but should not be copied into the new WPF line wholesale. Avoid reintroducing:
+The old WinUI 3 code can be used to understand previous behavior, but should not be copied into a new active Windows line wholesale. Avoid reintroducing:
 
 - Giant all-purpose window or ViewModel classes.
 - UI-control types in service layer inputs or domain models.

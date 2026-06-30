@@ -40,7 +40,7 @@
 
 - [ ] **Step 1: Create .NET 10 WinForms project**
 
-Use `net10.0-windows`, `UseWindowsForms`, nullable, implicit usings, and the existing `RynatApp.ico` copied from the WPF fallback assets.
+Use `net10.0-windows`, `UseWindowsForms`, nullable, implicit usings, and the existing `RynatApp.ico` copied into the tray project assets.
 
 - [ ] **Step 2: Add tray application context**
 
@@ -115,7 +115,7 @@ Run `dotnet publish -c Release -r win-x64 --self-contained true`, copy output in
 
 - [ ] **Step 3: Update docs**
 
-Document `apps/windows-tray` as the active Windows mainline. Mark Tauri as archived experiment/reference.
+Document `apps/windows-tray` as the active Windows mainline. Mark the old Tauri and WPF main-program lines as removed historical experiments.
 
 ## Self-Review
 

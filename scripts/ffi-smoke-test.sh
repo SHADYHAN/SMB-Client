@@ -6,8 +6,6 @@ LIB_PATH="$ROOT_DIR/target/release/librynat_core.dylib"
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 
-"$ROOT_DIR/scripts/check-bridge-surface.sh"
-
 cargo build -p rynat-core --release >/dev/null
 
 cat >"$TMP_DIR/smoke.c" <<'EOF'

@@ -5,7 +5,6 @@ param(
 $ErrorActionPreference = "Stop"
 
 $root = Split-Path -Parent $PSScriptRoot
-$surfaceCheckScript = Join-Path $root "scripts\check-bridge-surface.ps1"
 $project = Join-Path $root "tools\ffi-smoke-test\windows-dotnet\RynatFfiSmokeTest.csproj"
 $nugetConfig = Join-Path $root "tools\ffi-smoke-test\windows-dotnet\NuGet.Config"
 $projectOutputDir = Join-Path $root "tools\ffi-smoke-test\windows-dotnet\bin\Debug\net8.0"
@@ -29,9 +28,6 @@ Provide a path explicitly:
   powershell -ExecutionPolicy Bypass -File scripts\ffi-smoke-test-windows.ps1 -CoreLibraryPath C:\path\to\rynat_core.dll
 "@
 }
-
-Write-Host "Checking Rust/header/Swift/C# bridge surface..." -ForegroundColor Cyan
-powershell -ExecutionPolicy Bypass -File $surfaceCheckScript
 
 dotnet build $project --configuration Debug --configfile $nugetConfig
 

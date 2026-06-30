@@ -9,4 +9,4 @@ It is retained for:
 - Temporary migration source
 - Regression examples
 
-Do not use this directory as the active Windows client line. The active Windows client is `apps/windows`.
+Do not use this directory as the active Windows client line. The active Windows client is `apps/windows-tray`.
