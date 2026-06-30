@@ -84,12 +84,18 @@ internal sealed class ExplorerService
 
     private static bool TryReuseExistingDirectoryWindow(string directory)
     {
-        if (!TryFindReusableExplorerWindow(directory, out var windowHandle))
+        if (!TryFindReusableExplorerWindow(directory, out var windowHandle, out var navigated))
         {
             return false;
         }
 
         BringWindowToForeground(windowHandle);
+        if (navigated)
+        {
+            TryActivateWindowAtDirectoryWithRetry(windowHandle, directory);
+            BringWindowToForeground(windowHandle);
+        }
+
         return true;
     }
 
@@ -104,27 +110,124 @@ internal sealed class ExplorerService
         return true;
     }
 
-    private static bool TryFindReusableExplorerWindow(string directory, out IntPtr windowHandle)
+    private static bool TryActivateWindowAtDirectoryWithRetry(IntPtr windowHandle, string directory)
+    {
+        for (var attempt = 0; attempt < ActivationAttempts; attempt++)
+        {
+            Thread.Sleep(ActivationDelay);
+            if (TryGetExplorerWindowPath(windowHandle, out var windowPath)
+                && PathsEqual(NormalizePathForComparison(directory), NormalizePathForComparison(windowPath)))
+            {
+                BringWindowToForeground(windowHandle);
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool TryGetExplorerWindowPath(IntPtr windowHandle, out string path)
     {
         if (Thread.CurrentThread.GetApartmentState() == ApartmentState.STA)
         {
-            return TryFindReusableExplorerWindowCore(directory, out windowHandle);
+            return TryGetExplorerWindowPathCore(windowHandle, out path);
+        }
+
+        var found = false;
+        var result = string.Empty;
+        var thread = new Thread(() => found = TryGetExplorerWindowPathCore(windowHandle, out result));
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+
+        path = result;
+        return found;
+    }
+
+    private static bool TryGetExplorerWindowPathCore(IntPtr windowHandle, out string path)
+    {
+        path = string.Empty;
+        object? shell = null;
+        object? windows = null;
+        try
+        {
+            var shellType = Type.GetTypeFromProgID("Shell.Application");
+            if (shellType is null)
+            {
+                return false;
+            }
+
+            shell = Activator.CreateInstance(shellType);
+            if (shell is null)
+            {
+                return false;
+            }
+
+            windows = shellType.InvokeMember(
+                "Windows",
+                BindingFlags.InvokeMethod,
+                binder: null,
+                target: shell,
+                args: null,
+                culture: CultureInfo.InvariantCulture);
+
+            foreach (var window in EnumerateComCollection(windows))
+            {
+                if (!IsExplorerWindow(window))
+                {
+                    ReleaseComObject(window);
+                    continue;
+                }
+
+                var matchedWindowHandle = GetComIntPtr(window, "HWND");
+                if (matchedWindowHandle != windowHandle)
+                {
+                    ReleaseComObject(window);
+                    continue;
+                }
+
+                var locationUrl = GetComString(window, "LocationURL");
+                ReleaseComObject(window);
+                return TryConvertLocationUrlToPath(locationUrl, out path);
+            }
+        }
+        catch
+        {
+            return false;
+        }
+        finally
+        {
+            ReleaseComObject(windows);
+            ReleaseComObject(shell);
+        }
+
+        return false;
+    }
+
+    private static bool TryFindReusableExplorerWindow(string directory, out IntPtr windowHandle, out bool navigated)
+    {
+        if (Thread.CurrentThread.GetApartmentState() == ApartmentState.STA)
+        {
+            return TryFindReusableExplorerWindowCore(directory, out windowHandle, out navigated);
         }
 
         var found = false;
         var handle = IntPtr.Zero;
-        var thread = new Thread(() => found = TryFindReusableExplorerWindowCore(directory, out handle));
+        var didNavigate = false;
+        var thread = new Thread(() => found = TryFindReusableExplorerWindowCore(directory, out handle, out didNavigate));
         thread.SetApartmentState(ApartmentState.STA);
         thread.Start();
         thread.Join();
 
         windowHandle = handle;
+        navigated = didNavigate;
         return found;
     }
 
-    private static bool TryFindReusableExplorerWindowCore(string directory, out IntPtr windowHandle)
+    private static bool TryFindReusableExplorerWindowCore(string directory, out IntPtr windowHandle, out bool navigated)
     {
         windowHandle = IntPtr.Zero;
+        navigated = false;
         var targetPath = NormalizePathForComparison(directory);
         if (string.IsNullOrWhiteSpace(targetPath))
         {
@@ -184,10 +287,15 @@ internal sealed class ExplorerService
                     continue;
                 }
 
-                if (!PathsEqual(targetPath, normalizedLocationPath) && !TryNavigateExplorerWindow(window, targetPath))
+                if (!PathsEqual(targetPath, normalizedLocationPath))
                 {
-                    ReleaseComObject(window);
-                    continue;
+                    if (!TryNavigateExplorerWindow(window, targetPath))
+                    {
+                        ReleaseComObject(window);
+                        continue;
+                    }
+
+                    navigated = true;
                 }
 
                 ReleaseComObject(window);
