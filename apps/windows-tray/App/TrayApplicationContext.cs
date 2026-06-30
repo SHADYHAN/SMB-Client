@@ -79,11 +79,12 @@ internal sealed class TrayApplicationContext : ApplicationContext
 
     public async Task<string> CopyTestLinkAsync()
     {
-        var path = $@"\\{_state.ServerHost.Trim().Trim('\\')}\临时文件夹\123";
-        var link = _shareLinkService.CreateShareLink(path, "dir");
-        await ClipboardService.SetTextAsync(link);
-        _state.LastActivation = $"已复制测试链接: {link}";
-        return link;
+        return await CopyDirectoryLinkAsync("临时文件夹", "123");
+    }
+
+    public async Task<string> CopyMaterialTestLinkAsync()
+    {
+        return await CopyDirectoryLinkAsync("Pro素材", "B-热门品种");
     }
 
     public void HideWindow()
@@ -129,10 +130,21 @@ internal sealed class TrayApplicationContext : ApplicationContext
         var menu = new ContextMenuStrip();
         menu.Items.Add("打开 RYNAT", null, (_, _) => ShowWindow());
         menu.Items.Add("打开资源管理器", null, async (_, _) => await OpenExplorerAsync());
-        menu.Items.Add("复制测试链接", null, async (_, _) => await CopyTestLinkAsync());
+        menu.Items.Add("复制临时文件夹测试链接", null, async (_, _) => await CopyTestLinkAsync());
+        menu.Items.Add("复制 Pro 素材测试链接", null, async (_, _) => await CopyMaterialTestLinkAsync());
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("退出", null, (_, _) => ExitThread());
         return menu;
+    }
+
+    private async Task<string> CopyDirectoryLinkAsync(params string[] pathSegments)
+    {
+        var host = _state.ServerHost.Trim().Trim('\\');
+        var path = $@"\\{host}\{string.Join(@"\", pathSegments)}";
+        var link = _shareLinkService.CreateShareLink(path, "dir");
+        await ClipboardService.SetTextAsync(link);
+        _state.LastActivation = $"已复制测试链接: {path}";
+        return link;
     }
 
     private static Icon LoadAppIcon()

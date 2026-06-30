@@ -62,6 +62,7 @@ internal sealed class ShellWindow : Form
                 "disconnect" => _context.Disconnect(),
                 "openExplorer" => await RunAndReturnStateAsync(_context.OpenExplorerAsync),
                 "copyTestLink" => new { link = await _context.CopyTestLinkAsync(), state = _context.GetState() },
+                "copyMaterialTestLink" => new { link = await _context.CopyMaterialTestLinkAsync(), state = _context.GetState() },
                 "hideWindow" => HideAndReturnState(),
                 _ => new { error = $"unknown command: {message.Command}", state = _context.GetState() }
             };
