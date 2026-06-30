@@ -83,7 +83,6 @@ function render() {
 }
 
 function renderLogin() {
-  document.querySelector("#login-server-label").textContent = `默认服务器：${state.serverName || "未命名"} · ${state.serverHost || "-"}`;
   document.querySelector("#username").value = state.username || "";
   document.querySelector("#password").value = state.hasStoredPassword ? storedPasswordPlaceholder : "";
   document.querySelector("#remember-password").checked = Boolean(state.rememberPassword || state.autoLogin);
@@ -104,7 +103,6 @@ function renderShell() {
   document.querySelector("#state-smb-session").textContent = state.smbSessionStatus || "-";
   document.querySelector("#state-redirect").textContent = state.localRedirectStatus || "-";
   document.querySelector("#state-context").textContent = state.contextIpcStatus || "-";
-  document.querySelector("#last-activation").textContent = state.lastActivation || "暂无";
 }
 
 function renderServerPage() {
@@ -141,8 +139,6 @@ function renderServerPage() {
 function renderGeneralPage() {
   document.querySelector("#start-with-windows").checked = Boolean(state.general.startWithWindows);
   document.querySelector("#copy-link-hotkey").value = state.general.copyLinkHotkey || "";
-  document.querySelector("#status-text").textContent = state.status || "-";
-  document.querySelector("#general-last-activation").textContent = state.lastActivation || "暂无";
 }
 
 function renderServiceStatus() {
@@ -275,44 +271,9 @@ document.querySelector("#open-explorer").addEventListener("click", async () => {
   }
 });
 
-document.querySelector("#copy-test-link").addEventListener("click", async () => {
-  try {
-    const result = await send("copyTestLink");
-    applyState(result);
-  } catch (error) {
-    showError(error);
-  }
-});
-
-document.querySelector("#copy-material-test-link").addEventListener("click", async () => {
-  try {
-    const result = await send("copyMaterialTestLink");
-    applyState(result);
-  } catch (error) {
-    showError(error);
-  }
-});
-
-document.querySelector("#copy-second-material-test-link").addEventListener("click", async () => {
-  try {
-    const result = await send("copySecondMaterialTestLink");
-    applyState(result);
-  } catch (error) {
-    showError(error);
-  }
-});
-
 document.querySelector("#disconnect").addEventListener("click", async () => {
   try {
     applyState(await send("disconnect"));
-  } catch (error) {
-    showError(error);
-  }
-});
-
-document.querySelector("#hide-button").addEventListener("click", async () => {
-  try {
-    await send("hideWindow");
   } catch (error) {
     showError(error);
   }

@@ -191,26 +191,6 @@ internal sealed class TrayApplicationContext : ApplicationContext
         return Task.CompletedTask;
     }
 
-    public async Task<string> CopyTestLinkAsync()
-    {
-        return await CopyDirectoryLinkAsync("临时文件夹", "123");
-    }
-
-    public async Task<string> CopyMaterialTestLinkAsync()
-    {
-        return await CopyDirectoryLinkAsync("Pro素材", "B-热门品种");
-    }
-
-    public async Task<string> CopySecondMaterialTestLinkAsync()
-    {
-        return await CopyDirectoryLinkAsync("Pro素材", "E-新方向");
-    }
-
-    public void HideWindow()
-    {
-        _window?.Hide();
-    }
-
     public void ShowWindow()
     {
         if (_window is null || _window.IsDisposed)
@@ -248,24 +228,11 @@ internal sealed class TrayApplicationContext : ApplicationContext
     {
         var menu = new ContextMenuStrip();
         menu.Items.Add("打开 RYNAT", null, (_, _) => ShowWindow());
-        menu.Items.Add("打开资源管理器", null, async (_, _) => await OpenExplorerAsync());
-        menu.Items.Add("复制临时文件夹 123 测试链接", null, async (_, _) => await CopyTestLinkAsync());
-        menu.Items.Add("复制 Pro 素材 B 测试链接", null, async (_, _) => await CopyMaterialTestLinkAsync());
-        menu.Items.Add("复制 Pro 素材 E 测试链接", null, async (_, _) => await CopySecondMaterialTestLinkAsync());
+        menu.Items.Add("打开共享网盘", null, async (_, _) => await OpenExplorerAsync());
+        menu.Items.Add("退出登录", null, (_, _) => Disconnect());
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("退出", null, (_, _) => ExitThread());
         return menu;
-    }
-
-    private async Task<string> CopyDirectoryLinkAsync(params string[] pathSegments)
-    {
-        var host = _state.ServerHost.Trim().Trim('\\');
-        var path = $@"\\{host}\{string.Join(@"\", pathSegments)}";
-        var link = _shareLinkService.CreateShareLink(path, "dir");
-        await ClipboardService.SetTextAsync(link);
-        _state.LastActivation = $"已复制测试链接: {path}";
-        NotifyStateChanged();
-        return link;
     }
 
     private static Icon LoadAppIcon()

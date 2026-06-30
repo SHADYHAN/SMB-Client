@@ -7,5 +7,10 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>Rynat.WindowsContextHelper</RootNamespace>
     <AssemblyName>Rynat.WindowsContextHelper</AssemblyName>
+    <ApplicationIcon>..\windows-tray\Assets\RynatApp.ico</ApplicationIcon>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Content Include="..\windows-tray\Assets\RynatApp.ico" Link="Assets\RynatApp.ico" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

@@ -65,10 +65,6 @@ internal sealed class ShellWindow : Form
                 "setDefaultServer" => _context.SetDefaultServer(message.ServerId ?? string.Empty),
                 "saveGeneralSettings" => _context.SaveGeneralSettings(message.General ?? new GeneralSettings()),
                 "openExplorer" => await RunAndReturnStateAsync(_context.OpenExplorerAsync),
-                "copyTestLink" => new { link = await _context.CopyTestLinkAsync(), state = _context.GetState() },
-                "copyMaterialTestLink" => new { link = await _context.CopyMaterialTestLinkAsync(), state = _context.GetState() },
-                "copySecondMaterialTestLink" => new { link = await _context.CopySecondMaterialTestLinkAsync(), state = _context.GetState() },
-                "hideWindow" => HideAndReturnState(),
                 _ => new { error = $"unknown command: {message.Command}", state = _context.GetState() }
             };
 
@@ -78,12 +74,6 @@ internal sealed class ShellWindow : Form
         {
             PostMessage(message?.Id, new { error = ex.Message, state = _context.GetState() });
         }
-    }
-
-    private ShellState HideAndReturnState()
-    {
-        _context.HideWindow();
-        return _context.GetState();
     }
 
     private async Task<ShellState> RunAndReturnStateAsync(Func<Task> action)

@@ -9,9 +9,8 @@
   <body>
     <main id="login-screen" class="login-screen">
       <section class="login-card">
-        <div class="login-gear">R</div>
+        <img class="login-logo" src="../../Assets/RynatApp.ico" alt="RYNAT" />
         <h1>RYNAT 共享网盘</h1>
-        <p id="login-server-label" class="login-server">默认服务器：加载中</p>
 
         <form id="login-form" class="login-form">
           <label class="field">
@@ -63,22 +62,18 @@
       <section class="content">
         <header class="topbar">
           <div>
-            <p class="eyebrow">Explorer-first</p>
             <h1 id="page-title">服务器</h1>
           </div>
           <div class="topbar-actions">
-            <button id="open-explorer" class="secondary-button" type="button">打开资源管理器</button>
-            <button id="hide-button" class="ghost-button" type="button">最小化</button>
+            <button id="open-explorer" class="primary-button" type="button">打开共享网盘</button>
+            <button id="disconnect" class="ghost-button" type="button">退出登录</button>
           </div>
         </header>
 
         <section id="server-page" class="page-grid">
-          <section class="panel">
+          <section class="panel server-list-panel">
             <div class="panel-heading row-heading">
-              <div>
-                <h2>服务器列表</h2>
-                <p>登录页会使用默认服务器。服务器地址变更时，会清空该服务器已保存的用户名和密码。</p>
-              </div>
+              <h2>服务器列表</h2>
               <button id="add-server" class="secondary-button" type="button">新增服务器</button>
             </div>
             <div id="server-list" class="server-list"></div>
@@ -87,7 +82,6 @@
           <section class="panel">
             <div class="panel-heading">
               <h2 id="server-form-title">编辑服务器</h2>
-              <p>设置默认服务器后，登录页只需要输入用户名和密码。</p>
             </div>
             <form id="server-form" class="form-grid">
               <input id="server-id" type="hidden" />
@@ -111,17 +105,7 @@
           </section>
 
           <section class="panel span-2">
-            <div class="panel-heading">
-              <h2>当前连接</h2>
-              <p id="connected-summary">服务器状态正常。</p>
-            </div>
-            <div class="action-row">
-              <button id="copy-test-link" class="secondary-button" type="button">复制临时文件夹 123</button>
-              <button id="copy-material-test-link" class="secondary-button" type="button">复制 Pro 素材 B</button>
-              <button id="copy-second-material-test-link" class="secondary-button" type="button">复制 Pro 素材 E</button>
-              <button id="disconnect" class="ghost-button" type="button">退出登录</button>
-            </div>
-            <dl class="status-grid">
+            <dl class="status-grid compact-status">
               <div>
                 <dt>服务器</dt>
                 <dd id="state-host">-</dd>
@@ -143,8 +127,8 @@
                 <dd id="state-context">-</dd>
               </div>
               <div>
-                <dt>最近动作</dt>
-                <dd id="last-activation">暂无</dd>
+                <dt>状态</dt>
+                <dd id="connected-summary">-</dd>
               </div>
             </dl>
           </section>
@@ -154,7 +138,6 @@
           <section class="panel">
             <div class="panel-heading">
               <h2>启动与快捷键</h2>
-              <p>这些设置后续会由正式安装包和系统热键接管。</p>
             </div>
             <form id="general-form" class="form-grid">
               <label class="check-row">
@@ -167,14 +150,6 @@
               </label>
               <button class="primary-button" type="submit">保存通用设置</button>
             </form>
-          </section>
-
-          <section class="panel">
-            <div class="panel-heading">
-              <h2>运行状态</h2>
-              <p id="status-text">加载中</p>
-            </div>
-            <div class="log-line" id="general-last-activation">暂无</div>
           </section>
         </section>
       </section>

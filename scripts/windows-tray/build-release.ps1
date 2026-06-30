@@ -66,12 +66,15 @@ function Convert-ToRegValue([string]$Value) {
 
 function Write-ContextMenuScripts([string]$PublishRoot) {
     $helperPath = Join-Path $PublishRoot "Rynat.WindowsContextHelper.exe"
+    $iconPath = Join-Path $PublishRoot "Assets\RynatApp.ico"
     $escapedHelper = Convert-ToRegValue $helperPath
+    $escapedIcon = Convert-ToRegValue $iconPath
     $menuText = "复制 RYNAT 分享链接"
 
     $installPs1 = @"
 `$ErrorActionPreference = "Stop"
 `$helperPath = Join-Path `$PSScriptRoot "Rynat.WindowsContextHelper.exe"
+`$iconPath = Join-Path `$PSScriptRoot "Assets\RynatApp.ico"
 if (-not (Test-Path `$helperPath)) {
     throw "Cannot find RYNAT context helper: `$helperPath"
 }
@@ -84,7 +87,7 @@ if (-not (Test-Path `$helperPath)) {
 foreach (`$entry in `$entries) {
     `$key = [Microsoft.Win32.Registry]::CurrentUser.CreateSubKey(`$entry.Key)
     `$key.SetValue("", "$menuText")
-    `$key.SetValue("Icon", '"' + `$helperPath + '",0')
+    `$key.SetValue("Icon", '"' + `$iconPath + '"')
     `$key.Close()
 
     `$commandKey = [Microsoft.Win32.Registry]::CurrentUser.CreateSubKey(`$entry.Key + "\command")
@@ -121,14 +124,14 @@ Windows Registry Editor Version 5.00
 
 [HKEY_CURRENT_USER\Software\Classes\*\shell\RynatCopyLink]
 @="$menuText"
-"Icon"="\"$escapedHelper\",0"
+"Icon"="\"$escapedIcon\""
 
 [HKEY_CURRENT_USER\Software\Classes\*\shell\RynatCopyLink\command]
 @="\"$escapedHelper\" copy-link \"%1\" --kind file"
 
 [HKEY_CURRENT_USER\Software\Classes\Directory\shell\RynatCopyLink]
 @="$menuText"
-"Icon"="\"$escapedHelper\",0"
+"Icon"="\"$escapedIcon\""
 
 [HKEY_CURRENT_USER\Software\Classes\Directory\shell\RynatCopyLink\command]
 @="\"$escapedHelper\" copy-link \"%1\" --kind directory"
