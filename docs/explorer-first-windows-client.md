@@ -8,10 +8,11 @@
 
 现有 WPF 代码保留在 `apps/windows`，用途是 fallback、调试和复用登录 / 链接 / platform adapter 代码。旧 WinUI 3 代码保留在 `apps/windows-winui-legacy`，仅作历史参考。
 
-当前新线已开始落地：
+当前新线技术栈已在 2026-06-30 调整为更轻的 Windows 托盘主程序：
 
+- `apps/windows-tray`：.NET 10 WinForms 托盘宿主 + WebView2 本地 UI，作为新的 Windows 主线。它负责登录窗口、托盘常驻、本地短链监听、Explorer 唤醒和右键 helper IPC。
 - `crates/rynat-windows-shell-support`：共享 Rust 支撑层，负责 UNC 路径解析、Explorer 打开目标、SMB session 接入边界和右键 helper 请求格式。
-- `apps/windows-shell`：Tauri 2 + Rust backend + Web UI 的轻壳入口。
+- `apps/windows-shell`：Tauri 2 + Rust backend + Web UI 的实验线 / 参考线，不再作为当前主产品主线。
 - `apps/windows-context-helper`：Explorer 右键薄 helper，第一版只接收 `copy-link <UNC path>` 并输出 / 转发结构化请求。
 
 ## 背景
@@ -155,28 +156,30 @@ Explorer 右键
 
 ## 技术栈判断
 
-Explorer-first 以后，Windows 端不再是文件管理器 UI，而是登录、设置、托盘、链接和 Shell 集成轻壳。主程序可以优先评估：
+Explorer-first 以后，Windows 端不再是文件管理器 UI，而是登录、设置、托盘、链接和 Shell 集成轻壳。2026-06-30 决策：主程序采用：
 
 ```text
-Tauri 2 + Rust backend + Web UI
+.NET 10 WinForms Tray Host + WebView2 Local UI
 ```
 
 推荐理由：
 
-- UI 由 Web 技术实现，更容易做出接近 macOS 端的简约精致感。
-- 后端是 Rust，可以更直接复用 `rynat-core`。
-- 登录、设置、连接状态、诊断页都属于轻 UI，不需要 WPF 文件表格和 TreeView 架构。
-- 托盘、深链接、单实例、打开 Explorer 等轻壳能力更符合 Tauri 的职责边界。
+- 产品实际形态是登录一次后最小化常驻，不需要完整跨平台应用壳。
+- WinForms 负责托盘、单实例、注册表、Explorer 打开和本地监听，贴近 Windows 系统工具模型。
+- WebView2 只负责登录 / 设置 / 状态等可见界面，避免纯 WinForms 控件的老旧观感。
+- 构建环境压缩到 .NET 10 SDK + WebView2 Runtime，不再要求 Node/npm/Tauri/Rust/MSVC 参与主程序构建。
+- 右键 helper 和链接监听仍保持薄集成，业务逻辑留在主程序。
 
 备选：
 
 ```text
+Tauri 2 + Rust backend + Web UI
 WinUI 3 / Windows App SDK + C# + Rust FFI
 ```
 
-WinUI 3 仍可作为原生 Windows 轻壳备选，但旧 WinUI 3 文件管理器代码不应继承。WPF 不再作为新主架构候选，只保留 fallback / reference。
+Tauri 保留为实验线 / 参考线。它适合跨平台现代 UI，但对当前轻客户端而言构建链路偏重。WinUI 3 仍可作为原生 Windows 轻壳备选，但旧 WinUI 3 文件管理器代码不应继承。WPF 不再作为新主架构候选，只保留 fallback / reference。
 
-右键入口无论主程序选 Tauri 还是 WinUI 3，都应按 Windows Shell 集成单独处理：薄 helper / shell verb / Explorer command 只负责取路径和转发，主程序负责生成链接。
+右键入口无论主程序选 WinForms + WebView2、Tauri 还是 WinUI 3，都应按 Windows Shell 集成单独处理：薄 helper / shell verb / Explorer command 只负责取路径和转发，主程序负责生成链接。
 
 ### 4. 分享链接唤醒
 
@@ -353,7 +356,7 @@ Explorer 已经处理：
 
 ```text
 短期：保留 WPF 客户端可构建、可回退
-当前：实现 Explorer-first MVP，包含登录、SMB / UNC 接入、打开 Explorer、右键复制分享链接、链接唤醒和托盘入口
+当前：用 .NET 10 WinForms + WebView2 实现 Explorer-first MVP，包含登录、SMB / UNC 接入、打开 Explorer、右键复制分享链接、链接唤醒和托盘入口
 长期：如果体验成立，WPF 只保留为诊断 / fallback，不再作为主产品界面
 ```
 

@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>RYNAT</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark">R</div>
+          <div>
+            <strong>RYNAT</strong>
+            <span>Windows</span>
+          </div>
+        </div>
+
+        <nav class="nav">
+          <button class="nav-item active" type="button">服务器</button>
+          <button class="nav-item" type="button">分享链接</button>
+          <button class="nav-item" type="button">诊断</button>
+        </nav>
+
+        <div class="sidebar-footer">
+          <span id="service-dot" class="service-dot"></span>
+          <span id="service-label">服务启动中</span>
+        </div>
+      </aside>
+
+      <section class="content">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Explorer-first</p>
+            <h1 id="page-title">连接服务器</h1>
+          </div>
+          <button id="hide-button" class="ghost-button" type="button">最小化</button>
+        </header>
+
+        <section id="login-view" class="panel">
+          <div class="panel-heading">
+            <h2>登录</h2>
+            <p>登录后 RYNAT 会保持后台运行，并打开 Windows Explorer。</p>
+          </div>
+
+          <form id="login-form" class="form-grid">
+            <label>
+              <span>服务器</span>
+              <input id="server-host" autocomplete="off" value="192.168.102.136" />
+            </label>
+            <label>
+              <span>用户名</span>
+              <input id="username" autocomplete="username" />
+            </label>
+            <label>
+              <span>密码</span>
+              <input id="password" type="password" autocomplete="current-password" />
+            </label>
+            <label class="check-row">
+              <input id="remember-password" type="checkbox" checked />
+              <span>记住密码</span>
+            </label>
+            <button class="primary-button" type="submit">登录并打开资源管理器</button>
+          </form>
+        </section>
+
+        <section id="dashboard-view" class="panel hidden">
+          <div class="panel-heading">
+            <h2>已连接</h2>
+            <p id="connected-summary">服务器状态正常。</p>
+          </div>
+
+          <div class="action-row">
+            <button id="open-explorer" class="primary-button" type="button">打开资源管理器</button>
+            <button id="copy-test-link" class="secondary-button" type="button">复制测试链接</button>
+            <button id="disconnect" class="ghost-button" type="button">退出登录</button>
+          </div>
+
+          <dl class="status-grid">
+            <div>
+              <dt>服务器</dt>
+              <dd id="state-host">-</dd>
+            </div>
+            <div>
+              <dt>用户</dt>
+              <dd id="state-user">-</dd>
+            </div>
+            <div>
+              <dt>短链服务</dt>
+              <dd id="state-redirect">-</dd>
+            </div>
+            <div>
+              <dt>右键 IPC</dt>
+              <dd id="state-context">-</dd>
+            </div>
+          </dl>
+        </section>
+
+        <section class="panel compact">
+          <div class="panel-heading">
+            <h2>运行状态</h2>
+            <p id="status-text">加载中</p>
+          </div>
+          <div id="last-activation" class="log-line">暂无</div>
+        </section>
+      </section>
+    </main>
+
+    <script src="./app.js"></script>
+  </body>
+</html>

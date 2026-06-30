@@ -37,9 +37,11 @@ apps/windows/           Windows WPF 后备客户端（C# / .NET 8，已归档为
   Services/             登录、目录、文件操作、链接、预览、服务器配置等业务流程
   Platform/             剪贴板、对话框、Shell 拖拽、协议注册、单实例、本地中转
   UI/                   WPF Views / ViewModels
-apps/windows-shell/     Explorer-first Windows 轻壳（Tauri 2 + Rust + Web UI）
-  src-tauri/            登录、SMB session、Explorer 打开、链接/右键命令入口
-  src/                  轻量登录与连接状态 UI
+apps/windows-tray/      Explorer-first Windows 主线（.NET 10 WinForms 托盘宿主 + WebView2 UI）
+  App/                  托盘生命周期、运行状态
+  UI/                   WebView2 本地登录 / 设置 / 状态界面
+  Services/             Explorer 打开、本地短链、右键 helper IPC
+apps/windows-shell/     Explorer-first Windows Tauri 实验线 / 参考线
 apps/windows-context-helper/ Explorer 右键薄 helper，负责接收选中路径并转发
 apps/windows-winui-legacy/ 旧 WinUI 3 实现，仅作历史参考
 crates/rynat-windows-shell-support/ Explorer-first Windows 共享支撑逻辑
@@ -110,28 +112,34 @@ scripts/build-macos-client.sh
 # Windows WPF 后备客户端构建（需 Windows + .NET 8 SDK + Rust）
 dotnet build apps/windows/Rynat.WindowsClient.csproj
 
-# Windows Explorer-first 支撑逻辑测试
+# Windows Explorer-first WinForms + WebView2 主线构建检查
+scripts\windows-tray\build-check.bat
+
+# Windows Explorer-first WinForms + WebView2 主线发布
+scripts\windows-tray\build-release.bat
+
+# Windows Explorer-first 支撑逻辑测试（右键 helper / 路径映射参考线）
 cargo test -p rynat-windows-shell-support --locked --offline
 
 # Windows Explorer 右键 helper 契约测试
 cargo run -p rynat-windows-context-helper --locked --offline -- copy-link "\\\\nas.local\\Media\\demo.mp4"
 
-# Tauri Windows 轻壳 Rust 侧检查
+# Tauri Windows 轻壳 Rust 侧检查（实验线 / 参考线）
 cargo check --manifest-path apps/windows-shell/src-tauri/Cargo.toml --offline
 
-# Windows Explorer-first 新线检查脚本（在 Windows PowerShell 运行）
+# 旧 Tauri Explorer-first 实验线检查脚本
 scripts\windows-shell\build-check.ps1
 
 # 如需连同历史 core 全量测试一起跑
 scripts\windows-shell\build-check.ps1 -FullWorkspace
 
-# Windows Explorer-first 一键拉取最新代码并检查（可双击 bat）
+# 旧 Tauri Explorer-first 一键拉取最新代码并检查（可双击 bat）
 scripts\windows-shell\pull-build-check.bat
 
-# Windows Explorer-first 生成本地 release 产物（安装包 + helper exe + 注册表预览）
+# 旧 Tauri Explorer-first 生成本地 release 产物（安装包 + helper exe + 注册表预览）
 scripts\windows-shell\build-release.bat
 
-# Windows Explorer-first 快速增量构建（默认会清理旧 target/dist/release 输出）
+# 旧 Tauri Explorer-first 快速增量构建（默认会清理旧 target/dist/release 输出）
 scripts\windows-shell\build-release.bat -NoClean
 
 # 生成协议和 Explorer 右键注册表预览文件（先审查，再导入）
@@ -148,7 +156,9 @@ scripts\pull-build-run-windows.bat
 
 macOS 构建脚本先 `cargo build -p rynat-core --release`，再把 `librynat_core.dylib` 打包进 `.app`。Windows 工程 `csproj` 内置 cargo 构建目标，编译 Rust Core 并复制 `rynat_core.dll`。
 
-Explorer-first Windows release 脚本会把常用产物复制到 `build\windows-shell-release\<yyyyMMdd-HHmmss>\`，并写入 `build\windows-shell-release\latest.txt`。其中 `installers\` 放 Tauri `.msi` / NSIS `.exe` 安装包，`bin\` 放主程序 exe 和 `rynat-windows-context-helper.exe`，`registration-preview\` 放导入前需要审查的 `.reg` 文件。
+Windows Tray 主线 release 脚本会把发布产物复制到 `build\windows-tray-release\<yyyyMMdd-HHmmss>\`，并写入 `build\windows-tray-release\latest.txt`。
+
+旧 Tauri Explorer-first release 脚本会把常用产物复制到 `build\windows-shell-release\<yyyyMMdd-HHmmss>\`，并写入 `build\windows-shell-release\latest.txt`。其中 `installers\` 放 Tauri `.msi` / NSIS `.exe` 安装包，`bin\` 放主程序 exe 和 `rynat-windows-context-helper.exe`，`registration-preview\` 放导入前需要审查的 `.reg` 文件。
 
 Explorer-first Windows release 脚本默认会先清理 `apps\windows-shell\dist`、`apps\windows-shell\src-tauri\target`、workspace `target` 和旧的 `build\windows-shell-release` 输出，避免旧包 / PDB / 前端缓存影响验证。只有明确要快速增量构建时才加 `-NoClean`。只有 npm 依赖本身疑似损坏时再加 `-CleanNodeModules`，因为它会删除 `apps\windows-shell\node_modules` 并重新安装依赖。
 
@@ -178,8 +188,8 @@ scripts/ffi-smoke-test-windows.ps1
 - Windows：进入 Explorer-first Phase 1，验证登录后接入 Windows SMB / UNC 并打开 Explorer 到目标共享或目录。
 - Windows：在 Phase 1 内完成薄 Explorer 右键入口，把“复制 RYNAT 分享链接”委托给 RYNAT 主程序处理。
 - Windows：验证链接唤醒后打开 Explorer 到父目录并尽量选中文件；未登录时先登录再继续消费待处理链接。
-- Windows：主程序技术栈优先评估 Tauri 2 + Rust backend + Web UI；右键入口仍按 Windows Shell 原生薄集成独立处理。
-- Windows：已新增 `rynat-windows-shell-support`、`apps/windows-shell` 和 `apps/windows-context-helper` 作为 Explorer-first 新线起点。
+- Windows：主程序技术栈切换为 `.NET 10 WinForms Tray Host + WebView2 Local UI`；右键入口仍按 Windows Shell 原生薄集成独立处理。
+- Windows：新增 `apps/windows-tray` 作为 Explorer-first 主线；`apps/windows-shell` 保留为 Tauri 实验线 / 参考线。
 - Windows：WPF 后备线只做阻断构建和关键安全问题修复，不再继续自研文件管理器 UI 精修。
 - macOS：按 `docs/macos-architecture-evolution-plan.md` 渐进拆分桥接、服务和状态。
 - 双平台：保持 `include/rynat_core.h`、Swift bridge、C# bridge 与 Rust ABI 同步。
@@ -189,7 +199,8 @@ scripts/ffi-smoke-test-windows.ps1
 - `crates/rynat-core` — 共享业务协议与执行能力：SMB、链接、配置、凭据、任务、错误码、预览计划。
 - `crates/rynat-windows-shell-support` — Explorer-first Windows 路径映射、Explorer 目标、SMB session 和右键 helper 契约。
 - `apps/macos` — macOS AppKit 主客户端。
-- `apps/windows-shell` / `apps/windows-context-helper` — Windows Explorer-first 新主线。
+- `apps/windows-tray` / `apps/windows-context-helper` — Windows Explorer-first 新主线。
+- `apps/windows-shell` — Tauri Explorer-first 实验线 / 参考线。
 - `apps/windows` — WPF fallback / reference，不再承载 Windows 主体验。
 - `include/rynat_core.h` — 跨平台 C ABI 头文件，是两端 FFI 的唯一契约源。
 - `docs/` — 架构方向、实施状态和后续计划。
