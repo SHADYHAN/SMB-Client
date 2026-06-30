@@ -6,7 +6,7 @@
 
 2026-06-27 决策：Windows 主线进入 Explorer-first：RYNAT 负责登录、服务器设置、凭据接入、Explorer 右键复制分享链接、链接唤醒、托盘和诊断；Windows Explorer 负责文件浏览、打开、复制、移动、删除、重命名、缩略图和系统文件操作。
 
-2026-06-30 决策：旧 WPF 和 Tauri Windows 主程序线已移除，避免继续维护多条路线。旧 WinUI 3 代码保留在 `apps/windows-winui-legacy`，仅作历史参考。
+2026-06-30 决策：旧 WinUI 3、WPF 和 Tauri Windows 主程序线已移除，避免继续维护多条路线。历史结论保留在文档中，代码树只保留 Explorer-first 主线。
 
 当前新线技术栈已在 2026-06-30 调整为更轻的 Windows 托盘主程序：
 
