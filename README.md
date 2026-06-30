@@ -119,7 +119,7 @@ macOS 构建脚本先 `cargo build -p rynat-core --release`，再把 `librynat_c
 
 Windows Tray 主线 release 脚本会把发布产物复制到 `build\windows-tray-release\<yyyyMMdd-HHmmss>\`，并写入 `build\windows-tray-release\latest.txt`。
 默认发布为不指定 RID 的 framework-dependent 产物，依赖目标机器已安装 .NET 10 Windows Desktop Runtime / SDK；如需固定架构或自包含产物，可运行 `scripts\windows-tray\build-release.bat -RuntimeIdentifier win-x64` 或 `scripts\windows-tray\build-release.bat -RuntimeIdentifier win-x64 -SelfContained`。
-安装包脚本使用 Inno Setup 6，会读取 `latest.txt` 指向的发布目录，生成安装程序并注册右键 helper、开始菜单和桌面快捷方式。
+安装包脚本使用 Inno Setup 6，会读取 `latest.txt` 指向的发布目录，生成中文安装程序。安装器按所有用户安装到 `C:\Program Files\RYNAT`，需要管理员权限，并注册机器级右键 helper、公共开始菜单和公共桌面快捷方式。
 
 FFI 冒烟测试：
 
