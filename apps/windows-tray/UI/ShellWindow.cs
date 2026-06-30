@@ -19,8 +19,8 @@ internal sealed class ShellWindow : Form
 
         Text = "RYNAT";
         StartPosition = FormStartPosition.CenterScreen;
-        MinimumSize = new Size(900, 640);
-        Size = new Size(980, 700);
+        MinimumSize = new Size(1060, 680);
+        Size = new Size(1080, 720);
         BackColor = Color.FromArgb(246, 247, 249);
         Icon = LoadAppIcon();
 
