@@ -12,6 +12,10 @@ internal sealed class ShellState
 
     public string Status { get; set; } = "请登录以打开 Windows Explorer。";
 
+    public string SmbSessionStatus => Connected
+        ? $"已用 {Username} 连接 Windows SMB 会话"
+        : "尚未连接 Windows SMB 会话";
+
     public bool LocalRedirectRunning { get; set; }
 
     public string LocalRedirectStatus { get; set; } = "本地短链服务尚未启动";

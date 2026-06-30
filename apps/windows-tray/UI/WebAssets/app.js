@@ -4,6 +4,7 @@ const state = {
   username: "",
   rememberPassword: true,
   status: "加载中",
+  smbSessionStatus: "尚未连接 Windows SMB 会话",
   localRedirectRunning: false,
   localRedirectStatus: "本地短链服务尚未启动",
   contextIpcRunning: false,
@@ -63,6 +64,7 @@ function render() {
   document.querySelector("#connected-summary").textContent = state.status || "服务器状态正常。";
   document.querySelector("#state-host").textContent = state.serverHost || "-";
   document.querySelector("#state-user").textContent = state.username || "-";
+  document.querySelector("#state-smb-session").textContent = state.smbSessionStatus || "-";
   document.querySelector("#state-redirect").textContent = state.localRedirectStatus || "-";
   document.querySelector("#state-context").textContent = state.contextIpcStatus || "-";
   document.querySelector("#status-text").textContent = state.status || "-";

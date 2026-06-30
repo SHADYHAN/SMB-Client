@@ -9,6 +9,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
 {
     private readonly ShellState _state = new();
     private readonly ExplorerService _explorerService = new();
+    private readonly WindowsSmbSessionService _smbSessionService = new();
     private readonly ShareLinkService _shareLinkService = new();
     private readonly LocalRedirectService _localRedirectService;
     private readonly ContextIpcService _contextIpcService;
@@ -42,11 +43,19 @@ internal sealed class TrayApplicationContext : ApplicationContext
 
     public async Task<ShellState> ConnectAsync(string serverHost, string username, string password, bool rememberPassword)
     {
-        _state.ServerHost = string.IsNullOrWhiteSpace(serverHost) ? "192.168.102.136" : serverHost.Trim().Trim('\\');
-        _state.Username = username.Trim();
+        var normalizedHost = string.IsNullOrWhiteSpace(serverHost)
+            ? "192.168.102.136"
+            : WindowsSmbSessionService.NormalizeHost(serverHost);
+        var normalizedUsername = username.Trim();
+
+        _state.Status = "正在用输入的账号连接 Windows SMB 会话。";
+        await _smbSessionService.ConnectAsync(normalizedHost, normalizedUsername, password);
+
+        _state.ServerHost = normalizedHost;
+        _state.Username = normalizedUsername;
         _state.RememberPassword = rememberPassword;
         _state.Connected = true;
-        _state.Status = "已记录登录状态，正在打开 Windows Explorer。";
+        _state.Status = "已登录 Windows SMB 会话，正在打开 Windows Explorer。";
 
         await OpenExplorerAsync();
         return _state;
@@ -54,7 +63,9 @@ internal sealed class TrayApplicationContext : ApplicationContext
 
     public ShellState Disconnect()
     {
+        _smbSessionService.DisconnectCurrent();
         _state.Connected = false;
+        _state.Username = string.Empty;
         _state.Status = "已退出登录。";
         return _state;
     }
@@ -98,6 +109,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
         {
             _notifyIcon.Visible = false;
             _notifyIcon.Dispose();
+            _smbSessionService.DisconnectCurrent();
             _localRedirectService.Dispose();
             _contextIpcService.Dispose();
             _window?.Dispose();
