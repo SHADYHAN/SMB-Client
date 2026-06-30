@@ -84,11 +84,11 @@ if (-not (Test-Path `$helperPath)) {
 foreach (`$entry in `$entries) {
     `$key = [Microsoft.Win32.Registry]::CurrentUser.CreateSubKey(`$entry.Key)
     `$key.SetValue("", "$menuText")
-    `$key.SetValue("Icon", "`"`$helperPath`",0")
+    `$key.SetValue("Icon", '"' + `$helperPath + '",0')
     `$key.Close()
 
     `$commandKey = [Microsoft.Win32.Registry]::CurrentUser.CreateSubKey(`$entry.Key + "\command")
-    `$commandKey.SetValue("", "`"`$helperPath`" copy-link `"%1`" --kind `$(`$entry.Kind)")
+    `$commandKey.SetValue("", '"' + `$helperPath + '" copy-link "%1" --kind ' + `$entry.Kind)
     `$commandKey.Close()
 }
 
@@ -139,6 +139,16 @@ Windows Registry Editor Version 5.00
     Set-Content -Encoding UTF8 -Path (Join-Path $PublishRoot "uninstall-context-menu.ps1") -Value $uninstallPs1
     Set-Content -Encoding ASCII -Path (Join-Path $PublishRoot "uninstall-context-menu.bat") -Value $uninstallBat
     Set-Content -Encoding Unicode -Path (Join-Path $PublishRoot "install-context-menu.reg") -Value $reg
+
+    foreach ($scriptName in @("install-context-menu.ps1", "uninstall-context-menu.ps1")) {
+        $scriptPath = Join-Path $PublishRoot $scriptName
+        $tokens = $null
+        $errors = $null
+        [System.Management.Automation.Language.Parser]::ParseFile($scriptPath, [ref]$tokens, [ref]$errors) | Out-Null
+        if ($errors.Count -gt 0) {
+            throw "Generated $scriptName has PowerShell syntax errors: $($errors[0].Message)"
+        }
+    }
 }
 
 Push-Location $repoRoot
