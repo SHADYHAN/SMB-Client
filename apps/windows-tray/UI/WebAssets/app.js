@@ -1,8 +1,20 @@
+const storedPasswordPlaceholder = "********";
+const newServerId = "__new_server__";
+
 const state = {
   connected: false,
   serverHost: "192.168.102.136",
+  serverName: "默认服务器",
+  defaultServerId: "",
+  servers: [],
   username: "",
   rememberPassword: true,
+  autoLogin: false,
+  hasStoredPassword: false,
+  general: {
+    startWithWindows: true,
+    copyLinkHotkey: "未设置"
+  },
   status: "加载中",
   smbSessionStatus: "尚未连接 Windows SMB 会话",
   localRedirectRunning: false,
@@ -12,6 +24,8 @@ const state = {
   lastActivation: "暂无"
 };
 
+let activePage = "server";
+let editingServerId = "";
 let nextId = 1;
 const pending = new Map();
 
@@ -25,6 +39,11 @@ function send(command, payload = {}) {
 
 window.chrome.webview.addEventListener("message", (event) => {
   const { id, payload } = event.data || {};
+  if (id === "state") {
+    applyState(payload);
+    return;
+  }
+
   if (!id || !pending.has(id)) {
     return;
   }
@@ -46,33 +65,101 @@ function applyState(nextState) {
   }
 
   Object.assign(state, source);
+  state.servers = Array.isArray(state.servers) ? state.servers : [];
+  state.general = state.general || {};
+  editingServerId = editingServerId || state.defaultServerId || state.servers[0]?.id || "";
   render();
 }
 
 function render() {
-  const loginView = document.querySelector("#login-view");
-  const dashboardView = document.querySelector("#dashboard-view");
-  const title = document.querySelector("#page-title");
-  loginView.classList.toggle("hidden", state.connected);
-  dashboardView.classList.toggle("hidden", !state.connected);
-  title.textContent = state.connected ? "服务器状态" : "连接服务器";
+  document.querySelector("#login-screen").classList.toggle("hidden", state.connected);
+  document.querySelector("#app-screen").classList.toggle("hidden", !state.connected);
 
-  document.querySelector("#server-host").value = state.serverHost || "192.168.102.136";
+  renderLogin();
+  renderShell();
+  renderServerPage();
+  renderGeneralPage();
+  renderServiceStatus();
+}
+
+function renderLogin() {
+  document.querySelector("#login-server-label").textContent = `默认服务器：${state.serverName || "未命名"} · ${state.serverHost || "-"}`;
   document.querySelector("#username").value = state.username || "";
-  document.querySelector("#remember-password").checked = Boolean(state.rememberPassword);
+  document.querySelector("#password").value = state.hasStoredPassword ? storedPasswordPlaceholder : "";
+  document.querySelector("#remember-password").checked = Boolean(state.rememberPassword || state.autoLogin);
+  document.querySelector("#auto-login").checked = Boolean(state.autoLogin);
+  document.querySelector("#login-hint").textContent = state.status || "";
+}
 
+function renderShell() {
+  document.querySelector("#page-title").textContent = activePage === "server" ? "服务器" : "通用";
+  document.querySelectorAll(".nav-item").forEach((item) => {
+    item.classList.toggle("active", item.dataset.page === activePage);
+  });
+  document.querySelector("#server-page").classList.toggle("hidden", activePage !== "server");
+  document.querySelector("#general-page").classList.toggle("hidden", activePage !== "general");
   document.querySelector("#connected-summary").textContent = state.status || "服务器状态正常。";
   document.querySelector("#state-host").textContent = state.serverHost || "-";
   document.querySelector("#state-user").textContent = state.username || "-";
   document.querySelector("#state-smb-session").textContent = state.smbSessionStatus || "-";
   document.querySelector("#state-redirect").textContent = state.localRedirectStatus || "-";
   document.querySelector("#state-context").textContent = state.contextIpcStatus || "-";
-  document.querySelector("#status-text").textContent = state.status || "-";
   document.querySelector("#last-activation").textContent = state.lastActivation || "暂无";
+}
 
+function renderServerPage() {
+  const list = document.querySelector("#server-list");
+  list.innerHTML = "";
+  state.servers.forEach((server) => {
+    const item = document.createElement("button");
+    item.type = "button";
+    item.className = "server-item";
+    item.classList.toggle("active", server.id === editingServerId);
+    item.innerHTML = `
+      <span>
+        <strong>${escapeHtml(server.name || "共享网盘")}</strong>
+        <small>${escapeHtml(server.host || "-")}</small>
+      </span>
+      ${server.id === state.defaultServerId ? '<em>默认</em>' : ""}
+    `;
+    item.addEventListener("click", () => {
+      editingServerId = server.id;
+      renderServerPage();
+    });
+    list.appendChild(item);
+  });
+
+  const selected = selectedServer();
+  document.querySelector("#server-form-title").textContent = selected?.id ? "编辑服务器" : "新增服务器";
+  document.querySelector("#server-id").value = selected?.id || "";
+  document.querySelector("#server-name").value = selected?.name || "";
+  document.querySelector("#server-host").value = selected?.host || "";
+  document.querySelector("#server-set-default").checked = !selected?.id || selected?.id === state.defaultServerId;
+  document.querySelector("#delete-server").disabled = !selected?.id || state.servers.length <= 1;
+}
+
+function renderGeneralPage() {
+  document.querySelector("#start-with-windows").checked = Boolean(state.general.startWithWindows);
+  document.querySelector("#copy-link-hotkey").value = state.general.copyLinkHotkey || "";
+  document.querySelector("#status-text").textContent = state.status || "-";
+  document.querySelector("#general-last-activation").textContent = state.lastActivation || "暂无";
+}
+
+function renderServiceStatus() {
   const servicesOk = Boolean(state.localRedirectRunning && state.contextIpcRunning);
   document.querySelector("#service-dot").classList.toggle("ok", servicesOk);
   document.querySelector("#service-label").textContent = servicesOk ? "监听服务运行中" : "监听服务需检查";
+}
+
+function selectedServer() {
+  if (editingServerId === newServerId) {
+    return null;
+  }
+
+  return state.servers.find((server) => server.id === editingServerId)
+    || state.servers.find((server) => server.id === state.defaultServerId)
+    || state.servers[0]
+    || null;
 }
 
 function showError(error) {
@@ -80,17 +167,101 @@ function showError(error) {
   render();
 }
 
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+document.querySelectorAll(".nav-item").forEach((item) => {
+  item.addEventListener("click", () => {
+    activePage = item.dataset.page || "server";
+    render();
+  });
+});
+
+document.querySelector("#auto-login").addEventListener("change", (event) => {
+  if (event.target.checked) {
+    document.querySelector("#remember-password").checked = true;
+  }
+});
+
+document.querySelector("#remember-password").addEventListener("change", (event) => {
+  if (!event.target.checked) {
+    document.querySelector("#auto-login").checked = false;
+  }
+});
+
 document.querySelector("#login-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   try {
+    const passwordField = document.querySelector("#password");
+    const password = passwordField.value === storedPasswordPlaceholder ? "" : passwordField.value;
     const result = await send("connect", {
-      serverHost: document.querySelector("#server-host").value,
       username: document.querySelector("#username").value,
-      password: document.querySelector("#password").value,
-      rememberPassword: document.querySelector("#remember-password").checked
+      password,
+      rememberPassword: document.querySelector("#remember-password").checked,
+      autoLogin: document.querySelector("#auto-login").checked
     });
-    document.querySelector("#password").value = "";
+    passwordField.value = "";
     applyState(result);
+  } catch (error) {
+    showError(error);
+  }
+});
+
+document.querySelector("#add-server").addEventListener("click", () => {
+  editingServerId = newServerId;
+  renderServerPage();
+  document.querySelector("#server-name").focus();
+});
+
+document.querySelector("#server-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  try {
+    const result = await send("saveServer", {
+      setDefault: document.querySelector("#server-set-default").checked,
+      server: {
+        id: document.querySelector("#server-id").value,
+        name: document.querySelector("#server-name").value,
+        host: document.querySelector("#server-host").value
+      }
+    });
+    applyState(result);
+    editingServerId = result.savedServerId || state.defaultServerId || state.servers[0]?.id || "";
+    render();
+  } catch (error) {
+    showError(error);
+  }
+});
+
+document.querySelector("#delete-server").addEventListener("click", async () => {
+  const serverId = document.querySelector("#server-id").value;
+  if (!serverId) {
+    return;
+  }
+
+  try {
+    applyState(await send("deleteServer", { serverId }));
+    editingServerId = state.defaultServerId || state.servers[0]?.id || "";
+    render();
+  } catch (error) {
+    showError(error);
+  }
+});
+
+document.querySelector("#general-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  try {
+    applyState(await send("saveGeneralSettings", {
+      general: {
+        startWithWindows: document.querySelector("#start-with-windows").checked,
+        copyLinkHotkey: document.querySelector("#copy-link-hotkey").value
+      }
+    }));
   } catch (error) {
     showError(error);
   }

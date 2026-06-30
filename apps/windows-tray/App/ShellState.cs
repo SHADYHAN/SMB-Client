@@ -4,9 +4,21 @@ internal sealed class ShellState
 {
     public string ServerHost { get; set; } = "192.168.102.136";
 
+    public string ServerName { get; set; } = "默认服务器";
+
+    public string? DefaultServerId { get; set; }
+
+    public List<ServerProfile> Servers { get; set; } = new();
+
+    public GeneralSettings General { get; set; } = new();
+
     public string Username { get; set; } = string.Empty;
 
     public bool RememberPassword { get; set; } = true;
+
+    public bool AutoLogin { get; set; }
+
+    public bool HasStoredPassword { get; set; }
 
     public bool Connected { get; set; }
 

@@ -71,7 +71,7 @@ function Write-ContextMenuScripts([string]$PublishRoot) {
 
     $installPs1 = @"
 `$ErrorActionPreference = "Stop"
-`$helperPath = "$helperPath"
+`$helperPath = Join-Path `$PSScriptRoot "Rynat.WindowsContextHelper.exe"
 if (-not (Test-Path `$helperPath)) {
     throw "Cannot find RYNAT context helper: `$helperPath"
 }

@@ -55,11 +55,15 @@ internal sealed class ShellWindow : Form
             {
                 "getState" => _context.GetState(),
                 "connect" => await _context.ConnectAsync(
-                    message.ServerHost ?? string.Empty,
                     message.Username ?? string.Empty,
                     message.Password ?? string.Empty,
-                    message.RememberPassword),
+                    message.RememberPassword,
+                    message.AutoLogin),
                 "disconnect" => _context.Disconnect(),
+                "saveServer" => _context.SaveServer(message.Server ?? throw new InvalidOperationException("缺少服务器信息。"), message.SetDefault),
+                "deleteServer" => _context.DeleteServer(message.ServerId ?? string.Empty),
+                "setDefaultServer" => _context.SetDefaultServer(message.ServerId ?? string.Empty),
+                "saveGeneralSettings" => _context.SaveGeneralSettings(message.General ?? new GeneralSettings()),
                 "openExplorer" => await RunAndReturnStateAsync(_context.OpenExplorerAsync),
                 "copyTestLink" => new { link = await _context.CopyTestLinkAsync(), state = _context.GetState() },
                 "copyMaterialTestLink" => new { link = await _context.CopyMaterialTestLinkAsync(), state = _context.GetState() },
@@ -99,6 +103,17 @@ internal sealed class ShellWindow : Form
         _webView.CoreWebView2.PostWebMessageAsJson(json);
     }
 
+    public void PostStateUpdate()
+    {
+        if (InvokeRequired)
+        {
+            BeginInvoke((MethodInvoker)PostStateUpdate);
+            return;
+        }
+
+        PostMessage("state", new { state = _context.GetState() });
+    }
+
     private void OnFormClosing(object? sender, FormClosingEventArgs e)
     {
         if (e.CloseReason == CloseReason.UserClosing)
@@ -126,12 +141,20 @@ internal sealed class ShellWindow : Form
 
         public string Command { get; set; } = string.Empty;
 
-        public string? ServerHost { get; set; }
-
         public string? Username { get; set; }
 
         public string? Password { get; set; }
 
         public bool RememberPassword { get; set; } = true;
+
+        public bool AutoLogin { get; set; }
+
+        public ServerProfile? Server { get; set; }
+
+        public string? ServerId { get; set; }
+
+        public bool SetDefault { get; set; }
+
+        public GeneralSettings? General { get; set; }
     }
 }
