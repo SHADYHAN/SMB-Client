@@ -30,5 +30,7 @@ internal sealed class GeneralSettings
 {
     public bool StartWithWindows { get; set; } = true;
 
-    public string CopyLinkHotkey { get; set; } = "未设置";
+    public bool CopyLinkHotkeyEnabled { get; set; } = true;
+
+    public string CopyLinkHotkey { get; set; } = "Ctrl + Shift + L";
 }

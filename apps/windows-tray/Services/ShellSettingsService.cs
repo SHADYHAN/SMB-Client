@@ -145,5 +145,7 @@ internal sealed class ShellSettingsService
         {
             settings.DefaultServerId = settings.Servers[0].Id;
         }
+
+        settings.General.CopyLinkHotkey = "Ctrl + Shift + L";
     }
 }

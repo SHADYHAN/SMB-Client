@@ -53,6 +53,24 @@ internal sealed class ExplorerService
         OpenDirectory(normalizedPath);
     }
 
+    public bool TryGetForegroundSelection(out ExplorerSelection selection)
+    {
+        if (Thread.CurrentThread.GetApartmentState() == ApartmentState.STA)
+        {
+            return TryGetForegroundSelectionCore(out selection);
+        }
+
+        var found = false;
+        var result = new ExplorerSelection();
+        var thread = new Thread(() => found = TryGetForegroundSelectionCore(out result));
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+
+        selection = result;
+        return found;
+    }
+
     private static void StartExplorer(string arguments)
     {
         Process.Start(new ProcessStartInfo
@@ -406,6 +424,122 @@ internal sealed class ExplorerService
         return false;
     }
 
+    private static bool TryGetForegroundSelectionCore(out ExplorerSelection selection)
+    {
+        selection = new ExplorerSelection();
+        var foregroundWindow = GetForegroundWindow();
+        if (foregroundWindow == IntPtr.Zero)
+        {
+            return false;
+        }
+
+        object? shell = null;
+        object? windows = null;
+        try
+        {
+            var shellType = Type.GetTypeFromProgID("Shell.Application");
+            if (shellType is null)
+            {
+                return false;
+            }
+
+            shell = Activator.CreateInstance(shellType);
+            if (shell is null)
+            {
+                return false;
+            }
+
+            windows = shellType.InvokeMember(
+                "Windows",
+                BindingFlags.InvokeMethod,
+                binder: null,
+                target: shell,
+                args: null,
+                culture: CultureInfo.InvariantCulture);
+
+            foreach (var window in EnumerateComCollection(windows))
+            {
+                if (!IsExplorerWindow(window))
+                {
+                    ReleaseComObject(window);
+                    continue;
+                }
+
+                var matchedWindowHandle = GetComIntPtr(window, "HWND");
+                if (matchedWindowHandle != foregroundWindow)
+                {
+                    ReleaseComObject(window);
+                    continue;
+                }
+
+                var selectedPath = GetFirstSelectedPath(window);
+                if (string.IsNullOrWhiteSpace(selectedPath))
+                {
+                    ReleaseComObject(window);
+                    return false;
+                }
+
+                selection = new ExplorerSelection
+                {
+                    Path = NormalizePath(selectedPath),
+                    Kind = Directory.Exists(selectedPath) ? "dir" : "file"
+                };
+                ReleaseComObject(window);
+                return !string.IsNullOrWhiteSpace(selection.Path);
+            }
+        }
+        catch
+        {
+            return false;
+        }
+        finally
+        {
+            ReleaseComObject(windows);
+            ReleaseComObject(shell);
+        }
+
+        return false;
+    }
+
+    private static string GetFirstSelectedPath(object window)
+    {
+        object? document = null;
+        object? selectedItems = null;
+        object? selectedItem = null;
+        try
+        {
+            document = GetComProperty(window, "Document");
+            if (document is null)
+            {
+                return string.Empty;
+            }
+
+            selectedItems = InvokeComMethod(document, "SelectedItems");
+            if (selectedItems is null)
+            {
+                return string.Empty;
+            }
+
+            if (GetComInt32(selectedItems, "Count") <= 0)
+            {
+                return string.Empty;
+            }
+
+            selectedItem = InvokeComMethod(selectedItems, "Item", 0);
+            return selectedItem is null ? string.Empty : GetComString(selectedItem, "Path");
+        }
+        catch
+        {
+            return string.Empty;
+        }
+        finally
+        {
+            ReleaseComObject(selectedItem);
+            ReleaseComObject(selectedItems);
+            ReleaseComObject(document);
+        }
+    }
+
     private static IEnumerable<object> EnumerateComCollection(object? collection)
     {
         if (collection is null)
@@ -686,4 +820,11 @@ internal sealed class ExplorerService
 
     [DllImport("user32.dll")]
     private static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool fAttach);
+}
+
+internal sealed class ExplorerSelection
+{
+    public string Path { get; init; } = string.Empty;
+
+    public string Kind { get; init; } = "file";
 }

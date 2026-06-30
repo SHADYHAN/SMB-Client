@@ -12,7 +12,8 @@ const state = {
   hasStoredPassword: false,
   general: {
     startWithWindows: true,
-    copyLinkHotkey: "未设置"
+    copyLinkHotkeyEnabled: true,
+    copyLinkHotkey: "Ctrl + Shift + L"
   },
   status: "加载中",
   smbSessionStatus: "尚未连接共享网盘会话",
@@ -140,7 +141,8 @@ function renderServerPage() {
 
 function renderGeneralPage() {
   document.querySelector("#start-with-windows").checked = Boolean(state.general.startWithWindows);
-  document.querySelector("#copy-link-hotkey").value = state.general.copyLinkHotkey || "";
+  document.querySelector("#copy-link-hotkey-enabled").checked = state.general.copyLinkHotkeyEnabled !== false;
+  document.querySelector("#copy-link-hotkey").textContent = state.general.copyLinkHotkey || "Ctrl + Shift + L";
 }
 
 function renderServiceStatus() {
@@ -286,7 +288,8 @@ document.querySelector("#general-form").addEventListener("submit", async (event)
     applyState(await send("saveGeneralSettings", {
       general: {
         startWithWindows: document.querySelector("#start-with-windows").checked,
-        copyLinkHotkey: document.querySelector("#copy-link-hotkey").value
+        copyLinkHotkeyEnabled: document.querySelector("#copy-link-hotkey-enabled").checked,
+        copyLinkHotkey: "Ctrl + Shift + L"
       }
     }));
   } catch (error) {

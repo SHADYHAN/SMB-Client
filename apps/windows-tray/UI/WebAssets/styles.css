@@ -150,6 +150,32 @@ input:focus {
   height: 16px;
 }
 
+.setting-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 42px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-md);
+  padding: 0 12px;
+  background: var(--surface-soft);
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.setting-line strong {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.subtle-note {
+  color: var(--faint);
+  font-size: 12px;
+}
+
 .hint-text {
   min-height: 18px;
   margin: 14px 0 0;

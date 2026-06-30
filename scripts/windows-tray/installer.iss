@@ -36,6 +36,12 @@ Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs 
 Name: "{commonprograms}\RYANT共享网盘"; Filename: "{app}\Rynat.WindowsTray.exe"
 Name: "{commondesktop}\RYANT共享网盘"; Filename: "{app}\Rynat.WindowsTray.exe"; Tasks: desktopicon
 
+[InstallDelete]
+Type: files; Name: "{commonprograms}\RYNAT.lnk"
+Type: files; Name: "{commonprograms}\打开共享网盘.lnk"
+Type: files; Name: "{commondesktop}\RYNAT.lnk"
+Type: files; Name: "{commondesktop}\打开共享网盘.lnk"
+
 [Registry]
 Root: HKCU; Subkey: "Software\Classes\*\shell\RynatCopyLink"; Flags: deletekey noerror
 Root: HKCU; Subkey: "Software\Classes\Directory\shell\RynatCopyLink"; Flags: deletekey noerror

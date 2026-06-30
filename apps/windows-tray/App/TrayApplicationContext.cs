@@ -15,6 +15,8 @@ internal sealed class TrayApplicationContext : ApplicationContext
     private readonly ExplorerService _explorerService = new();
     private readonly WindowsSmbSessionService _smbSessionService = new();
     private readonly ShareLinkService _shareLinkService = new();
+    private readonly StartupRegistrationService _startupRegistrationService = new();
+    private readonly GlobalHotkeyService _globalHotkeyService = new();
     private readonly LocalRedirectService _localRedirectService;
     private readonly ContextIpcService _contextIpcService;
     private readonly NotifyIcon _notifyIcon;
@@ -24,10 +26,13 @@ internal sealed class TrayApplicationContext : ApplicationContext
     private ShellSettings _settings;
     private ShellWindow? _window;
     private Task? _autoLoginTask;
+    private readonly bool _autoLoginOpensExplorer;
+    private bool _hotkeyRegistrationFailed;
 
-    public TrayApplicationContext(string[] args, string activationPipeName)
+    public TrayApplicationContext(string[] args, string activationPipeName, bool createdByStartup)
     {
         _activationPipeName = activationPipeName;
+        _autoLoginOpensExplorer = !createdByStartup;
         _settings = _settingsService.Load();
         ApplySettingsToState();
 
@@ -42,13 +47,14 @@ internal sealed class TrayApplicationContext : ApplicationContext
             ContextMenuStrip = BuildTrayMenu()
         };
         _notifyIcon.DoubleClick += (_, _) => ShowWindow();
+        _globalHotkeyService.Pressed += (_, _) => CopyForegroundExplorerLink();
 
         _uiDispatcher.CreateControl();
         _ = _uiDispatcher.Handle;
         StartServices();
         StartActivationPipe();
-        _autoLoginTask = TryAutoLoginAsync();
-        HandleActivationArgs(args, showWindowWhenIdle: true);
+        _autoLoginTask = TryAutoLoginAsync(openExplorerAfterConnect: _autoLoginOpensExplorer);
+        HandleActivationArgs(args, showWindowWhenIdle: !createdByStartup);
 
         if (args.Length > 0)
         {
@@ -62,7 +68,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
         return _state;
     }
 
-    public async Task<ShellState> ConnectAsync(string username, string password, bool rememberPassword, bool autoLogin)
+    public async Task<ShellState> ConnectAsync(string username, string password, bool rememberPassword, bool autoLogin, bool openExplorerAfterConnect = true)
     {
         var server = GetDefaultServer();
         var normalizedHost = WindowsSmbSessionService.NormalizeHost(server.Host);
@@ -88,9 +94,15 @@ internal sealed class TrayApplicationContext : ApplicationContext
         _state.HasStoredPassword = !string.IsNullOrWhiteSpace(server.ProtectedPassword);
         _state.Connected = true;
         SaveSettings();
-        _state.Status = "已登录共享网盘，正在打开资源管理器。";
+        _state.Status = openExplorerAfterConnect
+            ? "已登录共享网盘，正在打开资源管理器。"
+            : "已登录共享网盘。";
 
-        await OpenExplorerAsync();
+        if (openExplorerAfterConnect)
+        {
+            await OpenExplorerAsync();
+        }
+
         NotifyStateChanged();
         return _state;
     }
@@ -183,12 +195,12 @@ internal sealed class TrayApplicationContext : ApplicationContext
 
     public ShellState SaveGeneralSettings(GeneralSettings general)
     {
+        _startupRegistrationService.SetEnabled(general.StartWithWindows);
         _settings.General.StartWithWindows = general.StartWithWindows;
-        _settings.General.CopyLinkHotkey = string.IsNullOrWhiteSpace(general.CopyLinkHotkey)
-            ? "未设置"
-            : general.CopyLinkHotkey.Trim();
+        _settings.General.CopyLinkHotkeyEnabled = general.CopyLinkHotkeyEnabled;
+        _settings.General.CopyLinkHotkey = "Ctrl + Shift + L";
         SaveSettings();
-        _state.Status = "通用设置已保存。";
+        ApplyHotkeySetting(updateStatus: true);
         NotifyStateChanged();
         return GetState();
     }
@@ -220,6 +232,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
             _activationPipeCts?.Cancel();
             _activationPipeCts?.Dispose();
             _uiDispatcher.Dispose();
+            _globalHotkeyService.Dispose();
             _notifyIcon.Visible = false;
             _notifyIcon.Dispose();
             _smbSessionService.DisconnectCurrent();
@@ -235,6 +248,45 @@ internal sealed class TrayApplicationContext : ApplicationContext
     {
         _localRedirectService.Start();
         _contextIpcService.Start();
+        ApplyHotkeySetting(updateStatus: false);
+    }
+
+    private void ApplyHotkeySetting(bool updateStatus)
+    {
+        if (!_settings.General.CopyLinkHotkeyEnabled)
+        {
+            _globalHotkeyService.Unregister();
+            _hotkeyRegistrationFailed = false;
+            _state.General.CopyLinkHotkey = "Ctrl + Shift + L";
+            _state.General.CopyLinkHotkeyEnabled = false;
+            if (updateStatus)
+            {
+                _state.Status = "通用设置已保存，快捷键已禁用。";
+            }
+
+            return;
+        }
+
+        if (_globalHotkeyService.Register())
+        {
+            _hotkeyRegistrationFailed = false;
+            _state.General.CopyLinkHotkey = "Ctrl + Shift + L";
+            _state.General.CopyLinkHotkeyEnabled = true;
+            if (updateStatus)
+            {
+                _state.Status = "通用设置已保存。";
+            }
+        }
+        else
+        {
+            _hotkeyRegistrationFailed = true;
+            _state.General.CopyLinkHotkey = "Ctrl + Shift + L 被占用";
+            _state.General.CopyLinkHotkeyEnabled = true;
+            if (updateStatus)
+            {
+                _state.Status = "快捷键 Ctrl + Shift + L 注册失败，可能已被其他软件占用。";
+            }
+        }
     }
 
     private void StartActivationPipe()
@@ -280,6 +332,11 @@ internal sealed class TrayApplicationContext : ApplicationContext
 
     private void HandleActivationArgs(string[] args, bool showWindowWhenIdle)
     {
+        if (args.Any(arg => string.Equals(arg, "--startup", StringComparison.OrdinalIgnoreCase)))
+        {
+            return;
+        }
+
         if (args.Any(arg => string.Equals(arg, "--open-share", StringComparison.OrdinalIgnoreCase)))
         {
             _ = OpenShareOrLoginAsync();
@@ -300,7 +357,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
             await _autoLoginTask;
         }
 
-        if (waitingForAutoLogin && _state.Connected)
+        if (waitingForAutoLogin && _state.Connected && _autoLoginOpensExplorer)
         {
             return;
         }
@@ -318,11 +375,68 @@ internal sealed class TrayApplicationContext : ApplicationContext
     {
         var menu = new ContextMenuStrip();
         menu.Items.Add("打开 RYANT共享网盘", null, (_, _) => ShowWindow());
-        menu.Items.Add("打开共享网盘", null, async (_, _) => await OpenExplorerAsync());
+        menu.Items.Add("打开共享网盘", null, async (_, _) => await OpenShareOrLoginAsync());
         menu.Items.Add("退出登录", null, (_, _) => Disconnect());
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("退出", null, (_, _) => ExitThread());
         return menu;
+    }
+
+    private void CopyForegroundExplorerLink()
+    {
+        try
+        {
+            if (!_state.Connected)
+            {
+                ShowBalloonTip("请先登录后再复制分享链接。", ToolTipIcon.Warning);
+                return;
+            }
+
+            if (!_explorerService.TryGetForegroundSelection(out var selection))
+            {
+                ShowBalloonTip("请在资源管理器中选中文件或文件夹。", ToolTipIcon.Warning);
+                return;
+            }
+
+            if (!IsPathUnderCurrentServer(selection.Path))
+            {
+                ShowBalloonTip("只能复制当前登录服务器下的文件链接。", ToolTipIcon.Warning);
+                return;
+            }
+
+            var link = _shareLinkService.CreateShareLink(selection.Path, selection.Kind);
+            ClipboardService.SetTextAsync(link).GetAwaiter().GetResult();
+            _state.LastActivation = $"快捷键复制链接: {selection.Path}";
+            _state.Status = "分享链接已复制。";
+            NotifyStateChanged();
+        }
+        catch (Exception ex)
+        {
+            _state.Status = ex.Message;
+            NotifyStateChanged();
+            ShowBalloonTip(ex.Message, ToolTipIcon.Warning);
+        }
+    }
+
+    private bool IsPathUnderCurrentServer(string path)
+    {
+        if (string.IsNullOrWhiteSpace(_state.ServerHost))
+        {
+            return false;
+        }
+
+        var normalizedPath = path.Trim().Replace('/', '\\');
+        var serverRoot = $@"\\{_state.ServerHost.Trim().Trim('\\')}";
+        return normalizedPath.Equals(serverRoot, StringComparison.OrdinalIgnoreCase)
+            || normalizedPath.StartsWith(serverRoot + @"\", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void ShowBalloonTip(string message, ToolTipIcon icon)
+    {
+        _notifyIcon.BalloonTipTitle = "RYANT共享网盘";
+        _notifyIcon.BalloonTipText = message;
+        _notifyIcon.BalloonTipIcon = icon;
+        _notifyIcon.ShowBalloonTip(2600);
     }
 
     private static Icon LoadAppIcon()
@@ -331,7 +445,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
         return File.Exists(iconPath) ? new Icon(iconPath) : SystemIcons.Application;
     }
 
-    private async Task TryAutoLoginAsync()
+    private async Task TryAutoLoginAsync(bool openExplorerAfterConnect)
     {
         var server = GetDefaultServer();
         if (!server.AutoLogin
@@ -346,7 +460,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
         {
             _state.Status = $"正在自动登录 {server.Name}。";
             NotifyStateChanged();
-            await ConnectAsync(server.Username, string.Empty, rememberPassword: true, autoLogin: true);
+            await ConnectAsync(server.Username, string.Empty, rememberPassword: true, autoLogin: true, openExplorerAfterConnect);
         }
         catch (Exception ex)
         {
@@ -393,8 +507,11 @@ internal sealed class TrayApplicationContext : ApplicationContext
             .ToList();
         _state.General = new GeneralSettings
         {
-            StartWithWindows = _settings.General.StartWithWindows,
-            CopyLinkHotkey = _settings.General.CopyLinkHotkey
+            StartWithWindows = _startupRegistrationService.IsEnabled(),
+            CopyLinkHotkeyEnabled = _settings.General.CopyLinkHotkeyEnabled,
+            CopyLinkHotkey = _hotkeyRegistrationFailed
+                ? "Ctrl + Shift + L 被占用"
+                : "Ctrl + Shift + L"
         };
 
         if (!_state.Connected)

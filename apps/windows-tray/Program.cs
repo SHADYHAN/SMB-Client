@@ -24,7 +24,12 @@ internal static class Program
 
         Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
         ApplicationConfiguration.Initialize();
-        Application.Run(new TrayApplicationContext(args, ActivationPipeName));
+        Application.Run(new TrayApplicationContext(args, ActivationPipeName, createdByStartup: IsStartupActivation(args)));
+    }
+
+    private static bool IsStartupActivation(IEnumerable<string> args)
+    {
+        return args.Any(arg => string.Equals(arg, "--startup", StringComparison.OrdinalIgnoreCase));
     }
 
     private static void TryForwardActivation(string[] args)

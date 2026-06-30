@@ -155,10 +155,15 @@
                 <input id="start-with-windows" type="checkbox" />
                 <span>开机自动启动 RYANT共享网盘</span>
               </label>
-              <label class="field">
-                <span>复制分享链接快捷键</span>
-                <input id="copy-link-hotkey" autocomplete="off" placeholder="未设置" />
+              <label class="check-row">
+                <input id="copy-link-hotkey-enabled" type="checkbox" />
+                <span>启用复制分享链接快捷键</span>
               </label>
+              <div class="setting-line">
+                <span>当前快捷键</span>
+                <strong id="copy-link-hotkey">Ctrl + Shift + L</strong>
+              </div>
+              <p class="subtle-note">自定义快捷键即将支持</p>
               <button class="primary-button" type="submit">保存通用设置</button>
             </form>
           </section>
