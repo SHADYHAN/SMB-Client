@@ -118,6 +118,7 @@ cargo run -p rynat-windows-context-helper --locked --offline -- copy-link "\\\\n
 macOS 构建脚本先 `cargo build -p rynat-core --release`，再把 `librynat_core.dylib` 打包进 `.app`。Windows 工程 `csproj` 内置 cargo 构建目标，编译 Rust Core 并复制 `rynat_core.dll`。
 
 Windows Tray 主线 release 脚本会把发布产物复制到 `build\windows-tray-release\<yyyyMMdd-HHmmss>\`，并写入 `build\windows-tray-release\latest.txt`。
+默认发布为不指定 RID 的 framework-dependent 产物，依赖目标机器已安装 .NET 10 Windows Desktop Runtime / SDK；如需固定架构或自包含产物，可运行 `scripts\windows-tray\build-release.bat -RuntimeIdentifier win-x64` 或 `scripts\windows-tray\build-release.bat -RuntimeIdentifier win-x64 -SelfContained`。
 
 FFI 冒烟测试：
 
